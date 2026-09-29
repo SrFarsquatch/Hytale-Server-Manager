@@ -8,7 +8,7 @@ FROM eclipse-temurin:25-jre-noble
 RUN apt-get update \
     && apt-get install -y --no-install-recommends bash ca-certificates tini procps unzip gosu \
     && rm -rf /var/lib/apt/lists/*
-RUN useradd -m -u 1000 -s /bin/bash hsm \
+RUN useradd --create-home --shell /bin/bash hsm \
     && mkdir -p /data \
     && chown -R hsm:hsm /data
 COPY --from=builder /out/hytale-server-manager /usr/local/bin/hytale-server-manager
