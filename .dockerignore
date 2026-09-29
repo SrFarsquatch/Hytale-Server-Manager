@@ -1,0 +1,6 @@
+.git
+.gitignore
+data
+*.zip
+*.tar.gz
+README*.md

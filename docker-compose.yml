@@ -1,0 +1,20 @@
+name: hytale-server-manager
+services:
+  manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hytale-server-manager
+    restart: unless-stopped
+    ports:
+      - "8090:8080/tcp"
+      - "${HYTALE_PORT_START:-5520}-${HYTALE_PORT_END:-5539}:${HYTALE_PORT_START:-5520}-${HYTALE_PORT_END:-5539}/udp"
+    volumes:
+      - ./data:/data
+    environment:
+      HSM_DATA_DIR: /data
+      HSM_LISTEN: ":8080"
+      HSM_GAME_PORT_START: "${HYTALE_PORT_START:-5520}"
+      HSM_GAME_PORT_END: "${HYTALE_PORT_END:-5539}"
+      TZ: America/Vancouver
+    stop_grace_period: 100s

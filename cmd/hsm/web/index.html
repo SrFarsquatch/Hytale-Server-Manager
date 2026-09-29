@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#15171b">
+  <title>Hytale Server Manager</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div id="auth" class="auth-shell hidden">
+    <form id="auth-form" class="auth-card">
+      <div class="auth-product">Hytale Server Manager</div>
+      <h1 id="auth-title">Sign in</h1>
+      <p id="auth-copy" class="muted">Manage Hytale servers on this host.</p>
+      <label>Username<input id="auth-user" autocomplete="username" value="admin" required></label>
+      <label>Password<input id="auth-pass" type="password" autocomplete="current-password" minlength="8" required></label>
+      <button class="btn primary full" type="submit" id="auth-submit">Continue</button>
+      <div id="auth-error" class="error-text"></div>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <strong>Hytale Server Manager</strong>
+        <small>v0.5.0</small>
+      </div>
+
+      <div class="server-picker-head"><span>Servers</span><button id="add-server-side" title="Add server">+</button></div>
+      <div id="server-list" class="server-list"></div>
+
+      <nav id="nav">
+        <button data-view="servers" class="active">Servers</button>
+        <div class="nav-divider"></div>
+        <button data-view="dashboard">Overview</button>
+        <button data-view="console">Console</button>
+        <button data-view="config">Files</button>
+        <button data-view="mods">Mods</button>
+        <button data-view="backups">Backups</button>
+        <button data-view="setup">Install</button>
+        <button data-view="settings">Settings</button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="fleet-state"><span id="fleet-online">0</span> / <span id="fleet-total">0</span> online</div>
+        <button id="logout" class="quiet-btn">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="view-title">Servers</h1>
+          <div id="top-context" class="top-context"></div>
+          <div class="section-label hidden" id="view-kicker">SERVER</div>
+        </div>
+        <div class="top-actions">
+          <div class="status-pill" id="top-status"><span class="dot"></span><span>Offline</span></div>
+          <button id="top-start" class="btn primary">Start</button>
+        </div>
+      </header>
+
+      <section id="view-servers" class="view active">
+        <div class="page-head">
+          <div><h2>Servers</h2><p class="help">Independent Hytale instances running on this host.</p></div>
+          <button id="add-server-main" class="btn primary">Add server</button>
+        </div>
+        <div id="fleet-summary" class="fleet-summary"></div>
+        <div class="table-shell">
+          <div class="server-table-head"><span>Server</span><span>Status</span><span>Address</span><span>Uptime</span><span>Files</span><span></span></div>
+          <div id="fleet-grid" class="fleet-grid"></div>
+        </div>
+      </section>
+
+      <section id="view-dashboard" class="view">
+        <div id="memory-warning" class="warning-bar hidden"><strong>Memory limit below 4 GB.</strong><span>Increase the Docker/CasaOS memory allocation before hosting players.</span></div>
+
+        <div class="server-header">
+          <div class="server-title-block">
+            <div class="status-line"><span class="dot large" id="hero-dot"></span><span id="hero-state">OFFLINE</span></div>
+            <h2 id="server-name">Hytale Server</h2>
+            <div class="connect-row"><code id="connect-address">server.local:5520</code><button class="quiet-btn" id="copy-address">Copy</button></div>
+          </div>
+          <div class="server-controls">
+            <button class="btn success" id="start-btn">Start</button>
+            <button class="btn" id="restart-btn">Restart</button>
+            <button class="btn danger" id="stop-btn">Stop</button>
+          </div>
+        </div>
+
+        <div class="stat-strip">
+          <div><span>Uptime</span><strong id="metric-uptime">—</strong></div>
+          <div><span>Memory</span><strong id="metric-memory">—</strong></div>
+          <div><span>Limit</span><strong id="metric-memory-limit">—</strong></div>
+          <div><span>UDP port</span><strong id="metric-port">—</strong></div>
+          <div><span>Files</span><strong id="metric-installed">—</strong></div>
+        </div>
+
+        <div class="dashboard-grid">
+          <section class="panel">
+            <div class="panel-head"><h3>Actions</h3></div>
+            <div class="operation-list">
+              <button data-action="auth"><span><b>Authenticate</b><small>Start Hytale device login</small></span><span>Run</span></button>
+              <button data-action="backup"><span><b>Native backup</b><small>Create a Hytale backup</small></span><span>Run</span></button>
+              <button data-view-link="console"><span><b>Console</b><small>Open live server output</small></span><span>Open</span></button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head"><h3>Update</h3></div>
+            <div class="button-grid">
+              <button class="btn" data-update="status">Status</button>
+              <button class="btn" data-update="check">Check</button>
+              <button class="btn" data-update="download">Download</button>
+              <button class="btn danger-ghost" data-update="apply">Apply</button>
+            </div>
+            <p class="help">Uses the selected server's Hytale updater.</p>
+          </section>
+
+          <section class="panel log-panel">
+            <div class="panel-head"><h3>Recent output</h3><button class="quiet-btn" data-view-link="console">Open console</button></div>
+            <div id="mini-log" class="mini-log"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="view-console" class="view">
+        <div class="panel console-card">
+          <div class="panel-head"><h3>Console</h3><div class="console-tools"><label><input type="checkbox" id="auto-scroll" checked> Auto-scroll</label><button class="quiet-btn" id="clear-console">Clear</button></div></div>
+          <div id="console-output" class="console-output"></div>
+          <form id="console-form" class="console-input"><span>&gt;</span><input id="console-command" autocomplete="off" placeholder="Enter a server command"><button class="btn primary">Send</button></form>
+        </div>
+      </section>
+
+      <section id="view-config" class="view">
+        <div class="panel">
+          <div class="panel-head file-head"><div><h3>Server files</h3><p class="help">Stop the server before editing files that Hytale writes at runtime.</p></div><div class="file-actions"><select id="config-file"><option>config.json</option><option>permissions.json</option><option>whitelist.json</option><option>bans.json</option></select><button class="btn" id="reload-config">Reload</button></div></div>
+          <div id="config-running-note" class="inline-notice hidden">Stop this server to edit the file.</div>
+          <textarea id="server-config" class="code-editor" spellcheck="false"></textarea>
+          <div class="row end"><span id="config-note" class="muted"></span><button class="btn primary" id="save-config">Save</button></div>
+        </div>
+      </section>
+
+      <section id="view-mods" class="view">
+        <div class="panel"><div class="panel-head"><div><h3>Mods</h3><p class="help">Installed for the selected server only.</p></div><label class="btn primary file-btn">Add mod<input type="file" id="mod-file" accept=".jar,.zip"></label></div><div id="mods-list" class="file-list empty-state">No mods installed.</div></div>
+      </section>
+
+      <section id="view-backups" class="view">
+        <div class="stack-panels">
+          <div class="panel"><div class="panel-head"><div><h3>Native backups</h3><p class="help">Backups created by Hytale.</p></div><button class="btn primary" id="native-backup">Back up now</button></div><div id="native-backups" class="file-list empty-state">No native backups found.</div></div>
+          <div class="panel"><div class="panel-head"><div><h3>Full snapshots</h3><p class="help">World, configuration, permissions and mods. Server must be stopped.</p></div><button class="btn" id="snapshot-backup">Create snapshot</button></div><div id="snapshots" class="file-list empty-state">No snapshots found.</div></div>
+        </div>
+      </section>
+
+      <section id="view-setup" class="view">
+        <div class="panel setup-panel">
+          <div class="panel-head"><h3>Install server files</h3></div>
+          <div id="install-state" class="install-state">Checking installation…</div>
+          <div class="setup-row"><div class="step-index">1</div><div><h4>Official downloader</h4><p>Upload the Hytale downloader once, then use it to install this server.</p></div><div class="setup-buttons"><label class="btn file-btn">Choose file<input type="file" id="downloader-file" accept=".zip,application/zip,application/octet-stream"></label><button class="btn primary" id="run-downloader">Download & install</button></div></div>
+          <div class="setup-row"><div class="step-index">2</div><div><h4>Existing game.zip</h4><p>Import a server bundle already placed in this instance's imports directory.</p></div><div class="setup-buttons"><button class="btn" id="import-local">Import game.zip</button></div></div>
+          <div class="setup-row"><div class="step-index">3</div><div><h4>First start</h4><p>Start the server, then authenticate from the Console using the device code.</p></div><div class="setup-buttons"><button class="btn success" id="setup-start">Start</button><button class="btn" id="setup-auth">Authenticate</button></div></div>
+        </div>
+      </section>
+
+      <section id="view-settings" class="view">
+        <form id="settings-form" class="panel settings-form">
+          <div class="panel-head"><h3>Server settings</h3><div class="row"><button type="button" id="delete-server" class="btn danger-ghost">Delete server</button><button class="btn primary">Save</button></div></div>
+          <div class="form-grid">
+            <label>Server name<input id="set-name" required></label>
+            <label>Public address<input id="set-host" placeholder="play.example.com or public IP"></label>
+            <label>UDP game port<input id="set-port" type="number" min="1" max="65535" required><small id="port-help">Each running server needs a unique UDP port.</small></label>
+            <label>Backup frequency (minutes)<input id="set-backup" type="number" min="5" max="10080" required></label>
+            <label>Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
+            <label>Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
+          </div>
+          <label>Additional server arguments<input id="set-args" placeholder="--accept-early-plugins"></label>
+          <label class="toggle-row"><span><b>Auto-start</b><small>Start this instance when the manager starts.</small></span><input id="set-autostart" type="checkbox"></label>
+          <div class="settings-note"><b>Networking</b><span>The container publishes a UDP range. Each server needs a different port in that range.</span></div>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="server-dialog" class="server-dialog">
+    <form id="server-create-form" method="dialog">
+      <div class="dialog-head"><h2>Add server</h2><button type="button" id="close-server-dialog" class="quiet-btn">Close</button></div>
+      <label>Server name<input id="new-server-name" value="New Hytale Server" required></label>
+      <label>UDP port<input id="new-server-port" type="number" min="1" max="65535"><small id="new-port-help">Leave blank to use the next available published port.</small></label>
+      <label>Start from<select id="new-server-source"><option value="">Blank server — install files after creation</option></select><small>Cloning copies the Hytale install, mods and config, but starts with a new world and no backups.</small></label>
+      <div class="dialog-actions"><button type="button" id="cancel-server-dialog" class="btn">Cancel</button><button class="btn primary" type="submit">Create</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+# Runtime data
+data/
+*.log
+
+# Local builds
+/hsm
+/orbis
+/hytale-server-manager
+/dist/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

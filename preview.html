@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#15171b">
+  <title>Hytale Server Manager</title>
+  <style>:root{
+  color-scheme:dark;
+  --bg:#111317;
+  --sidebar:#17191e;
+  --surface:#1a1d22;
+  --surface-2:#20242a;
+  --surface-3:#0d0f12;
+  --line:#2b3037;
+  --line-strong:#3a414b;
+  --text:#e6e8eb;
+  --muted:#9aa1aa;
+  --faint:#6f7781;
+  --accent:#5e8fca;
+  --accent-hover:#6b9bd4;
+  --green:#5da87c;
+  --red:#c66767;
+  --amber:#c59b57;
+  --sidebar-w:230px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{min-height:100vh}
+button,input,textarea,select{font:inherit}button{color:inherit}.hidden{display:none!important}.muted{color:var(--muted)}code{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#c5ccd4}
+.app{min-height:100vh;display:grid;grid-template-columns:var(--sidebar-w) minmax(0,1fr)}
+.sidebar{height:100vh;position:sticky;top:0;background:var(--sidebar);border-right:1px solid var(--line);padding:18px 12px 14px;display:flex;flex-direction:column}
+.brand{padding:1px 8px 17px;border-bottom:1px solid var(--line);margin-bottom:13px}.brand strong{display:block;font-size:13px;font-weight:650}.brand small{display:block;margin-top:4px;color:var(--faint);font-size:10px}
+.server-picker-head{display:flex;align-items:center;justify-content:space-between;padding:0 7px 7px;color:var(--muted);font-size:10px;font-weight:650}.server-picker-head button{width:24px;height:24px;border:1px solid var(--line-strong);border-radius:3px;background:#20242a;color:#c5cbd2;cursor:pointer}.server-picker-head button:hover{background:#272c33}
+.server-list{display:flex;flex-direction:column;gap:2px;max-height:235px;overflow:auto;padding:0 0 10px;margin-bottom:9px;border-bottom:1px solid var(--line)}
+.server-list-item{width:100%;min-height:39px;border:0;border-radius:3px;background:transparent;color:#a8afb7;display:grid;grid-template-columns:11px minmax(0,1fr);gap:6px;align-items:center;padding:5px 7px;text-align:left;cursor:pointer}.server-list-item:hover{background:#20242a}.server-list-item.active{background:#252a31;color:#f0f2f4}.server-list-copy{min-width:0}.server-list-copy b,.server-list-copy small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.server-list-copy b{font-size:11px;font-weight:600}.server-list-copy small{margin-top:2px;color:var(--faint);font-size:9px}
+.sidebar nav{display:flex;flex-direction:column;gap:2px}.sidebar nav button{height:34px;border:0;border-radius:3px;background:transparent;color:#a8afb7;padding:0 9px;text-align:left;font-size:11px;cursor:pointer}.sidebar nav button:hover{background:#20242a;color:#e5e7ea}.sidebar nav button.active{background:#252a31;color:#fff}.nav-divider{height:1px;background:var(--line);margin:5px 7px}
+.sidebar-foot{margin-top:auto;padding:12px 7px 0;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px}.fleet-state{color:var(--faint);font-size:9px}.fleet-state span:first-child{color:var(--green)}
+.quiet-btn{border:0;background:transparent;color:#959da7;padding:4px 5px;cursor:pointer;font-size:10px}.quiet-btn:hover{color:#fff}
+.main{min-width:0;padding:0 32px 42px}.topbar{height:78px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);margin-bottom:22px}.topbar h1{margin:0;font-size:21px;font-weight:650;letter-spacing:-.01em}.top-context{margin-top:3px;color:var(--muted);font-size:10px}.top-actions{display:flex;align-items:center;gap:8px}
+.status-pill{height:31px;display:flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);padding:0 9px;border-radius:3px;color:#b5bbc2;font-size:10px}.dot{width:7px;height:7px;border-radius:50%;background:#626a73}.dot.online{background:var(--green)}.dot.busy{background:var(--amber)}.dot.large{width:8px;height:8px}
+.view{display:none}.view.active{display:block}.section-label{display:none}.page-head,.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.page-head{align-items:flex-end;margin-bottom:14px}.page-head h2{margin:0;font-size:20px;font-weight:650}.panel-head{margin-bottom:14px}.panel-head h3{margin:0;font-size:13px;font-weight:650}.help{color:var(--muted);font-size:10px;line-height:1.5;margin:5px 0 0}
+.btn{height:32px;border:1px solid var(--line-strong);border-radius:3px;background:#24282e;color:#dfe2e6;padding:0 11px;font-size:10px;font-weight:600;cursor:pointer}.btn:hover:not(:disabled){background:#2b3037}.btn:disabled{opacity:.42;cursor:not-allowed}.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover:not(:disabled){background:var(--accent-hover)}.btn.success{background:#244735;border-color:#37674d;color:#d9efe3}.btn.danger{background:#4a292a;border-color:#714041;color:#f0d2d2}.btn.danger-ghost{border-color:#654143;color:#dca7a8;background:#21191b}.btn.full{width:100%}.btn.small{height:28px;padding:0 8px;font-size:9px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:17px}.warning-bar{margin-bottom:12px;border:1px solid #5d4c31;background:#201c15;border-radius:3px;padding:9px 11px;display:flex;gap:7px;align-items:center;font-size:10px;color:#d6c08e}.warning-bar span{color:#a9956c}
+.server-header{display:flex;align-items:center;justify-content:space-between;gap:22px;border-bottom:1px solid var(--line);padding:3px 0 18px}.server-title-block h2{margin:6px 0 7px;font-size:25px;font-weight:650;letter-spacing:-.02em}.status-line{display:flex;align-items:center;gap:7px;color:#abb2ba;font-size:9px;font-weight:700}.connect-row{display:flex;align-items:center;gap:6px}.connect-row code{background:#0e1013;border:1px solid var(--line);padding:5px 7px;border-radius:2px}.server-controls{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.stat-strip{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid var(--line);background:var(--surface);margin-top:12px}.stat-strip>div{padding:12px 14px;border-right:1px solid var(--line)}.stat-strip>div:last-child{border-right:0}.stat-strip span,.stat-strip strong{display:block}.stat-strip span{color:var(--muted);font-size:9px;margin-bottom:4px}.stat-strip strong{font-size:13px;font-weight:650}
+.dashboard-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:11px}.log-panel{grid-column:1/-1}.operation-list{border-top:1px solid var(--line)}.operation-list button{width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;color:inherit;display:flex;align-items:center;justify-content:space-between;padding:10px 0;cursor:pointer;text-align:left}.operation-list button:hover{background:#1f2329}.operation-list b,.operation-list small{display:block}.operation-list b{font-size:10px}.operation-list small{font-size:9px;color:var(--muted);margin-top:3px}.operation-list button>span:last-child{font-size:9px;color:#9eb9d8}.button-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.mini-log{height:150px;overflow:hidden;background:var(--surface-3);border:1px solid #242930;padding:9px 11px;font:10px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#a9b2bc}.mini-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini-line .time{color:#69737e;margin-right:8px}.mini-line.controller{color:#8bb0d1}.mini-line.stderr{color:#d17a7a}
+.console-card{padding:0;overflow:hidden}.console-card .panel-head{padding:14px 16px 0}.console-tools{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:9px}.console-output{height:calc(100vh - 215px);min-height:460px;background:#0a0c0f;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:13px 15px;overflow:auto;color:#adb6c0;font:10px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.log-line{white-space:pre-wrap;word-break:break-word}.log-line .stamp{color:#5f6974;margin-right:7px}.log-line .source{display:inline-block;width:66px;color:#77828d}.log-line.controller{color:#8db2d3}.log-line.stderr{color:#cf7d7d}.log-line.console{color:#9ab6ca}.console-input{display:flex;gap:8px;align-items:center;padding:10px 12px;background:#14171b}.console-input>span{color:#8aaed2;font-family:monospace}.console-input input{min-width:0;flex:1;border:0;outline:0;background:transparent;color:#e2e5e8;font:11px ui-monospace,SFMono-Regular,Menlo,monospace}
+.file-head{align-items:flex-end}.file-actions{display:flex;gap:6px;align-items:center}.file-actions select{height:32px;border:1px solid var(--line-strong);border-radius:3px;background:#13161a;color:#dbe0e4;padding:0 27px 0 8px;font-size:10px}.inline-notice{padding:8px 10px;margin-bottom:8px;border:1px solid #5a5038;background:#211e17;border-radius:3px;color:#c6b781;font-size:10px}.code-editor{width:100%;min-height:560px;resize:vertical;outline:0;border:1px solid var(--line);border-radius:3px;background:#0b0d10;color:#c0cad4;padding:13px;font:10px/1.62 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.code-editor:focus{border-color:#566b82}.code-editor:disabled{opacity:.62;cursor:not-allowed}
+.row{display:flex;align-items:center;gap:8px}.row.end{justify-content:flex-end;margin-top:9px}.row.end>span{margin-right:auto;font-size:9px}.file-btn{position:relative;overflow:hidden;display:inline-flex;align-items:center}.file-btn input{position:absolute;inset:0;opacity:0;cursor:pointer}.file-list{display:flex;flex-direction:column;border-top:1px solid var(--line)}.file-row{display:grid;grid-template-columns:minmax(0,1fr) 95px 155px auto;gap:12px;align-items:center;min-height:42px;border-bottom:1px solid var(--line);font-size:10px}.file-row .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.file-row .meta{color:var(--muted)}.file-row button{border:0;background:transparent;color:#cf8989;font-size:9px;cursor:pointer}.empty-state{color:var(--muted);font-size:10px;padding:13px 0}.empty-state:not(:only-child){padding:0}.stack-panels{display:grid;gap:11px}
+.setup-panel{padding:0}.setup-panel>.panel-head{padding:17px 17px 0}.install-state{margin:0 17px 4px;padding:10px 11px;background:#111419;border:1px solid var(--line);border-radius:3px;color:var(--muted);font-size:10px}.setup-row{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:13px;align-items:center;padding:17px;border-top:1px solid var(--line)}.step-index{color:#727b85;font:700 10px ui-monospace,monospace}.setup-row h4{margin:0 0 4px;font-size:12px}.setup-row p{margin:0;max-width:690px;color:var(--muted);font-size:10px;line-height:1.5}.setup-buttons{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.settings-form>label{display:flex;flex-direction:column;gap:5px;color:#abb2ba;font-size:10px}.settings-form input{height:34px;border:1px solid var(--line-strong);border-radius:3px;background:#111419;color:#edf0f2;padding:0 9px;outline:0}.settings-form input:focus{border-color:#5a718a}.settings-form input:disabled{opacity:.62}.settings-form label small{font-size:9px;color:var(--faint)}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}.toggle-row{margin-top:14px!important;display:flex!important;flex-direction:row!important;align-items:center;justify-content:space-between;padding:11px;border:1px solid var(--line);background:#15181d}.toggle-row b,.toggle-row small{display:block}.toggle-row small{margin-top:2px}.toggle-row input{width:16px;height:16px}.settings-note{display:flex;gap:8px;margin-top:12px;padding:10px 11px;border-left:2px solid #5d7fa5;background:#15181d;color:var(--muted);font-size:9px}.settings-note b{color:#d0d5da}
+.auth-shell{min-height:100vh;display:grid;place-items:center;padding:22px}.auth-card{width:min(360px,100%);border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:24px}.auth-product{color:#cfd4da;font-size:11px;font-weight:650;margin-bottom:24px}.auth-card h1{font-size:21px;margin:0 0 5px}.auth-card p{font-size:10px;margin:0 0 18px}.auth-card label{display:flex;flex-direction:column;gap:5px;margin:0 0 12px;color:#abb2ba;font-size:10px}.auth-card input{height:36px;border:1px solid var(--line-strong);border-radius:3px;background:#111419;color:#fff;padding:0 9px;outline:0}.auth-card input:focus{border-color:#5b7189}.error-text{min-height:16px;margin-top:9px;color:#d58686;font-size:9px}
+.toast{position:fixed;right:18px;bottom:18px;z-index:30;background:#1d2127;border:1px solid var(--line-strong);border-radius:3px;color:#e8ebed;padding:9px 11px;font-size:10px;opacity:0;transform:translateY(6px);pointer-events:none;transition:.12s}.toast.show{opacity:1;transform:none}.toast.error{border-color:#754645;color:#efbcbc}
+.fleet-summary{display:flex;gap:16px;padding:0 0 12px;color:var(--muted);font-size:10px}.fleet-summary>div{display:flex;align-items:baseline;gap:5px}.fleet-summary strong{font-size:14px;color:#e6e8eb}.fleet-summary span{text-transform:none;letter-spacing:0}
+.table-shell{border:1px solid var(--line);background:var(--surface)}.server-table-head,.fleet-card{display:grid;grid-template-columns:minmax(180px,1.5fr) 100px minmax(170px,1fr) 90px 90px 150px;gap:10px;align-items:center}.server-table-head{min-height:34px;padding:0 12px;border-bottom:1px solid var(--line);color:var(--faint);font-size:9px;font-weight:650}.fleet-grid{display:block}.fleet-card{min-height:54px;padding:0 12px;border-bottom:1px solid var(--line)}.fleet-card:last-child{border-bottom:0}.fleet-card.selected{background:#1d2127}.fleet-open{display:contents}.fleet-name{min-width:0}.fleet-name strong,.fleet-name small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fleet-name strong{font-size:11px;font-weight:600}.fleet-name small{color:var(--faint);font-size:9px;margin-top:2px}.fleet-cell{font-size:10px;color:#b5bcc4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fleet-status{display:flex;align-items:center;gap:6px}.primary-tag{margin-left:6px;color:#7f8790;font-size:8px}.fleet-actions{display:flex;justify-content:flex-end;gap:6px}
+.server-dialog{width:min(460px,calc(100vw - 28px));border:1px solid var(--line-strong);border-radius:4px;background:#191c21;color:var(--text);padding:0}.server-dialog::backdrop{background:rgba(0,0,0,.65)}.server-dialog form{padding:18px}.dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;margin-bottom:16px}.dialog-head h2{margin:0;font-size:18px}.server-dialog label{display:flex;flex-direction:column;gap:5px;margin:0 0 12px;color:#abb2ba;font-size:10px}.server-dialog input,.server-dialog select{height:35px;border:1px solid var(--line-strong);border-radius:3px;background:#111419;color:#edf0f2;padding:0 9px;outline:0}.server-dialog select{padding-right:28px}.server-dialog small{color:var(--faint);font-size:9px;line-height:1.4}.dialog-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+@media(max-width:1050px){:root{--sidebar-w:205px}.main{padding:0 22px 36px}.server-table-head,.fleet-card{grid-template-columns:minmax(160px,1.4fr) 90px minmax(150px,1fr) 80px 120px}.server-table-head span:nth-child(5),.fleet-card>.fleet-files{display:none}.stat-strip{grid-template-columns:repeat(3,1fr)}.stat-strip>div:nth-child(3){border-right:0}.stat-strip>div:nth-child(n+4){border-top:1px solid var(--line)}.dashboard-grid{grid-template-columns:1fr}.log-panel{grid-column:auto}.setup-row{grid-template-columns:32px 1fr}.setup-buttons{grid-column:2;justify-content:flex-start}}
+@media(max-width:700px){.app{display:block}.sidebar{position:fixed;z-index:20;left:0;right:0;bottom:0;top:auto;width:auto;height:58px;padding:4px 5px;border-right:0;border-top:1px solid var(--line);display:block;overflow-x:auto}.brand,.sidebar-foot,.server-picker-head,.server-list,.nav-divider{display:none}.sidebar nav{height:100%;display:flex;flex-direction:row;gap:2px;min-width:max-content}.sidebar nav button{min-width:72px;height:48px;text-align:center;padding:0 7px;font-size:9px}.main{padding:0 11px 72px}.topbar{height:68px;margin-bottom:12px}.topbar h1{font-size:18px}.top-actions .status-pill{display:none}.server-header{align-items:flex-start;flex-direction:column;padding-top:0}.server-title-block h2{font-size:22px}.server-controls{width:100%;justify-content:flex-start}.server-controls .btn{flex:1}.stat-strip{grid-template-columns:1fr 1fr}.stat-strip>div{border-right:1px solid var(--line);border-top:1px solid var(--line)}.stat-strip>div:nth-child(-n+2){border-top:0}.stat-strip>div:nth-child(2n){border-right:0}.panel{padding:14px}.file-head{display:block}.file-actions{margin-top:10px}.file-actions select{flex:1}.form-grid{grid-template-columns:1fr}.file-row{grid-template-columns:minmax(0,1fr) auto}.file-row .meta{display:none}.console-card{padding:0}.console-output{height:calc(100vh - 192px);min-height:390px}.setup-row{display:block}.step-index{margin-bottom:6px}.setup-buttons{margin-top:10px;justify-content:flex-start}.warning-bar{align-items:flex-start;flex-direction:column}.settings-note{display:block}.settings-note b{display:block;margin-bottom:4px}.page-head{align-items:flex-start;flex-direction:column}.page-head .btn{width:100%}.fleet-summary{gap:10px;flex-wrap:wrap}.server-table-head{display:none}.fleet-card{grid-template-columns:minmax(0,1fr) auto;gap:8px;min-height:68px;padding:9px 10px}.fleet-card>.fleet-status,.fleet-card>.fleet-address,.fleet-card>.fleet-uptime,.fleet-card>.fleet-files{display:none}.fleet-actions{align-self:center}.top-context{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sidebar nav button[data-view="servers"]{order:-1}}
+</style>
+</head>
+<body>
+  <div id="auth" class="auth-shell hidden">
+    <form id="auth-form" class="auth-card">
+      <div class="auth-product">Hytale Server Manager</div>
+      <h1 id="auth-title">Sign in</h1>
+      <p id="auth-copy" class="muted">Manage Hytale servers on this host.</p>
+      <label>Username<input id="auth-user" autocomplete="username" value="admin" required></label>
+      <label>Password<input id="auth-pass" type="password" autocomplete="current-password" minlength="8" required></label>
+      <button class="btn primary full" type="submit" id="auth-submit">Continue</button>
+      <div id="auth-error" class="error-text"></div>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <strong>Hytale Server Manager</strong>
+        <small>v0.5.0</small>
+      </div>
+
+      <div class="server-picker-head"><span>Servers</span><button id="add-server-side" title="Add server">+</button></div>
+      <div id="server-list" class="server-list"></div>
+
+      <nav id="nav">
+        <button data-view="servers" class="active">Servers</button>
+        <div class="nav-divider"></div>
+        <button data-view="dashboard">Overview</button>
+        <button data-view="console">Console</button>
+        <button data-view="config">Files</button>
+        <button data-view="mods">Mods</button>
+        <button data-view="backups">Backups</button>
+        <button data-view="setup">Install</button>
+        <button data-view="settings">Settings</button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="fleet-state"><span id="fleet-online">0</span> / <span id="fleet-total">0</span> online</div>
+        <button id="logout" class="quiet-btn">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="view-title">Servers</h1>
+          <div id="top-context" class="top-context"></div>
+          <div class="section-label hidden" id="view-kicker">SERVER</div>
+        </div>
+        <div class="top-actions">
+          <div class="status-pill" id="top-status"><span class="dot"></span><span>Offline</span></div>
+          <button id="top-start" class="btn primary">Start</button>
+        </div>
+      </header>
+
+      <section id="view-servers" class="view active">
+        <div class="page-head">
+          <div><h2>Servers</h2><p class="help">Independent Hytale instances running on this host.</p></div>
+          <button id="add-server-main" class="btn primary">Add server</button>
+        </div>
+        <div id="fleet-summary" class="fleet-summary"></div>
+        <div class="table-shell">
+          <div class="server-table-head"><span>Server</span><span>Status</span><span>Address</span><span>Uptime</span><span>Files</span><span></span></div>
+          <div id="fleet-grid" class="fleet-grid"></div>
+        </div>
+      </section>
+
+      <section id="view-dashboard" class="view">
+        <div id="memory-warning" class="warning-bar hidden"><strong>Memory limit below 4 GB.</strong><span>Increase the Docker/CasaOS memory allocation before hosting players.</span></div>
+
+        <div class="server-header">
+          <div class="server-title-block">
+            <div class="status-line"><span class="dot large" id="hero-dot"></span><span id="hero-state">OFFLINE</span></div>
+            <h2 id="server-name">Hytale Server</h2>
+            <div class="connect-row"><code id="connect-address">server.local:5520</code><button class="quiet-btn" id="copy-address">Copy</button></div>
+          </div>
+          <div class="server-controls">
+            <button class="btn success" id="start-btn">Start</button>
+            <button class="btn" id="restart-btn">Restart</button>
+            <button class="btn danger" id="stop-btn">Stop</button>
+          </div>
+        </div>
+
+        <div class="stat-strip">
+          <div><span>Uptime</span><strong id="metric-uptime">—</strong></div>
+          <div><span>Memory</span><strong id="metric-memory">—</strong></div>
+          <div><span>Limit</span><strong id="metric-memory-limit">—</strong></div>
+          <div><span>UDP port</span><strong id="metric-port">—</strong></div>
+          <div><span>Files</span><strong id="metric-installed">—</strong></div>
+        </div>
+
+        <div class="dashboard-grid">
+          <section class="panel">
+            <div class="panel-head"><h3>Actions</h3></div>
+            <div class="operation-list">
+              <button data-action="auth"><span><b>Authenticate</b><small>Start Hytale device login</small></span><span>Run</span></button>
+              <button data-action="backup"><span><b>Native backup</b><small>Create a Hytale backup</small></span><span>Run</span></button>
+              <button data-view-link="console"><span><b>Console</b><small>Open live server output</small></span><span>Open</span></button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head"><h3>Update</h3></div>
+            <div class="button-grid">
+              <button class="btn" data-update="status">Status</button>
+              <button class="btn" data-update="check">Check</button>
+              <button class="btn" data-update="download">Download</button>
+              <button class="btn danger-ghost" data-update="apply">Apply</button>
+            </div>
+            <p class="help">Uses the selected server's Hytale updater.</p>
+          </section>
+
+          <section class="panel log-panel">
+            <div class="panel-head"><h3>Recent output</h3><button class="quiet-btn" data-view-link="console">Open console</button></div>
+            <div id="mini-log" class="mini-log"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="view-console" class="view">
+        <div class="panel console-card">
+          <div class="panel-head"><h3>Console</h3><div class="console-tools"><label><input type="checkbox" id="auto-scroll" checked> Auto-scroll</label><button class="quiet-btn" id="clear-console">Clear</button></div></div>
+          <div id="console-output" class="console-output"></div>
+          <form id="console-form" class="console-input"><span>&gt;</span><input id="console-command" autocomplete="off" placeholder="Enter a server command"><button class="btn primary">Send</button></form>
+        </div>
+      </section>
+
+      <section id="view-config" class="view">
+        <div class="panel">
+          <div class="panel-head file-head"><div><h3>Server files</h3><p class="help">Stop the server before editing files that Hytale writes at runtime.</p></div><div class="file-actions"><select id="config-file"><option>config.json</option><option>permissions.json</option><option>whitelist.json</option><option>bans.json</option></select><button class="btn" id="reload-config">Reload</button></div></div>
+          <div id="config-running-note" class="inline-notice hidden">Stop this server to edit the file.</div>
+          <textarea id="server-config" class="code-editor" spellcheck="false"></textarea>
+          <div class="row end"><span id="config-note" class="muted"></span><button class="btn primary" id="save-config">Save</button></div>
+        </div>
+      </section>
+
+      <section id="view-mods" class="view">
+        <div class="panel"><div class="panel-head"><div><h3>Mods</h3><p class="help">Installed for the selected server only.</p></div><label class="btn primary file-btn">Add mod<input type="file" id="mod-file" accept=".jar,.zip"></label></div><div id="mods-list" class="file-list empty-state">No mods installed.</div></div>
+      </section>
+
+      <section id="view-backups" class="view">
+        <div class="stack-panels">
+          <div class="panel"><div class="panel-head"><div><h3>Native backups</h3><p class="help">Backups created by Hytale.</p></div><button class="btn primary" id="native-backup">Back up now</button></div><div id="native-backups" class="file-list empty-state">No native backups found.</div></div>
+          <div class="panel"><div class="panel-head"><div><h3>Full snapshots</h3><p class="help">World, configuration, permissions and mods. Server must be stopped.</p></div><button class="btn" id="snapshot-backup">Create snapshot</button></div><div id="snapshots" class="file-list empty-state">No snapshots found.</div></div>
+        </div>
+      </section>
+
+      <section id="view-setup" class="view">
+        <div class="panel setup-panel">
+          <div class="panel-head"><h3>Install server files</h3></div>
+          <div id="install-state" class="install-state">Checking installation…</div>
+          <div class="setup-row"><div class="step-index">1</div><div><h4>Official downloader</h4><p>Upload the Hytale downloader once, then use it to install this server.</p></div><div class="setup-buttons"><label class="btn file-btn">Choose file<input type="file" id="downloader-file" accept=".zip,application/zip,application/octet-stream"></label><button class="btn primary" id="run-downloader">Download & install</button></div></div>
+          <div class="setup-row"><div class="step-index">2</div><div><h4>Existing game.zip</h4><p>Import a server bundle already placed in this instance's imports directory.</p></div><div class="setup-buttons"><button class="btn" id="import-local">Import game.zip</button></div></div>
+          <div class="setup-row"><div class="step-index">3</div><div><h4>First start</h4><p>Start the server, then authenticate from the Console using the device code.</p></div><div class="setup-buttons"><button class="btn success" id="setup-start">Start</button><button class="btn" id="setup-auth">Authenticate</button></div></div>
+        </div>
+      </section>
+
+      <section id="view-settings" class="view">
+        <form id="settings-form" class="panel settings-form">
+          <div class="panel-head"><h3>Server settings</h3><div class="row"><button type="button" id="delete-server" class="btn danger-ghost">Delete server</button><button class="btn primary">Save</button></div></div>
+          <div class="form-grid">
+            <label>Server name<input id="set-name" required></label>
+            <label>Public address<input id="set-host" placeholder="play.example.com or public IP"></label>
+            <label>UDP game port<input id="set-port" type="number" min="1" max="65535" required><small id="port-help">Each running server needs a unique UDP port.</small></label>
+            <label>Backup frequency (minutes)<input id="set-backup" type="number" min="5" max="10080" required></label>
+            <label>Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
+            <label>Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
+          </div>
+          <label>Additional server arguments<input id="set-args" placeholder="--accept-early-plugins"></label>
+          <label class="toggle-row"><span><b>Auto-start</b><small>Start this instance when the manager starts.</small></span><input id="set-autostart" type="checkbox"></label>
+          <div class="settings-note"><b>Networking</b><span>The container publishes a UDP range. Each server needs a different port in that range.</span></div>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="server-dialog" class="server-dialog">
+    <form id="server-create-form" method="dialog">
+      <div class="dialog-head"><h2>Add server</h2><button type="button" id="close-server-dialog" class="quiet-btn">Close</button></div>
+      <label>Server name<input id="new-server-name" value="New Hytale Server" required></label>
+      <label>UDP port<input id="new-server-port" type="number" min="1" max="65535"><small id="new-port-help">Leave blank to use the next available published port.</small></label>
+      <label>Start from<select id="new-server-source"><option value="">Blank server — install files after creation</option></select><small>Cloning copies the Hytale install, mods and config, but starts with a new world and no backups.</small></label>
+      <div class="dialog-actions"><button type="button" id="cancel-server-dialog" class="btn">Cancel</button><button class="btn primary" type="submit">Create</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast"></div>
+  
+<script>
+const demoServers=[
+ {id:'main',serverName:'Main Server',port:5520,publicHost:'play.example.net',running:true,installed:true,installBusy:false,uptimeSeconds:18420,storageDir:'.',primary:true},
+ {id:'creative',serverName:'Creative',port:5521,publicHost:'play.example.net',running:true,installed:true,installBusy:false,uptimeSeconds:4380,storageDir:'servers/creative',primary:false},
+ {id:'testing',serverName:'Testing',port:5522,publicHost:'play.example.net',running:false,installed:true,installBusy:false,uptimeSeconds:0,storageDir:'servers/testing',primary:false},
+ {id:'new-server',serverName:'New Server',port:5523,publicHost:'',running:false,installed:false,installBusy:false,uptimeSeconds:0,storageDir:'servers/new-server',primary:false}
+];
+const demoSettings={};for(const s of demoServers)demoSettings[s.id]={...s,memoryMin:'2G',memoryMax:'4G',autoStart:s.id==='main',extraArgs:'',backupFrequency:30,portMin:5520,portMax:5539};
+const demoLogs={main:[{time:new Date(Date.now()-40000),source:'controller',line:'Starting Hytale server on PID 3812'},{time:new Date(Date.now()-35000),source:'server',line:'Server initialized successfully'},{time:new Date(Date.now()-12000),source:'server',line:'Player joined the world'}],creative:[{time:new Date(Date.now()-8000),source:'server',line:'Creative ready on UDP 5521'}],testing:[], 'new-server':[]};
+function demoId(opts,url){return opts?.headers?.['X-HSM-Server']||opts?.headers?.['X-Orbis-Server']||new URL(url,location.href).searchParams.get('server')||'main'}
+window.fetch=async function(url,opts={}){const method=(opts.method||'GET').toUpperCase(), id=demoId(opts,url), s=demoServers.find(x=>x.id===id)||demoServers[0];let body={ok:true};
+ if(url==='/api/bootstrap')body={configured:true};
+ else if(url==='/api/servers'&&method==='GET')body=demoServers;
+ else if(url==='/api/servers'&&method==='POST'){const x=JSON.parse(opts.body||'{}');const nid=(x.name||'new-server').toLowerCase().replace(/[^a-z0-9]+/g,'-');const n={id:nid,serverName:x.name||'New Hytale Server',port:x.port||5524,publicHost:'',running:false,installed:!!x.sourceServerId,installBusy:false,uptimeSeconds:0,storageDir:'servers/'+nid,primary:false};demoServers.push(n);demoSettings[nid]={...n,memoryMin:'2G',memoryMax:'4G',autoStart:false,extraArgs:'',backupFrequency:30,portMin:5520,portMax:5539};demoLogs[nid]=[];body=n}
+ else if(/^\/api\/servers\/[^/]+\/(start|stop|restart)$/.test(url)){const [,sid,act]=url.match(/^\/api\/servers\/([^/]+)\/(start|stop|restart)$/);const x=demoServers.find(v=>v.id===decodeURIComponent(sid));if(x){x.running=act!=='stop';x.uptimeSeconds=x.running?12:0}}
+ else if(/^\/api\/servers\/[^/]+$/.test(url)&&method==='DELETE'){const sid=decodeURIComponent(url.split('/').pop());const i=demoServers.findIndex(v=>v.id===sid);if(i>0)demoServers.splice(i,1)}
+ else if(url==='/api/status')body={running:s.running,installed:s.installed,installBusy:false,pid:s.running?3812:0,uptimeSeconds:s.uptimeSeconds,memoryBytes:s.running?(id==='main'?2411724800:1310720000):0,memoryLimitBytes:17179869184,meetsMinimumMemory:true,controllerVersion:'0.5.0'};
+ else if(url==='/api/settings'&&method==='GET')body=demoSettings[id];
+ else if(url==='/api/settings'&&method==='PUT'){Object.assign(demoSettings[id],JSON.parse(opts.body||'{}'));Object.assign(s,demoSettings[id]);body=demoSettings[id]}
+ else if(url==='/api/logs')body=demoLogs[id]||[];
+ else if(url.startsWith('/api/server/file/'))body={name:url.split('/').pop(),exists:true,content:'{\n  "ServerName": "'+s.serverName+'"\n}',running:s.running,editable:!s.running};
+ else if(url==='/api/mods')body=id==='main'?[{name:'BetterTorches.jar',size:381244,modified:new Date().toISOString()},{name:'VillageTools.zip',size:1209912,modified:new Date().toISOString()}]:[];
+ else if(url==='/api/backups')body={native:s.installed?[{name:'backup-2026-09-29.zip',size:52428800,modified:new Date().toISOString()}]:[],snapshots:[]};
+ else if(url==='/api/install/status')body={installed:s.installed,downloaderPresent:true,bundlePresent:false,busy:false,paths:{game:s.primary?'/data/game':'/data/'+s.storageDir+'/game'}};
+ else if(url.includes('/api/server/start')){s.running=true;s.installed=true}else if(url.includes('/api/server/stop'))s.running=false;
+ return new Response(JSON.stringify(body),{status:200,headers:{'Content-Type':'application/json'}})
+};
+window.EventSource=class{constructor(){this.onmessage=null}close(){}};
+</script>
+<script>const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const state={configured:false,servers:[],serverId:null,status:null,settings:null,logs:[],events:null,current:'servers',configFile:'config.json'};
+async function api(url,opts={}){const headers=opts.body instanceof FormData?{}:{'Content-Type':'application/json'};if(state.serverId)headers['X-HSM-Server']=state.serverId;const res=await fetch(url,{...opts,headers:{...headers,...(opts.headers||{})}});let body=null;try{body=await res.json()}catch{}if(res.status===401&&!url.includes('/login')){showAuth(false);throw new Error('Authentication required')}if(!res.ok)throw new Error(body?.error||`${res.status} ${res.statusText}`);return body}
+function toast(msg,error=false){const el=$('#toast');el.textContent=msg;el.className='toast show'+(error?' error':'');clearTimeout(toast.t);toast.t=setTimeout(()=>el.className='toast',3000)}
+function fmtBytes(n){if(!n)return'—';const u=['B','KB','MB','GB','TB'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++}return`${n.toFixed(i>1?1:0)} ${u[i]}`}
+function fmtUptime(sec){if(!sec)return'—';const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60);return d?`${d}d ${h}h`:h?`${h}h ${m}m`:`${m}m`}
+function fmtDate(v){try{return new Date(v).toLocaleString()}catch{return v}}function fmtTime(v){try{return new Date(v).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'})}catch{return''}}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function selectedSummary(){return state.servers.find(s=>s.id===state.serverId)}
+async function boot(){const b=await api('/api/bootstrap');state.configured=b.configured;if(!b.configured){showAuth(true);return}try{await api('/api/servers');showApp()}catch{showAuth(false)}}
+function showAuth(setup){$('#app').classList.add('hidden');$('#auth').classList.remove('hidden');$('#auth-title').textContent=setup?'Create admin account':'Sign in';$('#auth-copy').textContent=setup?'Secure this server manager.':'Manage your Hytale servers.';$('#auth-submit').textContent=setup?'Create account':'Sign in';$('#auth-pass').autocomplete=setup?'new-password':'current-password';$('#auth-form').dataset.mode=setup?'setup':'login'}
+async function showApp(){$('#auth').classList.add('hidden');$('#app').classList.remove('hidden');await loadServers(true);if(state.serverId)await loadSelected();clearInterval(state.poll);state.poll=setInterval(async()=>{await loadServers(false);if(state.serverId&&state.current!=='servers')await refreshStatus()},2000);switchView(state.current)}
+$('#auth-form').addEventListener('submit',async e=>{e.preventDefault();$('#auth-error').textContent='';const body={username:$('#auth-user').value.trim(),password:$('#auth-pass').value};try{await api($('#auth-form').dataset.mode==='setup'?'/api/bootstrap':'/api/login',{method:'POST',body:JSON.stringify(body)});showApp()}catch(err){$('#auth-error').textContent=err.message}});$('#logout').addEventListener('click',async()=>{try{await api('/api/logout',{method:'POST'})}catch{}location.reload()});
+$$('#nav button').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));$$('[data-view-link]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.viewLink)));
+function switchView(v){state.current=v;$$('.view').forEach(x=>x.classList.remove('active'));$(`#view-${v}`)?.classList.add('active');$$('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));const titles={servers:'Servers',dashboard:'Overview',console:'Console',config:'Files',mods:'Mods',backups:'Backups',setup:'Install',settings:'Settings'};$('#view-title').textContent=titles[v];const global=v==='servers';$('#top-status').classList.toggle('hidden',global);$('#top-start').classList.toggle('hidden',global);$('#top-context').textContent=global?'':(selectedSummary()?.serverName||'');loadCurrent()}
+function loadCurrent(){if(state.current==='servers')renderFleet();if(!state.serverId)return;if(state.current==='mods')loadMods();if(state.current==='backups')loadBackups();if(state.current==='config')loadServerConfig();if(state.current==='setup')loadInstallStatus()}
+async function loadServers(initial=false){try{state.servers=await api('/api/servers');if(!state.servers.length)return;const saved=localStorage.getItem('hsm-server');if(!state.serverId||!state.servers.some(s=>s.id===state.serverId)){state.serverId=(saved&&state.servers.some(s=>s.id===saved))?saved:state.servers[0].id}renderServerList();renderFleet();renderFleetStats();populateCloneSources();if(initial)$('#top-context').textContent=selectedSummary()?.serverName||''}catch(e){if(initial)toast(e.message,true)}}
+function renderFleetStats(){const online=state.servers.filter(s=>s.running).length;$('#fleet-online').textContent=online;$('#fleet-total').textContent=state.servers.length;const installed=state.servers.filter(s=>s.installed).length;$('#fleet-summary').innerHTML=`<div><strong>${state.servers.length}</strong><span>Instances</span></div><div><strong>${online}</strong><span>Online</span></div><div><strong>${installed}</strong><span>Installed</span></div><div><strong>${state.servers.length-online}</strong><span>Stopped</span></div>`}
+function renderServerList(){const el=$('#server-list');el.innerHTML=state.servers.map(s=>`<button class="server-list-item ${s.id===state.serverId?'active':''}" data-select-server="${esc(s.id)}"><span class="dot ${s.running?'online':s.installBusy?'busy':''}"></span><span class="server-list-copy"><b>${esc(s.serverName)}</b><small>UDP ${s.port}</small></span></button>`).join('');$$('[data-select-server]').forEach(b=>b.addEventListener('click',()=>selectServer(b.dataset.selectServer)))}
+function renderFleet(){if(!$('#fleet-grid'))return;const grid=$('#fleet-grid');if(!state.servers.length){grid.innerHTML='<div class="empty-state" style="padding:16px">No servers configured.</div>';return}grid.innerHTML=state.servers.map(s=>`<article class="fleet-card ${s.id===state.serverId?'selected':''}"><button class="fleet-open" data-fleet-open="${esc(s.id)}"><div class="fleet-name"><strong>${esc(s.serverName)}${s.primary?'<span class="primary-tag">primary</span>':''}</strong><small>UDP ${s.port}</small></div><div class="fleet-cell fleet-status"><span class="dot ${s.running?'online':s.installBusy?'busy':''}"></span>${s.running?'Online':s.installBusy?'Installing':'Offline'}</div><div class="fleet-cell fleet-address">${esc(s.publicHost||location.hostname)}:${s.port}</div><div class="fleet-cell fleet-uptime">${s.running?fmtUptime(s.uptimeSeconds):'—'}</div><div class="fleet-cell fleet-files">${s.installed?'Ready':'Missing'}</div></button><div class="fleet-actions"><button class="btn small ${s.running?'':'success'}" data-fleet-action="${s.running?'stop':'start'}" data-id="${esc(s.id)}">${s.running?'Stop':'Start'}</button><button class="btn small" data-fleet-open="${esc(s.id)}">Open</button></div></article>`).join('');$$('[data-fleet-open]').forEach(b=>b.addEventListener('click',()=>selectServer(b.dataset.fleetOpen)));$$('[data-fleet-action]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();fleetAction(b.dataset.id,b.dataset.fleetAction)}))}
+async function selectServer(id){if(id===state.serverId){switchView('dashboard');return}state.events?.close();state.events=null;state.serverId=id;localStorage.setItem('hsm-server',id);state.logs=[];renderServerList();switchView('dashboard');await loadSelected()}
+async function loadSelected(){if(!state.serverId)return;await Promise.all([loadSettings(),refreshStatus(),loadLogs()]);connectEvents();loadCurrent()}
+async function fleetAction(id,action){try{await api(`/api/servers/${encodeURIComponent(id)}/${action}`,{method:'POST'});toast(`${action==='start'?'Start':'Stop'} requested`);setTimeout(()=>loadServers(false),400)}catch(e){toast(e.message,true)}}
+async function refreshStatus(){if(!state.serverId)return;try{state.status=await api('/api/status');renderStatus()}catch{}}
+function renderStatus(){const s=state.status,on=s?.running,busy=s?.installBusy;$('#top-status').innerHTML=`<span class="dot ${on?'online':busy?'busy':''}"></span><span>${on?'Online':busy?'Installing':'Offline'}</span>`;$('#hero-dot').className='dot large '+(on?'online':busy?'busy':'');$('#hero-state').textContent=on?'ONLINE':busy?'INSTALLING':'OFFLINE';$('#metric-uptime').textContent=fmtUptime(s?.uptimeSeconds);$('#metric-memory').textContent=fmtBytes(s?.memoryBytes);$('#metric-memory-limit').textContent=fmtBytes(s?.memoryLimitBytes);$('#metric-installed').textContent=s?.installed?'Ready':'Missing';$('#memory-warning').classList.toggle('hidden',s?.meetsMinimumMemory!==false);$('#start-btn').disabled=on||busy||!s?.installed;$('#top-start').disabled=on||busy||!s?.installed;$('#stop-btn').disabled=!on;$('#restart-btn').disabled=!on;$('#top-start').textContent=on?'Running':s?.installed?'Start':'Install';if(state.settings){$('#metric-port').textContent=state.settings.port;updateAddress()}if(state.current==='config')setConfigEditState(!on)}
+async function loadSettings(){if(!state.serverId)return;state.settings=await api('/api/settings');const s=state.settings;$('#server-name').textContent=s.serverName;$('#top-context').textContent=s.serverName;$('#set-name').value=s.serverName;$('#set-host').value=s.publicHost||'';$('#set-port').value=s.port;$('#set-port').min=s.portMin||1;$('#set-port').max=s.portMax||65535;$('#port-help').textContent=`Published UDP range: ${s.portMin||1}–${s.portMax||65535}. Each server must use a unique port.`;$('#set-backup').value=s.backupFrequency;$('#set-xms').value=s.memoryMin;$('#set-xmx').value=s.memoryMax;$('#set-args').value=s.extraArgs||'';$('#set-autostart').checked=s.autoStart;$('#metric-port').textContent=s.port;const sel=selectedSummary();$('#delete-server').disabled=!!sel?.primary;$('#delete-server').title=sel?.primary?'The primary server is retained for existing storage compatibility.':'';updateAddress()}
+function updateAddress(){const s=state.settings;if(!s)return;$('#connect-address').textContent=`${s.publicHost||location.hostname}:${s.port}`}
+$('#copy-address').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('#connect-address').textContent);toast('Address copied')}catch{toast('Could not copy address',true)}});
+for(const id of['start-btn','top-start','setup-start'])$('#'+id).addEventListener('click',()=>serverAction('start'));$('#stop-btn').addEventListener('click',()=>serverAction('stop'));$('#restart-btn').addEventListener('click',()=>serverAction('restart'));
+async function serverAction(action){if(action==='start'&&state.status&&!state.status.installed){switchView('setup');return}try{await api(`/api/server/${action}`,{method:'POST'});toast(`${action[0].toUpperCase()+action.slice(1)} requested`);setTimeout(async()=>{await refreshStatus();await loadServers(false)},450)}catch(e){toast(e.message,true)}}
+async function loadLogs(){if(!state.serverId)return;try{state.logs=await api('/api/logs');renderLogs()}catch{}}
+function renderLogs(){const out=$('#console-output');out.innerHTML=state.logs.map(logHTML).join('');if($('#auto-scroll').checked)out.scrollTop=out.scrollHeight;renderMiniLog()}
+function renderMiniLog(){const recent=state.logs.slice(-8);$('#mini-log').innerHTML=recent.map(x=>`<div class="mini-line ${esc(x.source)}"><span class="time">${fmtTime(x.time)}</span>${esc(x.line)}</div>`).join('')||'<span class="muted">No server output yet.</span>'}
+function logHTML(x){return`<div class="log-line ${esc(x.source)}"><span class="stamp">${fmtTime(x.time)}</span><span class="source">${esc(x.source)}</span>${esc(x.line)}</div>`}
+function connectEvents(){state.events?.close();if(!state.serverId)return;const id=state.serverId;const es=new EventSource(`/api/events?server=${encodeURIComponent(id)}`);state.events=es;es.onmessage=e=>{if(id!==state.serverId)return;try{const line=JSON.parse(e.data);state.logs.push(line);if(state.logs.length>2500)state.logs=state.logs.slice(-2500);const out=$('#console-output');out.insertAdjacentHTML('beforeend',logHTML(line));if($('#auto-scroll').checked)out.scrollTop=out.scrollHeight;renderMiniLog()}catch{}}}
+$('#console-form').addEventListener('submit',async e=>{e.preventDefault();const i=$('#console-command'),command=i.value.trim();if(!command)return;try{await api('/api/console',{method:'POST',body:JSON.stringify({command})});i.value=''}catch(e){toast(e.message,true)}});$('#clear-console').addEventListener('click',()=>{$('#console-output').innerHTML=''});
+$$('[data-action]').forEach(b=>b.addEventListener('click',async()=>{try{if(b.dataset.action==='auth'){await api('/api/auth/device',{method:'POST'});switchView('console');toast('Device login started')}if(b.dataset.action==='backup'){await api('/api/backups/native',{method:'POST'});toast('Backup requested')}}catch(e){toast(e.message,true)}}));
+$$('[data-update]').forEach(b=>b.addEventListener('click',async()=>{const action=b.dataset.update;if(action==='apply'&&!confirm('Apply the staged Hytale update to this server now?'))return;try{await api(`/api/update/${action}`,{method:'POST'});switchView('console');toast(`Update ${action} requested`)}catch(e){toast(e.message,true)}}));
+$('#setup-auth').addEventListener('click',async()=>{try{await api('/api/auth/device',{method:'POST'});switchView('console');toast('Device login started')}catch(e){toast(e.message,true)}});
+function setConfigEditState(editable){$('#server-config').disabled=!editable;$('#save-config').disabled=!editable;$('#config-running-note').classList.toggle('hidden',editable)}
+async function loadServerConfig(){state.configFile=$('#config-file').value;try{const d=await api(`/api/server/file/${encodeURIComponent(state.configFile)}`);let c=d.content;try{c=JSON.stringify(JSON.parse(c),null,2)}catch{}$('#server-config').value=c;$('#config-note').textContent=d.exists?`Loaded ${d.name}`:`${d.name} does not exist yet`;setConfigEditState(d.editable)}catch(e){toast(e.message,true)}}
+$('#config-file').addEventListener('change',loadServerConfig);$('#reload-config').addEventListener('click',loadServerConfig);$('#save-config').addEventListener('click',async()=>{try{JSON.parse($('#server-config').value);await api(`/api/server/file/${encodeURIComponent($('#config-file').value)}`,{method:'PUT',body:JSON.stringify({content:$('#server-config').value})});toast('File saved')}catch(e){toast(e.message,true)}});
+async function loadMods(){try{const mods=await api('/api/mods'),el=$('#mods-list');el.classList.toggle('empty-state',!mods.length);el.innerHTML=mods.map(m=>`<div class="file-row"><span class="name">${esc(m.name)}</span><span class="meta">${fmtBytes(m.size)}</span><span class="meta">${fmtDate(m.modified)}</span><button data-del-mod="${encodeURIComponent(m.name)}">Remove</button></div>`).join('')||'No mods installed.';$$('[data-del-mod]').forEach(b=>b.addEventListener('click',()=>deleteMod(decodeURIComponent(b.dataset.delMod))))}catch(e){toast(e.message,true)}}
+$('#mod-file').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append('file',f);try{await api('/api/mods/upload',{method:'POST',body:fd});toast('Mod uploaded');loadMods()}catch(err){toast(err.message,true)}finally{e.target.value=''}});async function deleteMod(name){if(!confirm(`Remove ${name} from this server?`))return;try{await api(`/api/mods/${encodeURIComponent(name)}`,{method:'DELETE'});toast('Mod removed');loadMods()}catch(e){toast(e.message,true)}}
+async function loadBackups(){try{const d=await api('/api/backups');renderFiles($('#native-backups'),d.native);const el=$('#snapshots');el.classList.toggle('empty-state',!d.snapshots.length);el.innerHTML=d.snapshots.map(m=>`<div class="file-row"><span class="name">${esc(m.name)}</span><span class="meta">${fmtBytes(m.size)}</span><span class="meta">${fmtDate(m.modified)}</span><span><button data-restore="${encodeURIComponent(m.name)}">Restore</button> <button data-del-snap="${encodeURIComponent(m.name)}">Delete</button></span></div>`).join('')||'No snapshots found.';$$('[data-restore]').forEach(b=>b.addEventListener('click',()=>restoreSnapshot(decodeURIComponent(b.dataset.restore))));$$('[data-del-snap]').forEach(b=>b.addEventListener('click',()=>deleteSnapshot(decodeURIComponent(b.dataset.delSnap))))}catch(e){toast(e.message,true)}}
+function renderFiles(el,files){el.classList.toggle('empty-state',!files.length);el.innerHTML=files.map(m=>`<div class="file-row"><span class="name">${esc(m.name)}</span><span class="meta">${fmtBytes(m.size)}</span><span class="meta">${fmtDate(m.modified)}</span><span></span></div>`).join('')||'No backups found.'}
+$('#native-backup').addEventListener('click',async()=>{try{await api('/api/backups/native',{method:'POST'});toast('Backup requested');setTimeout(loadBackups,1800)}catch(e){toast(e.message,true)}});$('#snapshot-backup').addEventListener('click',async()=>{try{await api('/api/backups/snapshot',{method:'POST'});toast('Snapshot created');loadBackups()}catch(e){toast(e.message,true)}});async function restoreSnapshot(name){if(!confirm(`Restore ${name} to this server? Hytale Server Manager will create a safety snapshot first.`))return;try{const r=await api(`/api/backups/${encodeURIComponent(name)}/restore`,{method:'POST'});toast(`Restored. Safety copy: ${r.safetySnapshot}`);loadBackups()}catch(e){toast(e.message,true)}}async function deleteSnapshot(name){if(!confirm(`Delete ${name}?`))return;try{await api(`/api/backups/${encodeURIComponent(name)}`,{method:'DELETE'});toast('Snapshot deleted');loadBackups()}catch(e){toast(e.message,true)}}
+async function loadInstallStatus(){try{const d=await api('/api/install/status');$('#install-state').innerHTML=d.installed?`<b style="color:var(--green)">Server files installed</b><br><span class="muted">${esc(d.paths.game)}</span>`:`<b>Server files not installed</b><br><span class="muted">Shared downloader: ${d.downloaderPresent?'ready':'not uploaded'} · Instance game.zip: ${d.bundlePresent?'found':'not found'}${d.busy?' · installer running':''}</span>`;$('#run-downloader').disabled=d.busy||!d.downloaderPresent||d.installed;$('#import-local').disabled=d.busy||!d.bundlePresent||d.installed}catch(e){toast(e.message,true)}}
+$('#downloader-file').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append('file',f);try{await api('/api/install/downloader',{method:'POST',body:fd});toast('Shared Hytale downloader ready');loadInstallStatus()}catch(err){toast(err.message,true)}finally{e.target.value=''}});$('#run-downloader').addEventListener('click',async()=>{try{await api('/api/install/run-downloader',{method:'POST'});toast('Downloader started');switchView('console')}catch(e){toast(e.message,true)}});$('#import-local').addEventListener('click',async()=>{try{await api('/api/install/import-local',{method:'POST'});toast('Import started');switchView('console')}catch(e){toast(e.message,true)}});
+$('#settings-form').addEventListener('submit',async e=>{e.preventDefault();const s={id:state.serverId,serverName:$('#set-name').value.trim(),publicHost:$('#set-host').value.trim(),port:+$('#set-port').value,backupFrequency:+$('#set-backup').value,memoryMin:$('#set-xms').value.trim(),memoryMax:$('#set-xmx').value.trim(),extraArgs:$('#set-args').value.trim(),autoStart:$('#set-autostart').checked,storageDir:state.settings.storageDir||''};try{state.settings=await api('/api/settings',{method:'PUT',body:JSON.stringify(s)});await loadServers(false);await loadSettings();renderStatus();toast('Server settings saved')}catch(e){toast(e.message,true)}});
+$('#delete-server').addEventListener('click',async()=>{const s=selectedSummary();if(!s||s.primary)return;if(!confirm(`Delete ${s.serverName}? Its server files, world, mods and snapshots will be permanently removed.`))return;try{await api(`/api/servers/${encodeURIComponent(s.id)}`,{method:'DELETE'});toast('Server deleted');state.serverId=null;await loadServers(true);await loadSelected();switchView('servers')}catch(e){toast(e.message,true)}});
+
+const dialog=$('#server-dialog');function openServerDialog(){const ports=state.settings||{};$('#new-server-port').value='';$('#new-port-help').textContent=ports.portMin?`Leave blank for the next available port in ${ports.portMin}–${ports.portMax}.`:'Leave blank for the next available published port.';dialog.showModal()}function closeServerDialog(){dialog.close()}$('#add-server-side').addEventListener('click',openServerDialog);$('#add-server-main').addEventListener('click',openServerDialog);$('#close-server-dialog').addEventListener('click',closeServerDialog);$('#cancel-server-dialog').addEventListener('click',closeServerDialog);
+function populateCloneSources(){const sel=$('#new-server-source'),current=sel.value;sel.innerHTML='<option value="">Blank server — install files after creation</option>'+state.servers.filter(s=>s.installed).map(s=>`<option value="${esc(s.id)}">Clone ${esc(s.serverName)} (new world)</option>`).join('');if([...sel.options].some(o=>o.value===current))sel.value=current}
+$('#server-create-form').addEventListener('submit',async e=>{e.preventDefault();const body={name:$('#new-server-name').value.trim(),port:+$('#new-server-port').value||0,sourceServerId:$('#new-server-source').value};try{const s=await api('/api/servers',{method:'POST',body:JSON.stringify(body)});closeServerDialog();toast('Server created');await loadServers(false);await selectServer(s.id);if(!body.sourceServerId)switchView('setup')}catch(err){toast(err.message,true)}});
+boot().catch(e=>{document.body.innerHTML=`<pre style="padding:30px;color:#e29a96">${esc(e.stack||e.message)}</pre>`});
+</script>
+</body>
+</html>

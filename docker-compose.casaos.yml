@@ -1,0 +1,38 @@
+name: hytale-server-manager
+services:
+  manager:
+    image: ghcr.io/srfarsquatch/hytale-server-manager:latest
+    container_name: hytale-server-manager
+    restart: unless-stopped
+    ports:
+      - "8090:8080/tcp"
+      - "5520-5539:5520-5539/udp"
+    volumes:
+      - type: bind
+        source: /DATA/AppData/hytale-server-manager
+        target: /data
+    environment:
+      HSM_DATA_DIR: /data
+      HSM_LISTEN: ":8080"
+      HSM_GAME_PORT_START: "5520"
+      HSM_GAME_PORT_END: "5539"
+      TZ: America/Vancouver
+    stop_grace_period: 100s
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: manager
+  author: Community
+  category: Games
+  description:
+    en_us: Self-hosted multi-server manager for Hytale dedicated servers.
+  developer: Community
+  index: /
+  port_map: "8090"
+  scheme: http
+  store_app_id: hytale-server-manager
+  tagline:
+    en_us: Run and manage multiple Hytale servers from one panel.
+  title:
+    en_us: Hytale Server Manager
