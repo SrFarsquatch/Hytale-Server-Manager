@@ -19,7 +19,7 @@ services:
     environment:
       HSM_DATA_DIR: /data
       HSM_LISTEN: ":8008"
-      HSM_GAME_PORT_START: "${HYTALE_PORT_START:-5520}"
-      HSM_GAME_PORT_END: "${HYTALE_PORT_END:-5525}"
+      HSM_GAME_PORT_START: "5520"
+      HSM_GAME_PORT_END: "5525"
       TZ: America/Vancouver
     stop_grace_period: 100s
