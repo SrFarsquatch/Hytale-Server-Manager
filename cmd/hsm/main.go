@@ -162,7 +162,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	app.routes(mux)
-	addr := envFirst([]string{"HSM_LISTEN", "ORBIS_LISTEN"}, ":8080")
+	addr := envFirst([]string{"HSM_LISTEN", "ORBIS_LISTEN"}, ":8008")
 	srv := &http.Server{Addr: addr, Handler: securityHeaders(mux), ReadHeaderTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second}
 
 	app.cfgMu.RLock()
@@ -1667,7 +1667,7 @@ func pbkdf2SHA256(password, salt []byte, iterations, keyLen int) []byte {
 }
 func deploymentPortRange() (int, int, bool) {
 	start := 5520
-	end := 5539
+	end := 5525
 	locked := false
 	if v := strings.TrimSpace(envFirst([]string{"HSM_GAME_PORT_START", "ORBIS_GAME_PORT_START"}, "")); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 65535 {
