@@ -40,7 +40,7 @@ func (a *App) resourceMetrics() ResourceMetrics {
 		a.lastCPUUsageNS, a.lastCPUSampleAt = usage, now
 		a.resourceMu.Unlock()
 	}
-	if used, limit, ok := readContainerMemory(); ok { m.ContainerMemoryBytes, m.ContainerMemoryLimitBytes, m.MemoryAvailable = used, limit, true }
+	if used, limit, ok := readContainerMemoryWithLimit(); ok { m.ContainerMemoryBytes, m.ContainerMemoryLimitBytes, m.MemoryAvailable = used, limit, true }
 	if used, total, free, err := diskUsage(a.dataDir); err == nil { m.DiskUsedBytes, m.DiskTotalBytes, m.DiskFreeBytes, m.DiskAvailable = used, total, free, true }
 	return m
 }
@@ -81,7 +81,7 @@ func cpuPercent(usageDeltaNS, elapsedNS uint64, capacityCores float64) float64 {
 	p := float64(usageDeltaNS)/float64(elapsedNS)/capacityCores*100; if p < 0 { return 0 }; if p > 100 { return 100 }; return p
 }
 
-func readContainerMemory() (int64, int64, bool) {
+func readContainerMemoryWithLimit() (int64, int64, bool) {
 	for _, p := range []string{"/sys/fs/cgroup/memory.current", "/sys/fs/cgroup/memory/memory.usage_in_bytes"} {
 		if b, err := os.ReadFile(p); err == nil { if n, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64); err == nil && n >= 0 { return n, readEffectiveMemoryLimit(), true } }
 	}
