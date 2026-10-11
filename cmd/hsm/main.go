@@ -122,6 +122,7 @@ type Status struct {
 	Running          bool   `json:"running"`
 	Installed        bool   `json:"installed"`
 	InstallBusy      bool   `json:"installBusy"`
+	State            string `json:"state"`
 	PID              int    `json:"pid"`
 	UptimeSeconds    int64  `json:"uptimeSeconds"`
 	ExitCode         int    `json:"exitCode"`
@@ -140,6 +141,9 @@ type ServerSummary struct {
 	Running       bool   `json:"running"`
 	Installed     bool   `json:"installed"`
 	InstallBusy   bool   `json:"installBusy"`
+	State         string `json:"state"`
+	ExitCode      int    `json:"exitCode"`
+	LastExitAt    string `json:"lastExitAt,omitempty"`
 	UptimeSeconds int64  `json:"uptimeSeconds"`
 	StorageDir    string `json:"storageDir"`
 	Primary       bool   `json:"primary"`
@@ -370,7 +374,7 @@ func (a *App) handleServersList(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		st := m.Status()
-		out = append(out, ServerSummary{ID: s.ID, ServerName: s.ServerName, Port: s.Port, PublicHost: s.PublicHost, Running: st.Running, Installed: st.Installed, InstallBusy: st.InstallBusy, UptimeSeconds: st.UptimeSeconds, StorageDir: s.StorageDir, Primary: i == 0})
+		out = append(out, ServerSummary{ID: s.ID, ServerName: s.ServerName, Port: s.Port, PublicHost: s.PublicHost, Running: st.Running, Installed: st.Installed, InstallBusy: st.InstallBusy, State: st.State, ExitCode: st.ExitCode, LastExitAt: st.LastExitAt, UptimeSeconds: st.UptimeSeconds, StorageDir: s.StorageDir, Primary: i == 0})
 	}
 	jsonOut(w, 200, out)
 }
@@ -1291,6 +1295,22 @@ func (m *ServerManager) Installed() bool {
 }
 func (m *ServerManager) IsRunning() bool   { m.mu.Lock(); defer m.mu.Unlock(); return m.running }
 func (m *ServerManager) InstallBusy() bool { m.mu.Lock(); defer m.mu.Unlock(); return m.installBusy }
+func serverDisplayState(running, installBusy, installed bool, exitCode int, lastExitAt time.Time) string {
+	if running {
+		return "online"
+	}
+	if installBusy {
+		return "installing"
+	}
+	if !installed {
+		return "not-installed"
+	}
+	if !lastExitAt.IsZero() && exitCode != 0 {
+		return "crashed"
+	}
+	return "offline"
+}
+
 func (m *ServerManager) Status() Status {
 	m.mu.Lock()
 	running := m.running
@@ -1310,6 +1330,7 @@ func (m *ServerManager) Status() Status {
 	if !lastExit.IsZero() {
 		st.LastExitAt = lastExit.Format(time.RFC3339)
 	}
+	st.State = serverDisplayState(running, busy, st.Installed, exitCode, lastExit)
 	if running && pid > 0 {
 		st.MemoryBytes = readProcessGroupMemory(pid)
 	} else {
