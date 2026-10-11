@@ -86,6 +86,11 @@ type App struct {
 	sessions   map[string]Session
 	managersMu sync.RWMutex
 	managers   map[string]*ServerManager
+	resourceMu sync.Mutex
+	lastCPUUsageNS uint64
+	lastCPUSampleAt time.Time
+	lastCPUPercent float64
+	hasCPUPercent bool
 }
 
 type ServerManager struct {
@@ -203,6 +208,7 @@ func (a *App) routes(mux *http.ServeMux) {
 	mux.Handle("POST /api/servers/{id}/restart", a.auth(http.HandlerFunc(a.handleServerRestartByPath)))
 
 	mux.Handle("GET /api/status", a.auth(http.HandlerFunc(a.handleStatus)))
+	mux.Handle("GET /api/resources", a.auth(http.HandlerFunc(a.handleResources)))
 	mux.Handle("GET /api/settings", a.auth(http.HandlerFunc(a.handleSettingsGet)))
 	mux.Handle("PUT /api/settings", a.auth(http.HandlerFunc(a.handleSettingsPut)))
 	mux.Handle("POST /api/server/start", a.auth(http.HandlerFunc(a.handleStart)))
@@ -583,6 +589,10 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOut(w, 200, m.Status())
+}
+
+func (a *App) handleResources(w http.ResponseWriter, r *http.Request) {
+	jsonOut(w, 200, a.resourceMetrics())
 }
 func (a *App) handleSettingsGet(w http.ResponseWriter, r *http.Request) {
 	_, s, err := a.requestServer(r)
