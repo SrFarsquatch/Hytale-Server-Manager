@@ -55,3 +55,18 @@ button,input,textarea,select{font:inherit}button{color:inherit}.hidden{display:n
 /* Live process-state feedback */
 .dot.crashed{background:var(--red);box-shadow:0 0 0 3px rgba(198,103,103,.12)}
 .status-detail{margin:10px 0 0;max-width:680px}
+
+
+/* Container resource monitoring */
+.resource-panel{margin-top:14px}
+.resource-sampled{font-size:11px;text-align:right}
+.resource-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:0 16px 16px}
+.resource-card{min-width:0;border:1px solid var(--line);border-radius:10px;padding:13px;background:var(--surface-2)}
+.resource-card-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;color:var(--muted)}
+.resource-card-head strong{font-size:15px;color:var(--text);text-align:right}
+.resource-track{height:7px;margin:12px 0 9px;border-radius:99px;overflow:hidden;background:var(--surface-3)}
+.resource-fill{height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .25s ease}
+.resource-fill.warning{background:var(--amber)}
+.resource-fill.critical{background:var(--red)}
+.resource-card .help{margin:0;font-size:11px;line-height:1.5}
+@media(max-width:900px){.resource-grid{grid-template-columns:1fr}.resource-sampled{text-align:left}}

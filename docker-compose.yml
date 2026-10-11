@@ -7,14 +7,19 @@ services:
     container_name: hytale-server-manager
     restart: unless-stopped
     ports:
-      - "8090:8080/tcp"
-      - "${HYTALE_PORT_START:-5520}-${HYTALE_PORT_END:-5539}:${HYTALE_PORT_START:-5520}-${HYTALE_PORT_END:-5539}/udp"
+      - "8008:8008/tcp"
+      - "5520:5520/udp"
+      - "5521:5521/udp"
+      - "5522:5522/udp"
+      - "5523:5523/udp"
+      - "5524:5524/udp"
+      - "5525:5525/udp"
     volumes:
       - ./data:/data
     environment:
       HSM_DATA_DIR: /data
-      HSM_LISTEN: ":8080"
-      HSM_GAME_PORT_START: "${HYTALE_PORT_START:-5520}"
-      HSM_GAME_PORT_END: "${HYTALE_PORT_END:-5539}"
+      HSM_LISTEN: ":8008"
+      HSM_GAME_PORT_START: "5520"
+      HSM_GAME_PORT_END: "5525"
       TZ: America/Vancouver
     stop_grace_period: 100s

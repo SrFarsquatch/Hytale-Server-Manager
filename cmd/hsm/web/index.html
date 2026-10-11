@@ -98,6 +98,15 @@
           <div><span>Files</span><strong id="metric-installed">—</strong></div>
         </div>
 
+        <section class="panel resource-panel">
+          <div class="panel-head"><div><h3>Host resources</h3><p class="help">Container CPU and RAM, plus filesystem capacity for the persistent /data volume.</p></div><span id="resource-sampled" class="muted resource-sampled">Waiting for metrics</span></div>
+          <div class="resource-grid">
+            <article class="resource-card"><div class="resource-card-head"><span>Container CPU</span><strong id="resource-cpu-value">Sampling…</strong></div><div class="resource-track"><div id="resource-cpu-bar" class="resource-fill"></div></div><p class="help">Usage as a percentage of available container CPU capacity.</p></article>
+            <article class="resource-card"><div class="resource-card-head"><span>Container RAM</span><strong id="resource-memory-value">—</strong></div><div class="resource-track"><div id="resource-memory-bar" class="resource-fill"></div></div><p class="help">Memory use and cgroup limit, when the runtime reports one.</p></article>
+            <article class="resource-card"><div class="resource-card-head"><span>Data filesystem</span><strong id="resource-disk-value">—</strong></div><div class="resource-track"><div id="resource-disk-bar" class="resource-fill"></div></div><p class="help">Filesystem containing /data, not the size of an individual world.</p></article>
+          </div>
+        </section>
+
         <div class="dashboard-grid">
           <section class="panel">
             <div class="panel-head"><h3>Actions</h3></div>

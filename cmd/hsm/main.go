@@ -86,6 +86,11 @@ type App struct {
 	sessions   map[string]Session
 	managersMu sync.RWMutex
 	managers   map[string]*ServerManager
+	resourceMu sync.Mutex
+	lastCPUUsageNS uint64
+	lastCPUSampleAt time.Time
+	lastCPUPercent float64
+	hasCPUPercent bool
 }
 
 type ServerManager struct {
@@ -162,7 +167,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	app.routes(mux)
-	addr := envFirst([]string{"HSM_LISTEN", "ORBIS_LISTEN"}, ":8080")
+	addr := envFirst([]string{"HSM_LISTEN", "ORBIS_LISTEN"}, ":8008")
 	srv := &http.Server{Addr: addr, Handler: securityHeaders(mux), ReadHeaderTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second}
 
 	app.cfgMu.RLock()
@@ -203,6 +208,7 @@ func (a *App) routes(mux *http.ServeMux) {
 	mux.Handle("POST /api/servers/{id}/restart", a.auth(http.HandlerFunc(a.handleServerRestartByPath)))
 
 	mux.Handle("GET /api/status", a.auth(http.HandlerFunc(a.handleStatus)))
+	mux.Handle("GET /api/resources", a.auth(http.HandlerFunc(a.handleResources)))
 	mux.Handle("GET /api/settings", a.auth(http.HandlerFunc(a.handleSettingsGet)))
 	mux.Handle("PUT /api/settings", a.auth(http.HandlerFunc(a.handleSettingsPut)))
 	mux.Handle("POST /api/server/start", a.auth(http.HandlerFunc(a.handleStart)))
@@ -583,6 +589,10 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOut(w, 200, m.Status())
+}
+
+func (a *App) handleResources(w http.ResponseWriter, r *http.Request) {
+	jsonOut(w, 200, a.resourceMetrics())
 }
 func (a *App) handleSettingsGet(w http.ResponseWriter, r *http.Request) {
 	_, s, err := a.requestServer(r)
@@ -1667,7 +1677,7 @@ func pbkdf2SHA256(password, salt []byte, iterations, keyLen int) []byte {
 }
 func deploymentPortRange() (int, int, bool) {
 	start := 5520
-	end := 5539
+	end := 5525
 	locked := false
 	if v := strings.TrimSpace(envFirst([]string{"HSM_GAME_PORT_START", "ORBIS_GAME_PORT_START"}, "")); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 65535 {

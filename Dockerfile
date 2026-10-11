@@ -16,8 +16,8 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 WORKDIR /data
 VOLUME ["/data"]
-EXPOSE 8080/tcp 5520-5539/udp
+EXPOSE 8008/tcp 5520-5525/udp
 ENV HSM_DATA_DIR=/data \
-    HSM_LISTEN=:8080
+    HSM_LISTEN=:8008
 ENTRYPOINT ["/usr/bin/tini","--","/usr/local/bin/entrypoint.sh"]
 CMD ["/usr/local/bin/hytale-server-manager"]
