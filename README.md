@@ -24,9 +24,9 @@ cd Hytale-Server-Manager
 ./install.sh
 ```
 
-Open `http://YOUR-SERVER-IP:8090`.
+Open `http://YOUR-SERVER-IP:8008`.
 
-The default Hytale UDP range is `5520-5539`. Each running instance gets its own port from that range.
+The default Hytale UDP range is `5520-5525`. Each running instance gets its own port from that range.
 
 ## CasaOS
 
@@ -52,7 +52,7 @@ Each instance keeps its own `game/`, imports, snapshots, Hytale world/universe d
 
 ## Networking
 
-The web panel uses TCP `8090` on the host. Hytale game servers use UDP/QUIC. The default Compose file publishes UDP `5520-5539` so up to 20 instances can be assigned unique ports without changing the container definition.
+The web panel uses TCP `8008` on the host and container. Hytale game servers use UDP/QUIC. The Compose and CasaOS definitions publish only UDP ports `5520`, `5521`, `5522`, `5523`, `5524`, and `5525`, allowing up to six instances to use unique ports.
 
 ## Hytale files
 
