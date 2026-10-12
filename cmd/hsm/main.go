@@ -56,6 +56,7 @@ type ServerSettings struct {
 	ExtraArgs       string `json:"extraArgs"`
 	PublicHost      string `json:"publicHost"`
 	BackupFrequency int    `json:"backupFrequency"`
+	SnapshotRetention int  `json:"snapshotRetention"`
 	StorageDir      string `json:"storageDir,omitempty"`
 	PortMin         int    `json:"portMin,omitempty"`
 	PortMax         int    `json:"portMax,omitempty"`
@@ -220,6 +221,7 @@ func (a *App) routes(mux *http.ServeMux) {
 
 	mux.Handle("GET /api/status", a.auth(http.HandlerFunc(a.handleStatus)))
 	mux.Handle("GET /api/resources", a.auth(http.HandlerFunc(a.handleResources)))
+	mux.Handle("GET /api/diagnostics", a.auth(http.HandlerFunc(a.handleDiagnostics)))
 	mux.Handle("GET /api/settings", a.auth(http.HandlerFunc(a.handleSettingsGet)))
 	mux.Handle("PUT /api/settings", a.auth(http.HandlerFunc(a.handleSettingsPut)))
 	mux.Handle("POST /api/server/start", a.auth(http.HandlerFunc(a.handleStart)))
@@ -237,6 +239,7 @@ func (a *App) routes(mux *http.ServeMux) {
 	mux.Handle("POST /api/mods/upload", a.auth(http.HandlerFunc(a.handleModUpload)))
 	mux.Handle("DELETE /api/mods/{name}", a.auth(http.HandlerFunc(a.handleModDelete)))
 	mux.Handle("GET /api/backups", a.auth(http.HandlerFunc(a.handleBackupsList)))
+	mux.Handle("POST /api/backups/{name}/verify", a.auth(http.HandlerFunc(a.handleSnapshotVerify)))
 	mux.Handle("POST /api/backups/native", a.auth(http.HandlerFunc(a.handleNativeBackup)))
 	mux.Handle("POST /api/backups/snapshot", a.auth(http.HandlerFunc(a.handleSnapshotCreate)))
 	mux.Handle("POST /api/backups/{name}/restore", a.auth(http.HandlerFunc(a.handleSnapshotRestore)))
@@ -712,6 +715,11 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "backup frequency must be between 5 and 10080 minutes")
 		return
 	}
+	if in.SnapshotRetention == 0 { in.SnapshotRetention = current.SnapshotRetention }
+	if in.SnapshotRetention < 1 || in.SnapshotRetention > 100 {
+		jsonError(w, 400, "snapshot retention must be between 1 and 100 snapshots")
+		return
+	}
 	if m.IsRunning() && in.Port != current.Port {
 		jsonError(w, 409, "stop the server before changing its port")
 		return
@@ -1097,10 +1105,11 @@ func (a *App) handleSnapshotCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 500, err.Error())
 		return
 	}
+	pruneSnapshots(filepath.Join(root, "snapshots"), s.SnapshotRetention)
 	jsonOut(w, 201, map[string]any{"ok": true, "name": name})
 }
 func (a *App) handleSnapshotRestore(w http.ResponseWriter, r *http.Request) {
-	m, s, err := a.requestServer(r)
+	m, server, err := a.requestServer(r)
 	if err != nil {
 		jsonError(w, 404, err.Error())
 		return
@@ -1110,25 +1119,111 @@ func (a *App) handleSnapshotRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := filepath.Base(r.PathValue("name"))
-	if !strings.HasSuffix(name, ".tar.gz") {
+	if !strings.HasSuffix(name, ".tar.gz") || name == "." || name == ".." {
 		jsonError(w, 400, "invalid snapshot")
 		return
 	}
-	root := a.serverRoot(s)
+	root := a.serverRoot(server)
 	src := filepath.Join(root, "snapshots", name)
-	if _, err := os.Stat(src); err != nil {
+	if info, err := os.Stat(src); err != nil || !info.Mode().IsRegular() {
 		jsonError(w, 404, "snapshot not found")
 		return
 	}
 	serverDir := filepath.Join(root, "game", "Server")
-	safety := filepath.Join(root, "snapshots", "pre-restore-"+time.Now().Format("20060102-150405")+".tar.gz")
-	_ = createTarGz(safety, serverDir, []string{"universe", "mods", "config.json", "permissions.json", "whitelist.json", "bans.json"})
-	if err := extractTarGz(src, serverDir); err != nil {
-		jsonError(w, 500, err.Error())
+	include := []string{"universe", "mods", "config.json", "permissions.json", "whitelist.json", "bans.json"}
+	safety := filepath.Join(root, "snapshots", "pre-restore-"+time.Now().Format("20060102-150405.000")+".tar.gz")
+	if err := createTarGz(safety, serverDir, include); err != nil {
+		jsonError(w, 500, "could not create safety snapshot; restore was not attempted: "+err.Error())
+		return
+	}
+
+	// Validate and extract the archive in a staging directory first. A malformed
+	// snapshot must never partially overwrite the live server data.
+	stage, err := os.MkdirTemp(filepath.Dir(serverDir), ".snapshot-restore-")
+	if err != nil {
+		jsonError(w, 500, "could not create restore staging directory: "+err.Error())
+		return
+	}
+	defer os.RemoveAll(stage)
+	if err := extractTarGz(src, stage); err != nil {
+		jsonError(w, 400, "snapshot could not be validated; server data was not changed: "+err.Error())
+		return
+	}
+
+	if err := replaceSnapshotEntries(stage, serverDir, include); err != nil {
+		rollbackErr := replaceSnapshotEntriesFromArchive(safety, serverDir, include)
+		if rollbackErr != nil {
+			jsonError(w, 500, fmt.Sprintf("restore failed: %v; automatic rollback also failed: %v. Safety snapshot retained at %s", err, rollbackErr, filepath.Base(safety)))
+			return
+		}
+		jsonError(w, 500, "restore failed; the original server data was restored from the safety snapshot: "+err.Error())
 		return
 	}
 	jsonOut(w, 200, map[string]any{"ok": true, "safetySnapshot": filepath.Base(safety)})
 }
+func replaceSnapshotEntries(stage, dst string, include []string) error {
+	for _, name := range include {
+		target := filepath.Join(dst, name)
+		if err := os.RemoveAll(target); err != nil {
+			return fmt.Errorf("remove existing %s: %w", name, err)
+		}
+		source := filepath.Join(stage, name)
+		if _, err := os.Lstat(source); errors.Is(err, os.ErrNotExist) {
+			continue
+		} else if err != nil {
+			return err
+		}
+		if err := os.Rename(source, target); err != nil {
+			return fmt.Errorf("install restored %s: %w", name, err)
+		}
+	}
+	return nil
+}
+func replaceSnapshotEntriesFromArchive(archive, dst string, include []string) error {
+	stage, err := os.MkdirTemp(filepath.Dir(dst), ".snapshot-rollback-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(stage)
+	if err := extractTarGz(archive, stage); err != nil {
+		return err
+	}
+	return replaceSnapshotEntries(stage, dst, include)
+}
+func (a *App) handleSnapshotVerify(w http.ResponseWriter, r *http.Request) {
+	_, server, err := a.requestServer(r)
+	if err != nil { jsonError(w, 404, err.Error()); return }
+	name := filepath.Base(r.PathValue("name"))
+	if !strings.HasPrefix(name, "snapshot-") || !strings.HasSuffix(name, ".tar.gz") {
+		jsonError(w, 400, "only restorable snapshots can be verified"); return
+	}
+	src := filepath.Join(a.serverRoot(server), "snapshots", name)
+	if info, err := os.Stat(src); err != nil || !info.Mode().IsRegular() {
+		jsonError(w, 404, "snapshot not found"); return
+	}
+	stage, err := os.MkdirTemp("", "hsm-snapshot-verify-")
+	if err != nil { jsonError(w, 500, "could not create verification workspace: "+err.Error()); return }
+	defer os.RemoveAll(stage)
+	if err := extractTarGz(src, stage); err != nil {
+		jsonOut(w, 200, map[string]any{"ok": true, "valid": false, "name": name, "message": "Verification failed: " + err.Error()}); return
+	}
+	entries := 0
+	_ = filepath.WalkDir(stage, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil { return err }; if !d.IsDir() { entries++ }; return nil
+	})
+	jsonOut(w, 200, map[string]any{"ok": true, "valid": true, "name": name, "entries": entries, "message": fmt.Sprintf("Archive is readable and passed safety checks (%d files).", entries)})
+}
+
+func pruneSnapshots(dir string, retention int) {
+	if retention < 1 { return }
+	files := listFiles(dir, ".tar.gz")
+	var snapshots []FileInfoDTO
+	for _, f := range files { if strings.HasPrefix(f.Name, "snapshot-") { snapshots = append(snapshots, f) } }
+	for _, f := range snapshots[minInt(retention, len(snapshots)):] { _ = os.Remove(filepath.Join(dir, f.Name)) }
+}
+
+func minInt(a, b int) int { if a < b { return a }; return b }
+
 func (a *App) handleSnapshotDelete(w http.ResponseWriter, r *http.Request) {
 	_, s, err := a.requestServer(r)
 	if err != nil {
@@ -1246,7 +1341,7 @@ func (a *App) handleImportLocal(w http.ResponseWriter, r *http.Request) {
 
 func defaultServerSettings(id, name string, port int, storage string) ServerSettings {
 	min, max, _ := deploymentPortRange()
-	return ServerSettings{ID: id, ServerName: name, Port: port, GameMode: "Adventure", MaxPlayers: 20, MOTD: "Welcome to your Hytale server!", MemoryMin: "2G", MemoryMax: "4G", AutoStart: false, ExtraArgs: "", PublicHost: "", BackupFrequency: 30, StorageDir: storage, PortMin: min, PortMax: max}
+	return ServerSettings{ID: id, ServerName: name, Port: port, GameMode: "Adventure", MaxPlayers: 20, MOTD: "Welcome to your Hytale server!", MemoryMin: "2G", MemoryMax: "4G", AutoStart: false, ExtraArgs: "", PublicHost: "", BackupFrequency: 30, SnapshotRetention: 10, StorageDir: storage, PortMin: min, PortMax: max}
 }
 func (a *App) loadConfig() error {
 	path := filepath.Join(a.dataDir, "controller.json")
@@ -1329,6 +1424,9 @@ func (a *App) loadConfig() error {
 		}
 		if cfg.Servers[i].BackupFrequency == 0 {
 			cfg.Servers[i].BackupFrequency = 30
+		}
+		if cfg.Servers[i].SnapshotRetention == 0 {
+			cfg.Servers[i].SnapshotRetention = 10
 		}
 	}
 	a.cfg = cfg
@@ -2272,6 +2370,12 @@ func createTarGz(dst, base string, include []string) error {
 	if err != nil {
 		return err
 	}
+	success := false
+	defer func() {
+		if !success {
+			_ = os.Remove(dst)
+		}
+	}()
 	gz := gzip.NewWriter(f)
 	tw := tar.NewWriter(gz)
 	closeAll := func() error {
@@ -2294,6 +2398,11 @@ func createTarGz(dst, base string, include []string) error {
 		err := filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
+			}
+			// Snapshots intentionally contain only directories and regular files.
+			// Skipping links/special files keeps every generated snapshot restorable.
+			if !info.IsDir() && !info.Mode().IsRegular() {
+				return nil
 			}
 			rel, err := filepath.Rel(base, p)
 			if err != nil {
@@ -2326,7 +2435,11 @@ func createTarGz(dst, base string, include []string) error {
 			return err
 		}
 	}
-	return closeAll()
+	if err := closeAll(); err != nil {
+		return err
+	}
+	success = true
+	return nil
 }
 func extractTarGz(src, dst string) error {
 	f, err := os.Open(src)
@@ -2348,17 +2461,25 @@ func extractTarGz(src, dst string) error {
 		if err != nil {
 			return err
 		}
-		clean := filepath.Clean(h.Name)
-		if clean == "." || strings.HasPrefix(clean, "..") || filepath.IsAbs(clean) {
+		clean := filepath.Clean(filepath.FromSlash(h.Name))
+		if clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(os.PathSeparator)) || filepath.IsAbs(clean) || h.Name == "" {
 			return fmt.Errorf("unsafe snapshot path: %s", h.Name)
 		}
+		// Snapshots only contain ordinary files and directories. Refuse links and
+		// special files so a crafted archive cannot write outside the server tree.
+		if h.Typeflag != tar.TypeDir && h.Typeflag != tar.TypeReg && h.Typeflag != tar.TypeRegA {
+			return fmt.Errorf("unsupported snapshot entry type for %s", h.Name)
+		}
 		target := filepath.Join(dst, clean)
+		if rel, err := filepath.Rel(dst, target); err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+			return fmt.Errorf("unsafe snapshot path: %s", h.Name)
+		}
 		switch h.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(target, 0755); err != nil {
 				return err
 			}
-		case tar.TypeReg:
+		case tar.TypeReg, tar.TypeRegA:
 			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 				return err
 			}

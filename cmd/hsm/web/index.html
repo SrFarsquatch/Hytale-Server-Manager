@@ -121,6 +121,11 @@
           </div>
         </section>
 
+        <section class="panel diagnostics-panel">
+          <div class="panel-head"><div><h3>Health checks</h3><p class="help">Checks for missing files, configuration errors, port assignments, disk space and recent crashes.</p></div><div class="row"><span id="diagnostics-summary" class="diagnostic-summary">Checking…</span><button id="diagnostics-refresh" class="quiet-btn">Run checks</button></div></div>
+          <div id="diagnostics-list" class="diagnostics-list"><p class="muted">Checking this server…</p></div>
+        </section>
+
         <div class="dashboard-grid">
           <section class="panel">
             <div class="panel-head"><h3>Actions</h3></div>
@@ -151,7 +156,8 @@
 
       <section id="view-console" class="view">
         <div class="panel console-card">
-          <div class="panel-head"><h3>Console</h3><div class="console-tools"><label><input type="checkbox" id="auto-scroll" checked> Auto-scroll</label><button class="quiet-btn" id="clear-console">Clear</button></div></div>
+          <div class="panel-head"><div><h3>Live console</h3><p id="log-count" class="help">Waiting for logs</p></div><div class="console-tools"><label><input type="checkbox" id="auto-scroll" checked> Auto-scroll</label><button class="quiet-btn" id="download-logs">Download</button><button class="quiet-btn" id="clear-console">Clear view</button></div></div>
+          <div class="log-filters"><input id="log-search" type="search" placeholder="Search log messages…" aria-label="Search log messages"><select id="log-source" aria-label="Filter log source"><option value="all">All sources</option><option value="server">Server output</option><option value="stderr">Errors</option><option value="controller">Manager</option><option value="console">Commands</option><option value="installer">Installer</option></select></div>
           <div id="console-output" class="console-output"></div>
           <form id="console-form" class="console-input"><span>&gt;</span><input id="console-command" autocomplete="off" placeholder="Enter a server command"><button class="btn primary">Send</button></form>
         </div>
@@ -173,7 +179,7 @@
       <section id="view-backups" class="view">
         <div class="stack-panels">
           <div class="panel"><div class="panel-head"><div><h3>Native backups</h3><p class="help">Backups created by Hytale.</p></div><button class="btn primary" id="native-backup">Back up now</button></div><div id="native-backups" class="file-list empty-state">No native backups found.</div></div>
-          <div class="panel"><div class="panel-head"><div><h3>Full snapshots</h3><p class="help">World, configuration, permissions and mods. Server must be stopped.</p></div><button class="btn" id="snapshot-backup">Create snapshot</button></div><div id="snapshots" class="file-list empty-state">No snapshots found.</div></div>
+          <div class="panel"><div class="panel-head"><div><h3>Full snapshots</h3><p class="help">Restores replace the saved world, mods and listed configuration files. Server must be stopped.</p></div><button class="btn" id="snapshot-backup">Create snapshot</button></div><div id="snapshots" class="file-list empty-state">No snapshots found.</div></div>
         </div>
       </section>
 
@@ -199,7 +205,8 @@
             <label>Server message<input id="set-motd" maxlength="160" placeholder="Welcome to your server"></label>
             <label class="toggle-row"><span><b>Require whitelist permission</b><small>Restrict joining to players granted server join access.</small></span><input id="set-whitelist" type="checkbox"></label>
             <label>Server password (optional)<input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label>
-            <label>Backup frequency (minutes)<input id="set-backup" type="number" min="5" max="10080" required></label>
+            <label>Backup frequency (minutes)<input id="set-backup" type="number" min="5" max="10080" required><small>How often Hytale makes native backups.</small></label>
+            <label>Snapshot retention<input id="set-retention" type="number" min="1" max="100" required><small>Keep this many recent full snapshots. Safety copies are kept separately.</small></label>
             <label>Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
             <label>Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
           </div>
