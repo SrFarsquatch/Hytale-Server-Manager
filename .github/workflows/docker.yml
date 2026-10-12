@@ -1,8 +1,9 @@
-name: Build container
+name: Build container (manual diagnostic)
+
+# Stable releases and the latest image are published by auto-release.yml.
+# Keep this workflow for on-demand diagnostic builds only, without touching
+# the stable version or latest tags.
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,8 +25,6 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=tag
             type=sha
       - uses: docker/build-push-action@v6
         with:
