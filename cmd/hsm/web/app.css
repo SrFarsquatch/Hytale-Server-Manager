@@ -115,3 +115,10 @@ button,input,textarea,select{font:inherit}button{color:inherit}.hidden{display:n
 .diagnostic-copy small { display: block; margin-top: 5px; font-size: 12px; line-height: 1.45; color: var(--text); opacity: .82; }
 .diagnostic-state { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 @media (max-width: 600px) { .diagnostic-check { grid-template-columns: 9px minmax(0,1fr); } .diagnostic-state { grid-column: 2; } .diagnostics-panel .panel-head { align-items: flex-start; flex-wrap: wrap; } }
+
+
+/* Console log search and export */
+.log-filters { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: 8px; padding: 0 16px 12px; }
+.log-filters input, .log-filters select { min-width: 0; width: 100%; }
+.log-empty { color: var(--muted); padding: 22px 12px; text-align: center; font-size: 13px; }
+@media (max-width: 600px) { .log-filters { grid-template-columns: 1fr; } }
