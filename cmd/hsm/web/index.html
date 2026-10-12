@@ -39,7 +39,8 @@
         <button data-view="mods">Mods</button>
         <button data-view="backups">Backups</button>
         <button data-view="setup">Install</button>
-        <button data-view="settings">Settings</button>
+        <button data-view="settings">Server settings</button>
+        <button data-view="app-settings">Application settings</button>
       </nav>
 
       <div class="sidebar-foot">
@@ -207,6 +208,9 @@
           <label class="toggle-row"><span><b>Auto-start</b><small>Start this instance when the manager starts.</small></span><input id="set-autostart" type="checkbox"></label>
           <div class="settings-note"><b>Networking</b><span>The container publishes a UDP range. Each server needs a different port in that range.</span></div>
         </form>
+      </section>
+
+      <section id="view-app-settings" class="view">
         <section class="panel app-update-panel" aria-labelledby="app-update-title">
           <div class="panel-head">
             <div><h3 id="app-update-title">Application updates</h3><p class="help">Check for new Hytale Server Manager releases and update this container without leaving the dashboard.</p></div>
