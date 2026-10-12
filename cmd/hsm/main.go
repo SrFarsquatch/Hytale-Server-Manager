@@ -1257,7 +1257,7 @@ func (a *App) loadConfig() error {
 		return err
 	}
 	var rawCfg struct {
-		Servers []map[string]json.RawMessage `+"`"+`json:"servers"`+"`"+`
+		Servers []map[string]json.RawMessage `json:"servers"`
 	}
 	_ = json.Unmarshal(b, &rawCfg)
 	if len(cfg.Servers) == 0 && cfg.Settings != nil {
