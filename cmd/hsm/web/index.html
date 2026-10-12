@@ -207,6 +207,25 @@
           <label class="toggle-row"><span><b>Auto-start</b><small>Start this instance when the manager starts.</small></span><input id="set-autostart" type="checkbox"></label>
           <div class="settings-note"><b>Networking</b><span>The container publishes a UDP range. Each server needs a different port in that range.</span></div>
         </form>
+        <section class="panel app-update-panel" aria-labelledby="app-update-title">
+          <div class="panel-head">
+            <div><h3 id="app-update-title">Application updates</h3><p class="help">Check for new Hytale Server Manager releases and update this container without leaving the dashboard.</p></div>
+            <span id="app-update-badge" class="update-badge">Checking</span>
+          </div>
+          <div class="update-version-grid">
+            <div><span>Installed version</span><strong id="app-update-current">v0.5.0</strong></div>
+            <div><span>Latest release</span><strong id="app-update-latest">—</strong></div>
+            <div><span>Published</span><strong id="app-update-date">—</strong></div>
+          </div>
+          <p id="app-update-message" class="help update-message">Check GitHub for the latest stable release.</p>
+          <div id="app-update-notes" class="update-notes hidden"></div>
+          <div class="update-actions">
+            <button type="button" id="app-update-check" class="btn">Check for updates</button>
+            <button type="button" id="app-update-apply" class="btn primary" disabled>Update and restart</button>
+            <a id="app-update-release-link" class="quiet-btn hidden" href="#" target="_blank" rel="noreferrer">Release details ↗</a>
+          </div>
+          <p class="update-security-note"><strong>Security note:</strong> Self-updating uses Docker Engine access to replace this container. Anyone who compromises this manager could gain host-level Docker access. Keep the dashboard private and use a strong admin password.</p>
+        </section>
       </section>
     </main>
   </div>
