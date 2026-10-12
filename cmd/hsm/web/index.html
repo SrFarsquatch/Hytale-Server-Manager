@@ -163,8 +163,8 @@
 
       <section id="view-config" class="view">
         <div class="panel">
-          <div class="panel-head file-head"><div><h3>Server files</h3><p class="help">Stop the server before editing files that Hytale writes at runtime.</p></div><div class="file-actions"><select id="config-file"><option>config.json</option><option>permissions.json</option><option>whitelist.json</option><option>bans.json</option></select><button class="btn" id="reload-config">Reload</button></div></div>
-          <div id="config-running-note" class="inline-notice hidden">Stop this server to edit the file.</div>
+          <div class="panel-head file-head"><div><h3>Server configuration</h3><p class="help">Edit supported JSON files directly in the app. Changes are checked for valid JSON before saving.</p></div><div class="file-actions"><select id="config-file"><option>config.json</option><option>permissions.json</option><option>whitelist.json</option><option>bans.json</option></select><button class="btn" id="reload-config">Reload</button></div></div>
+          <div id="config-running-note" class="inline-notice hidden">Stop this server to edit the file.</div><p id="config-mode-note" class="help">Checking whether this file can be edited…</p>
           <textarea id="server-config" class="code-editor" spellcheck="false"></textarea>
           <div class="row end"><span id="config-note" class="muted"></span><button class="btn primary" id="save-config">Save</button></div>
         </div>
@@ -203,7 +203,7 @@
             <label>Server message<input id="set-motd" maxlength="160" placeholder="Welcome to your server"></label>
             <label class="toggle-row"><span><b>Require whitelist permission</b><small>Restrict joining to players granted server join access.</small></span><input id="set-whitelist" type="checkbox"></label>
             <label>Server password (optional)<input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label>
-            <label>Backup frequency (minutes)<input id="set-backup" type="number" min="5" max="10080" required></label>
+            <label>Automatic Hytale backup frequency (minutes)<input id="set-backup" type="number" min="5" max="10080" required><small>Range: 5 minutes to 7 days. Applied when the server next starts; restart a running server after changing this value.</small></label>
             <label>Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
             <label>Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
           </div>
