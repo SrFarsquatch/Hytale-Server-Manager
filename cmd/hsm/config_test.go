@@ -50,6 +50,30 @@ func TestLoadConfigPreservesExistingServers(t *testing.T) {
 	}
 }
 
+func TestLoadConfigPreservesExistingGameSettings(t *testing.T) {
+	dir := t.TempDir()
+	controller := []byte(`{"servers":[{"id":"main","serverName":"Old World","port":5520,"memoryMin":"2G","memoryMax":"4G","backupFrequency":30,"storageDir":"."}]}`)
+	if err := os.WriteFile(filepath.Join(dir, "controller.json"), controller, 0600); err != nil {
+		t.Fatal(err)
+	}
+	gameDir := filepath.Join(dir, "game", "Server")
+	if err := os.MkdirAll(gameDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	gameConfig := []byte(`{"Version":4,"MOTD":"Keep my world","Password":"keep-secret","MaxPlayers":64,"RequireJoinPermission":true,"Defaults":{"World":"default","GameMode":"Creative"}}`)
+	if err := os.WriteFile(filepath.Join(gameDir, "config.json"), gameConfig, 0644); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{dataDir: dir}
+	if err := a.loadConfig(); err != nil {
+		t.Fatalf("loadConfig() error = %v", err)
+	}
+	got := a.cfg.Servers[0]
+	if got.GameMode != "Creative" || got.MaxPlayers != 64 || got.MOTD != "Keep my world" || got.Password != "keep-secret" || !got.WhitelistEnabled {
+		t.Fatalf("existing game settings were not migrated: %#v", got)
+	}
+}
+
 func TestLoadConfigMigratesLegacySettings(t *testing.T) {
 	dir := t.TempDir()
 	cfg := ControllerConfig{Settings: &legacySettings{ServerName: "Old World", Port: 5522, MemoryMin: "3G", MemoryMax: "5G"}}
