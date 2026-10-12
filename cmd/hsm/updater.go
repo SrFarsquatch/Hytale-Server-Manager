@@ -337,7 +337,7 @@ func launchUpdateHelper(containerID, targetImage string) error {
 	name := "hsm-update-helper-"+strconv.FormatInt(time.Now().Unix(), 10)
 	createBody := map[string]any{
 		"Image": inspect.Image,
-		"Cmd": []string{"--update-helper"},
+		"Cmd": []string{"/usr/local/bin/hytale-server-manager", "--update-helper"},
 		"Env": []string{"HSM_UPDATE_CONTAINER_ID="+containerID, "HSM_UPDATE_TARGET_IMAGE="+targetImage},
 		"HostConfig": hostConfig,
 	}
