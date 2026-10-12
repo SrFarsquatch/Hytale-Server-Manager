@@ -45,6 +45,10 @@ type ServerSettings struct {
 	ID              string `json:"id"`
 	ServerName      string `json:"serverName"`
 	Port            int    `json:"port"`
+	GameMode        string `json:"gameMode"`
+	MaxPlayers      int    `json:"maxPlayers"`
+	MOTD            string `json:"motd"`
+	Password        string `json:"password"`
 	MemoryMin       string `json:"memoryMin"`
 	MemoryMax       string `json:"memoryMax"`
 	AutoStart       bool   `json:"autoStart"`
@@ -386,17 +390,54 @@ func (a *App) handleServersList(w http.ResponseWriter, r *http.Request) {
 }
 func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Name           string `json:"name"`
-		Port           int    `json:"port"`
-		SourceServerID string `json:"sourceServerId"`
+		Game            string `json:"game"`
+		Name            string `json:"name"`
+		Port            int    `json:"port"`
+		GameMode        string `json:"gameMode"`
+		MaxPlayers      int    `json:"maxPlayers"`
+		MOTD            string `json:"motd"`
+		Password        string `json:"password"`
+		MemoryMin       string `json:"memoryMin"`
+		MemoryMax       string `json:"memoryMax"`
+		BackupFrequency int    `json:"backupFrequency"`
+		AutoStart       bool   `json:"autoStart"`
+		SourceServerID  string `json:"sourceServerId"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		jsonError(w, 400, err.Error())
 		return
 	}
+	game := strings.TrimSpace(body.Game)
+	if game != "" && game != "hytale" {
+		jsonError(w, 400, "this release supports Hytale servers only")
+		return
+	}
 	name := strings.TrimSpace(body.Name)
-	if name == "" {
-		name = "New Hytale Server"
+	if len(name) < 2 || len(name) > 64 {
+		jsonError(w, 400, "server name must be between 2 and 64 characters")
+		return
+	}
+	if body.GameMode == "" { body.GameMode = "Adventure" }
+	if body.GameMode != "Adventure" && body.GameMode != "Creative" {
+		jsonError(w, 400, "game mode must be Adventure or Creative")
+		return
+	}
+	if body.MaxPlayers == 0 { body.MaxPlayers = 20 }
+	if body.MaxPlayers < 1 || body.MaxPlayers > 1000 {
+		jsonError(w, 400, "maximum players must be between 1 and 1000")
+		return
+	}
+	if body.MOTD == "" { body.MOTD = "Welcome to your Hytale server!" }
+	if body.MemoryMin == "" { body.MemoryMin = "2G" }
+	if body.MemoryMax == "" { body.MemoryMax = "4G" }
+	if !validMemory(body.MemoryMin) || !validMemory(body.MemoryMax) {
+		jsonError(w, 400, "memory values must look like 2G, 4096M, or 1024K")
+		return
+	}
+	if body.BackupFrequency == 0 { body.BackupFrequency = 30 }
+	if body.BackupFrequency < 5 || body.BackupFrequency > 10080 {
+		jsonError(w, 400, "backup frequency must be between 5 and 10080 minutes")
+		return
 	}
 	id := a.uniqueServerID(slugify(name))
 	if id == "" {
@@ -417,6 +458,14 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := defaultServerSettings(id, name, port, filepath.Join("servers", id))
+	s.GameMode = body.GameMode
+	s.MaxPlayers = body.MaxPlayers
+	s.MOTD = body.MOTD
+	s.Password = body.Password
+	s.MemoryMin = body.MemoryMin
+	s.MemoryMax = body.MemoryMax
+	s.BackupFrequency = body.BackupFrequency
+	s.AutoStart = body.AutoStart
 	if err := ensureServerDirs(a.serverRoot(s)); err != nil {
 		jsonError(w, 500, err.Error())
 		return
@@ -637,6 +686,18 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "memory values must look like 2G, 4096M, or 1024K")
 		return
 	}
+	if in.GameMode == "" { in.GameMode = current.GameMode }
+	if in.GameMode != "Adventure" && in.GameMode != "Creative" {
+		jsonError(w, 400, "game mode must be Adventure or Creative")
+		return
+	}
+	if in.MaxPlayers == 0 { in.MaxPlayers = current.MaxPlayers }
+	if in.MaxPlayers < 1 || in.MaxPlayers > 1000 {
+		jsonError(w, 400, "maximum players must be between 1 and 1000")
+		return
+	}
+	if in.MOTD == "" { in.MOTD = current.MOTD }
+	if in.Password == "" && current.Password != "" { in.Password = current.Password }
 	if in.BackupFrequency < 5 || in.BackupFrequency > 10080 {
 		jsonError(w, 400, "backup frequency must be between 5 and 10080 minutes")
 		return
@@ -662,6 +723,12 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 500, err.Error())
 		return
 	}
+	if !m.IsRunning() {
+		if err := a.applyHytaleConfig(in); err != nil {
+			jsonError(w, 500, "settings saved, but Hytale config could not be updated: "+err.Error())
+			return
+		}
+	}
 	jsonOut(w, 200, in)
 }
 func (a *App) handleStart(w http.ResponseWriter, r *http.Request) {
@@ -683,6 +750,9 @@ func (a *App) startServerByID(id string) error {
 	}
 	if err := a.writeJVMOptionsFor(s); err != nil {
 		return err
+	}
+	if err := a.applyHytaleConfig(s); err != nil {
+		return fmt.Errorf("could not apply Hytale settings: %w", err)
 	}
 	args := []string{"--bind", fmt.Sprintf("0.0.0.0:%d", s.Port), "--backup-frequency", strconv.Itoa(s.BackupFrequency)}
 	args = append(args, splitArgs(s.ExtraArgs)...)
@@ -1166,14 +1236,13 @@ func (a *App) handleImportLocal(w http.ResponseWriter, r *http.Request) {
 
 func defaultServerSettings(id, name string, port int, storage string) ServerSettings {
 	min, max, _ := deploymentPortRange()
-	return ServerSettings{ID: id, ServerName: name, Port: port, MemoryMin: "2G", MemoryMax: "4G", AutoStart: false, ExtraArgs: "", PublicHost: "", BackupFrequency: 30, StorageDir: storage, PortMin: min, PortMax: max}
+	return ServerSettings{ID: id, ServerName: name, Port: port, GameMode: "Adventure", MaxPlayers: 20, MOTD: "Welcome to your Hytale server!", MemoryMin: "2G", MemoryMax: "4G", AutoStart: false, ExtraArgs: "", PublicHost: "", BackupFrequency: 30, StorageDir: storage, PortMin: min, PortMax: max}
 }
 func (a *App) loadConfig() error {
 	path := filepath.Join(a.dataDir, "controller.json")
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		min, _, _ := deploymentPortRange()
-		a.cfg = ControllerConfig{Servers: []ServerSettings{defaultServerSettings("main", "My Hytale Server", min, ".")}}
+		a.cfg = ControllerConfig{Servers: []ServerSettings{}}
 		return a.saveConfigUnlocked()
 	}
 	if err != nil {
@@ -1183,7 +1252,7 @@ func (a *App) loadConfig() error {
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return err
 	}
-	if len(cfg.Servers) == 0 {
+	if len(cfg.Servers) == 0 && cfg.Settings != nil {
 		port := 5520
 		name := "My Hytale Server"
 		ls := cfg.Settings
@@ -1226,6 +1295,15 @@ func (a *App) loadConfig() error {
 		}
 		cfg.Servers[i].PortMin = min
 		cfg.Servers[i].PortMax = max
+		if cfg.Servers[i].GameMode != "Creative" && cfg.Servers[i].GameMode != "Adventure" {
+			cfg.Servers[i].GameMode = "Adventure"
+		}
+		if cfg.Servers[i].MaxPlayers < 1 || cfg.Servers[i].MaxPlayers > 1000 {
+			cfg.Servers[i].MaxPlayers = 20
+		}
+		if cfg.Servers[i].MOTD == "" {
+			cfg.Servers[i].MOTD = "Welcome to your Hytale server!"
+		}
 		if cfg.Servers[i].MemoryMin == "" {
 			cfg.Servers[i].MemoryMin = "2G"
 		}
@@ -1247,6 +1325,28 @@ func (a *App) saveConfigUnlocked() error {
 	return atomicWrite(filepath.Join(a.dataDir, "controller.json"), b, 0600)
 }
 func (a *App) saveConfigLocked() error { return a.saveConfigUnlocked() }
+func (a *App) applyHytaleConfig(s ServerSettings) error {
+	path := filepath.Join(a.serverRoot(s), "game", "Server", "config.json")
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		// Hytale creates this file during first startup; saved options are applied on the next start.
+		return nil
+	}
+	if err != nil { return err }
+	var cfg map[string]any
+	if err := json.Unmarshal(b, &cfg); err != nil { return fmt.Errorf("invalid config.json: %w", err) }
+	cfg["ServerName"] = s.ServerName
+	cfg["MOTD"] = s.MOTD
+	cfg["Password"] = s.Password
+	cfg["MaxPlayers"] = s.MaxPlayers
+	defaults, ok := cfg["Defaults"].(map[string]any)
+	if !ok { defaults = map[string]any{}; cfg["Defaults"] = defaults }
+	defaults["GameMode"] = s.GameMode
+	out, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil { return err }
+	return atomicWrite(path, out, 0644)
+}
+
 func (a *App) writeJVMOptionsFor(s ServerSettings) error {
 	if !validMemory(s.MemoryMin) || !validMemory(s.MemoryMax) {
 		return errors.New("invalid JVM memory settings")
