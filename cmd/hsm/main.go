@@ -702,8 +702,6 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.MOTD == "" { in.MOTD = current.MOTD }
-	if in.Password == "" && current.Password != "" { in.Password = current.Password }
-	if in.PublicHost == "" { in.PublicHost = current.PublicHost }
 	if in.BackupFrequency < 5 || in.BackupFrequency > 10080 {
 		jsonError(w, 400, "backup frequency must be between 5 and 10080 minutes")
 		return
@@ -1342,6 +1340,7 @@ func (a *App) applyHytaleConfig(s ServerSettings) error {
 	var cfg map[string]any
 	if err := json.Unmarshal(b, &cfg); err != nil { return fmt.Errorf("invalid config.json: %w", err) }
 	cfg["ServerName"] = s.ServerName
+	cfg["Port"] = s.Port
 	cfg["MOTD"] = s.MOTD
 	cfg["Password"] = s.Password
 	cfg["MaxPlayers"] = s.MaxPlayers
