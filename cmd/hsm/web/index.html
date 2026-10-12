@@ -30,7 +30,7 @@
       <div class="server-picker-head"><span>Servers</span><button id="add-server-side" title="Add server">+</button></div>
       <div id="server-list" class="server-list"></div>
 
-      <nav id="nav">
+      <nav id="nav" aria-label="Main navigation">
         <button data-view="servers" class="active">Servers</button>
         <div class="nav-divider"></div>
         <button data-view="dashboard">Overview</button>
@@ -56,7 +56,7 @@
           <div class="section-label hidden" id="view-kicker">SERVER</div>
         </div>
         <div class="top-actions">
-          <div class="status-pill" id="top-status"><span class="dot"></span><span>Offline</span></div>
+          <div class="status-pill" id="top-status" aria-live="polite" aria-atomic="true"><span class="dot"></span><span>Offline</span></div>
           <button id="top-start" class="btn primary">Start</button>
         </div>
       </header>
@@ -152,7 +152,7 @@
       <section id="view-console" class="view">
         <div class="panel console-card">
           <div class="panel-head"><h3>Console</h3><div class="console-tools"><label><input type="checkbox" id="auto-scroll" checked> Auto-scroll</label><button class="quiet-btn" id="copy-logs">Copy logs</button><button class="quiet-btn" id="clear-console">Clear</button></div></div>
-          <div id="console-output" class="console-output"></div>
+          <div id="console-output" class="console-output" role="log" aria-label="Live server console output" aria-live="polite" aria-relevant="additions text"></div>
           <form id="console-form" class="console-input"><span>&gt;</span><input id="console-command" autocomplete="off" placeholder="Enter a server command"><button class="btn primary">Send</button></form>
         </div>
       </section>
