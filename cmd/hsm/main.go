@@ -1256,6 +1256,10 @@ func (a *App) loadConfig() error {
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return err
 	}
+	var rawCfg struct {
+		Servers []map[string]json.RawMessage `+"`"+`json:"servers"`+"`"+`
+	}
+	_ = json.Unmarshal(b, &rawCfg)
 	if len(cfg.Servers) == 0 && cfg.Settings != nil {
 		port := 5520
 		name := "My Hytale Server"
@@ -1294,6 +1298,9 @@ func (a *App) loadConfig() error {
 				cfg.Servers[i].StorageDir = filepath.Join("servers", cfg.Servers[i].ID)
 			}
 		}
+		var rawFields map[string]json.RawMessage
+		if i < len(rawCfg.Servers) { rawFields = rawCfg.Servers[i] }
+		a.migrateMissingHytaleSettings(&cfg.Servers[i], rawFields)
 		if cfg.Servers[i].Port == 0 {
 			cfg.Servers[i].Port = min + i
 		}
@@ -1321,6 +1328,37 @@ func (a *App) loadConfig() error {
 	a.cfg = cfg
 	return a.saveConfigUnlocked()
 }
+func (a *App) migrateMissingHytaleSettings(s *ServerSettings, raw map[string]json.RawMessage) {
+	missing := func(key string) bool {
+		_, present := raw[key]
+		return !present
+	}
+	path := filepath.Join(a.serverRoot(*s), "game", "Server", "config.json")
+	b, err := os.ReadFile(path)
+	if err != nil { return }
+	var gameCfg map[string]any
+	if json.Unmarshal(b, &gameCfg) != nil { return }
+	if missing("gameMode") {
+		if defaults, ok := gameCfg["Defaults"].(map[string]any); ok {
+			if mode, ok := defaults["GameMode"].(string); ok && (mode == "Adventure" || mode == "Creative") { s.GameMode = mode }
+		}
+	}
+	if missing("maxPlayers") {
+		if players, ok := gameCfg["MaxPlayers"].(float64); ok && players >= 1 && players <= 1000 { s.MaxPlayers = int(players) }
+	}
+	if missing("motd") {
+		if motd, ok := gameCfg["MOTD"].(string); ok { s.MOTD = motd }
+	}
+	if missing("password") {
+		if password, ok := gameCfg["Password"].(string); ok { s.Password = password }
+	}
+	if missing("whitelistEnabled") {
+		if required, ok := gameCfg["RequireJoinPermission"].(bool); ok {
+			s.WhitelistEnabled = required
+		}
+	}
+}
+
 func (a *App) saveConfigUnlocked() error {
 	b, err := json.MarshalIndent(a.cfg, "", "  ")
 	if err != nil {
