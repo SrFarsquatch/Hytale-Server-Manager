@@ -9,14 +9,17 @@ fi
 # Docker socket. Docker socket access is effectively host-root access.
 if [ -S /var/run/docker.sock ]; then
   docker_gid="$(stat -c '%g' /var/run/docker.sock)"
-  socket_group="$(getent group "$docker_gid" | cut -d: -f1 || true)"
-  if [ -z "$socket_group" ]; then
-    socket_group="hsm-docker-socket"
-    if ! getent group "$socket_group" >/dev/null; then
-      groupadd --gid "$docker_gid" "$socket_group"
+  hsm_gid="$(id -g hsm)"
+  if [ "$docker_gid" != "$hsm_gid" ]; then
+    socket_group="$(getent group "$docker_gid" | cut -d: -f1 || true)"
+    if [ -z "$socket_group" ]; then
+      socket_group="hsm-docker-socket"
+      if ! getent group "$socket_group" >/dev/null; then
+        groupadd --gid "$docker_gid" "$socket_group"
+      fi
     fi
+    usermod -a -G "$socket_group" hsm
   fi
-  usermod -a -G "$socket_group" hsm
 fi
 
 exec gosu hsm "$@"
