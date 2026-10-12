@@ -1101,7 +1101,7 @@ func (a *App) handleSnapshotCreate(w http.ResponseWriter, r *http.Request) {
 	jsonOut(w, 201, map[string]any{"ok": true, "name": name})
 }
 func (a *App) handleSnapshotRestore(w http.ResponseWriter, r *http.Request) {
-	m, s, err := a.requestServer(r)
+	m, server, err := a.requestServer(r)
 	if err != nil {
 		jsonError(w, 404, err.Error())
 		return
@@ -1111,27 +1111,76 @@ func (a *App) handleSnapshotRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := filepath.Base(r.PathValue("name"))
-	if !strings.HasSuffix(name, ".tar.gz") {
+	if !strings.HasSuffix(name, ".tar.gz") || name == "." || name == ".." {
 		jsonError(w, 400, "invalid snapshot")
 		return
 	}
-	root := a.serverRoot(s)
+	root := a.serverRoot(server)
 	src := filepath.Join(root, "snapshots", name)
-	if _, err := os.Stat(src); err != nil {
+	if info, err := os.Stat(src); err != nil || !info.Mode().IsRegular() {
 		jsonError(w, 404, "snapshot not found")
 		return
 	}
 	serverDir := filepath.Join(root, "game", "Server")
-	safety := filepath.Join(root, "snapshots", "pre-restore-"+time.Now().Format("20060102-150405")+".tar.gz")
-	if err := createTarGz(safety, serverDir, []string{"universe", "mods", "config.json", "permissions.json", "whitelist.json", "bans.json"}); err != nil {
+	include := []string{"universe", "mods", "config.json", "permissions.json", "whitelist.json", "bans.json"}
+	safety := filepath.Join(root, "snapshots", "pre-restore-"+time.Now().Format("20060102-150405.000")+".tar.gz")
+	if err := createTarGz(safety, serverDir, include); err != nil {
 		jsonError(w, 500, "could not create safety snapshot; restore was not attempted: "+err.Error())
 		return
 	}
-	if err := extractTarGz(src, serverDir); err != nil {
-		jsonError(w, 500, err.Error())
+
+	// Validate and extract the archive in a staging directory first. A malformed
+	// snapshot must never partially overwrite the live server data.
+	stage, err := os.MkdirTemp(filepath.Dir(serverDir), ".snapshot-restore-")
+	if err != nil {
+		jsonError(w, 500, "could not create restore staging directory: "+err.Error())
+		return
+	}
+	defer os.RemoveAll(stage)
+	if err := extractTarGz(src, stage); err != nil {
+		jsonError(w, 400, "snapshot could not be validated; server data was not changed: "+err.Error())
+		return
+	}
+
+	if err := replaceSnapshotEntries(stage, serverDir, include); err != nil {
+		rollbackErr := replaceSnapshotEntriesFromArchive(safety, serverDir, include)
+		if rollbackErr != nil {
+			jsonError(w, 500, fmt.Sprintf("restore failed: %v; automatic rollback also failed: %v. Safety snapshot retained at %s", err, rollbackErr, filepath.Base(safety)))
+			return
+		}
+		jsonError(w, 500, "restore failed; the original server data was restored from the safety snapshot: "+err.Error())
 		return
 	}
 	jsonOut(w, 200, map[string]any{"ok": true, "safetySnapshot": filepath.Base(safety)})
+}
+func replaceSnapshotEntries(stage, dst string, include []string) error {
+	for _, name := range include {
+		target := filepath.Join(dst, name)
+		if err := os.RemoveAll(target); err != nil {
+			return fmt.Errorf("remove existing %s: %w", name, err)
+		}
+		source := filepath.Join(stage, name)
+		if _, err := os.Lstat(source); errors.Is(err, os.ErrNotExist) {
+			continue
+		} else if err != nil {
+			return err
+		}
+		if err := os.Rename(source, target); err != nil {
+			return fmt.Errorf("install restored %s: %w", name, err)
+		}
+	}
+	return nil
+}
+func replaceSnapshotEntriesFromArchive(archive, dst string, include []string) error {
+	stage, err := os.MkdirTemp(filepath.Dir(dst), ".snapshot-rollback-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(stage)
+	if err := extractTarGz(archive, stage); err != nil {
+		return err
+	}
+	return replaceSnapshotEntries(stage, dst, include)
 }
 func (a *App) handleSnapshotDelete(w http.ResponseWriter, r *http.Request) {
 	_, s, err := a.requestServer(r)
