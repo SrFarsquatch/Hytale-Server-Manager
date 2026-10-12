@@ -2325,6 +2325,12 @@ func createTarGz(dst, base string, include []string) error {
 	if err != nil {
 		return err
 	}
+	success := false
+	defer func() {
+		if !success {
+			_ = os.Remove(dst)
+		}
+	}()
 	gz := gzip.NewWriter(f)
 	tw := tar.NewWriter(gz)
 	closeAll := func() error {
@@ -2347,6 +2353,11 @@ func createTarGz(dst, base string, include []string) error {
 		err := filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
+			}
+			// Snapshots intentionally contain only directories and regular files.
+			// Skipping links/special files keeps every generated snapshot restorable.
+			if !info.IsDir() && !info.Mode().IsRegular() {
+				return nil
 			}
 			rel, err := filepath.Rel(base, p)
 			if err != nil {
@@ -2379,7 +2390,11 @@ func createTarGz(dst, base string, include []string) error {
 			return err
 		}
 	}
-	return closeAll()
+	if err := closeAll(); err != nil {
+		return err
+	}
+	success = true
+	return nil
 }
 func extractTarGz(src, dst string) error {
 	f, err := os.Open(src)
