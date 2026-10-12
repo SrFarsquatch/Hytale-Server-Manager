@@ -6,8 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
-	"syscall"
+		"syscall"
 )
 
 type DiagnosticCheck struct {
@@ -89,7 +88,7 @@ func (a *App) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
 	} else if a.portInUse(s.Port, s.ID) {
 		add("port-range", "UDP port assignment", "error", fmt.Sprintf("UDP port %d is assigned to more than one managed server.", s.Port), "Assign a unique UDP port to each server.")
 	} else {
-		add("port-range", "UDP port assignment", fmt.Sprintf("ok"), fmt.Sprintf("UDP port %d is within the configured range %d–%d and is unique in this manager.", s.Port, minPort, maxPort), "")
+		add("port-range", "UDP port assignment", "ok", fmt.Sprintf("UDP port %d is within the configured range %d–%d and is unique in this manager.", s.Port, minPort, maxPort), "")
 	}
 
 	var fs syscall.Statfs_t
@@ -151,13 +150,3 @@ func humanBytes(n int64) string {
 	return fmt.Sprintf("%.1f %s", float64(n)/float64(div), []string{"KB", "MB", "GB", "TB", "PB"}[exp])
 }
 
-func diagnosticSummaryText(state string) string {
-	switch strings.ToLower(state) {
-	case "error":
-		return "One or more checks need attention."
-	case "warning":
-		return "Some checks recommend attention."
-	default:
-		return "No blocking issues were detected."
-	}
-}
