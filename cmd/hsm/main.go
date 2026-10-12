@@ -19,6 +19,7 @@ import (
 	"io/fs"
 	"log"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -89,6 +90,8 @@ type App struct {
 	cfg        ControllerConfig
 	sessionsMu sync.Mutex
 	sessions   map[string]Session
+	loginMu sync.Mutex
+	loginAttempts map[string]loginAttempt
 	managersMu sync.RWMutex
 	managers   map[string]*ServerManager
 	resourceMu sync.Mutex
@@ -322,6 +325,13 @@ func (a *App) handleBootstrapCreate(w http.ResponseWriter, r *http.Request) {
 	jsonOut(w, 201, map[string]any{"ok": true})
 }
 func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
+	key := clientAddress(r)
+	now := time.Now()
+	if blocked, wait := a.loginBlocked(key, now); blocked {
+		w.Header().Set("Retry-After", strconv.Itoa(maxInt(1, int(wait.Seconds()))))
+		jsonError(w, http.StatusTooManyRequests, "too many failed login attempts; try again later")
+		return
+	}
 	var body struct{ Username, Password string }
 	if err := decodeJSON(r, &body); err != nil {
 		jsonError(w, 400, err.Error())
@@ -331,13 +341,80 @@ func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	admin := a.cfg.Admin
 	a.cfgMu.RUnlock()
 	if admin == nil || admin.Username != body.Username || !verifyPassword(admin.PasswordHash, body.Password) {
+		a.recordLoginFailure(key, now)
 		jsonError(w, 401, "invalid username or password")
 		return
 	}
+	a.clearLoginFailures(key)
 	token := a.newSession(body.Username)
 	a.setSessionCookie(w, token)
 	jsonOut(w, 200, map[string]any{"ok": true})
 }
+
+const loginAttemptLimit = 10
+const loginWindow = 15 * time.Minute
+const loginBlockDuration = 15 * time.Minute
+
+type loginAttempt struct {
+	Count int
+	WindowStart time.Time
+	BlockedUntil time.Time
+}
+
+func clientAddress(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil && host != "" { return host }
+	if r.RemoteAddr != "" { return r.RemoteAddr }
+	return "unknown"
+}
+
+func (a *App) loginBlocked(key string, now time.Time) (bool, time.Duration) {
+	a.loginMu.Lock()
+	defer a.loginMu.Unlock()
+	if a.loginAttempts == nil { a.loginAttempts = make(map[string]loginAttempt) }
+	attempt, ok := a.loginAttempts[key]
+	if !ok { return false, 0 }
+	if now.Before(attempt.BlockedUntil) { return true, attempt.BlockedUntil.Sub(now) }
+	if !attempt.WindowStart.IsZero() && now.Sub(attempt.WindowStart) >= loginWindow {
+		delete(a.loginAttempts, key)
+		return false, 0
+	}
+	if attempt.Count >= loginAttemptLimit {
+		attempt.BlockedUntil = now.Add(loginBlockDuration)
+		a.loginAttempts[key] = attempt
+		return true, loginBlockDuration
+	}
+	return false, 0
+}
+
+func (a *App) recordLoginFailure(key string, now time.Time) {
+	a.loginMu.Lock()
+	defer a.loginMu.Unlock()
+	if a.loginAttempts == nil { a.loginAttempts = make(map[string]loginAttempt) }
+	attempt := a.loginAttempts[key]
+	if attempt.WindowStart.IsZero() || now.Sub(attempt.WindowStart) >= loginWindow {
+		attempt = loginAttempt{WindowStart: now}
+	}
+	attempt.Count++
+	if attempt.Count >= loginAttemptLimit { attempt.BlockedUntil = now.Add(loginBlockDuration) }
+	a.loginAttempts[key] = attempt
+	// Bound memory if many unique addresses hit the login endpoint.
+	if len(a.loginAttempts) > 4096 {
+		for address, entry := range a.loginAttempts {
+			if now.Sub(entry.WindowStart) >= loginWindow || (!entry.BlockedUntil.IsZero() && now.After(entry.BlockedUntil)) {
+				delete(a.loginAttempts, address)
+			}
+		}
+	}
+}
+
+func (a *App) clearLoginFailures(key string) {
+	a.loginMu.Lock()
+	delete(a.loginAttempts, key)
+	a.loginMu.Unlock()
+}
+
+func maxInt(a, b int) int { if a > b { return a }; return b }
 func (a *App) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if c, err := sessionCookie(r); err == nil {
 		a.sessionsMu.Lock()
