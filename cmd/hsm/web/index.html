@@ -205,7 +205,8 @@
             <label>Server message<input id="set-motd" maxlength="160" placeholder="Welcome to your server"></label>
             <label class="toggle-row"><span><b>Require whitelist permission</b><small>Restrict joining to players granted server join access.</small></span><input id="set-whitelist" type="checkbox"></label>
             <label>Server password (optional)<input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label>
-            <label>Backup frequency (minutes)<input id="set-backup" type="number" min="5" max="10080" required></label>
+            <label>Backup frequency (minutes)<input id="set-backup" type="number" min="5" max="10080" required><small>How often Hytale makes native backups.</small></label>
+            <label>Snapshot retention<input id="set-retention" type="number" min="1" max="100" required><small>Keep this many recent full snapshots. Safety copies are kept separately.</small></label>
             <label>Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
             <label>Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
           </div>
