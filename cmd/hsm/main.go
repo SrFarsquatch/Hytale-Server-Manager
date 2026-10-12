@@ -538,11 +538,6 @@ func (a *App) handleServersDelete(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 404, "server not found")
 		return
 	}
-	if idx == 0 || s.StorageDir == "." {
-		a.cfgMu.Unlock()
-		jsonError(w, 409, "the primary server cannot be deleted; rename or repurpose it instead")
-		return
-	}
 	a.cfg.Servers = append(a.cfg.Servers[:idx], a.cfg.Servers[idx+1:]...)
 	err = a.saveConfigLocked()
 	a.cfgMu.Unlock()
@@ -553,12 +548,29 @@ func (a *App) handleServersDelete(w http.ResponseWriter, r *http.Request) {
 	a.managersMu.Lock()
 	delete(a.managers, id)
 	a.managersMu.Unlock()
-	if err := os.RemoveAll(a.serverRoot(s)); err != nil {
+	if err := removeServerData(a.serverRoot(s), s.StorageDir == "" || s.StorageDir == "."); err != nil {
 		jsonError(w, 500, err.Error())
 		return
 	}
 	jsonOut(w, 200, map[string]any{"ok": true})
 }
+
+// removeServerData removes a server's files without deleting manager-wide state.
+// The legacy primary server lives directly in dataDir, alongside config.json,
+// shared tools, and other server directories, so only its server-owned folders
+// may be removed in that case.
+func removeServerData(root string, sharedRoot bool) error {
+	if !sharedRoot {
+		return os.RemoveAll(root)
+	}
+	for _, name := range []string{"game", "imports", "snapshots", "home", "backups"} {
+		if err := os.RemoveAll(filepath.Join(root, name)); err != nil {
+			return fmt.Errorf("remove server data %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
 func (a *App) handleServerStartByPath(w http.ResponseWriter, r *http.Request) {
 	if err := a.startServerByID(r.PathValue("id")); err != nil {
 		jsonError(w, 409, err.Error())
