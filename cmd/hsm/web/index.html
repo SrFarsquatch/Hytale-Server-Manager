@@ -62,14 +62,28 @@
       </header>
 
       <section id="view-servers" class="view active">
-        <div class="page-head">
-          <div><h2>Servers</h2><p class="help">Independent Hytale instances running on this host.</p></div>
-          <button id="add-server-main" class="btn primary">Add server</button>
+        <div id="first-run" class="welcome-shell hidden">
+          <div class="welcome-eyebrow"><span class="welcome-mark">H</span> Hytale Server Manager</div>
+          <div class="welcome-copy">
+            <p class="eyebrow">YOUR SERVER. YOUR RULES.</p>
+            <h2>Let's build your<br><span>first world.</span></h2>
+            <p class="welcome-lede">A few quick choices, then we'll prepare your server and walk you through installing the game files.</p>
+            <button id="first-create" class="btn primary welcome-cta">Create your first server <span aria-hidden="true">→</span></button>
+            <p class="welcome-footnote">No server is created until you choose to create one.</p>
+          </div>
+          <div class="welcome-art" aria-hidden="true"><div class="planet planet-back"></div><div class="planet planet-main"></div><div class="planet-ring"></div><div class="planet-moon"></div><div class="art-star star-one">✦</div><div class="art-star star-two">✧</div><div class="art-star star-three">·</div></div>
+          <div class="welcome-bottom"><span>01 / CREATE</span><span>02 / CONFIGURE</span><span>03 / PLAY</span></div>
         </div>
-        <div id="fleet-summary" class="fleet-summary"></div>
-        <div class="table-shell">
-          <div class="server-table-head"><span>Server</span><span>Status</span><span>Address</span><span>Uptime</span><span>Files</span><span></span></div>
-          <div id="fleet-grid" class="fleet-grid"></div>
+        <div id="fleet-content">
+          <div class="page-head">
+            <div><h2>Your servers</h2><p class="help">Manage your game worlds from one place.</p></div>
+            <button id="add-server-main" class="btn primary">+ Create server</button>
+          </div>
+          <div id="fleet-summary" class="fleet-summary"></div>
+          <div class="table-shell">
+            <div class="server-table-head"><span>Server</span><span>Status</span><span>Address</span><span>Uptime</span><span>Files</span><span></span></div>
+            <div id="fleet-grid" class="fleet-grid"></div>
+          </div>
         </div>
       </section>
 
@@ -180,11 +194,15 @@
             <label>Server name<input id="set-name" required></label>
             <label>Public address<input id="set-host" placeholder="play.example.com or public IP"></label>
             <label>UDP game port<input id="set-port" type="number" min="1" max="65535" required><small id="port-help">Each running server needs a unique UDP port.</small></label>
+            <label>Game mode<select id="set-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select><small>Default mode for newly created worlds.</small></label>
+            <label>Maximum players<input id="set-players" type="number" min="1" max="1000" required></label>
+            <label>Server message<input id="set-motd" maxlength="160" placeholder="Welcome to your server"></label>
+            <label>Server password (optional)<input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label>
             <label>Backup frequency (minutes)<input id="set-backup" type="number" min="5" max="10080" required></label>
             <label>Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
             <label>Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
           </div>
-          <label>Additional server arguments<input id="set-args" placeholder="--accept-early-plugins"></label>
+          <label>Additional server arguments<input id="set-args" placeholder="Only change if you know which flags your server supports"></label>
           <label class="toggle-row"><span><b>Auto-start</b><small>Start this instance when the manager starts.</small></span><input id="set-autostart" type="checkbox"></label>
           <div class="settings-note"><b>Networking</b><span>The container publishes a UDP range. Each server needs a different port in that range.</span></div>
         </form>
@@ -192,13 +210,42 @@
     </main>
   </div>
 
-  <dialog id="server-dialog" class="server-dialog">
+  <dialog id="server-dialog" class="server-dialog wizard-dialog">
     <form id="server-create-form" method="dialog">
-      <div class="dialog-head"><h2>Add server</h2><button type="button" id="close-server-dialog" class="quiet-btn">Close</button></div>
-      <label>Server name<input id="new-server-name" value="New Hytale Server" required></label>
-      <label>UDP port<input id="new-server-port" type="number" min="1" max="65535"><small id="new-port-help">Leave blank to use the next available published port.</small></label>
-      <label>Start from<select id="new-server-source"><option value="">Blank server — install files after creation</option></select><small>Cloning copies the Hytale install, mods and config, but starts with a new world and no backups.</small></label>
-      <div class="dialog-actions"><button type="button" id="cancel-server-dialog" class="btn">Cancel</button><button class="btn primary" type="submit">Create</button></div>
+      <div class="wizard-progress"><span id="wizard-step-label">STEP 1 OF 4</span><span id="wizard-step-title">Choose your game</span><div class="wizard-track"><span id="wizard-progress-fill"></span></div></div>
+      <div class="wizard-step" data-wizard-step="0">
+        <div class="wizard-heading"><p class="eyebrow">LET'S GET STARTED</p><h2>What are we hosting?</h2><p>We'll tailor the setup to the game you choose.</p></div>
+        <button type="button" class="game-choice selected" data-game-choice="hytale"><span class="game-icon">H</span><span><strong>Hytale</strong><small>Dedicated server · Java runtime</small></span><span class="choice-check">✓</span></button>
+        <div class="wizard-note">More game profiles can be added later. Hytale is the supported game in this release.</div>
+      </div>
+      <div class="wizard-step hidden" data-wizard-step="1">
+        <div class="wizard-heading"><p class="eyebrow">THE BASICS</p><h2>Name your world.</h2><p>Give this server a name and choose how players connect.</p></div>
+        <label>Server name<input id="new-server-name" value="My Hytale Server" minlength="2" maxlength="64" required></label>
+        <label>Game port (UDP)<input id="new-server-port" type="number" min="0" max="65535" placeholder="Automatic"><small id="new-port-help">Leave blank to assign the next available port in the published range.</small></label>
+        <label>Public address (optional)<input id="new-server-host" placeholder="play.example.com or your public IP"></label>
+        <label>Start from<select id="new-server-source"><option value="">Fresh install — set up game files next</option></select><small>Clone an installed server if you'd like to reuse its mods and configuration.</small></label>
+      </div>
+      <div class="wizard-step hidden" data-wizard-step="2">
+        <div class="wizard-heading"><p class="eyebrow">YOUR GAME, YOUR WAY</p><h2>Set up the experience.</h2><p>These become the default settings for the new server.</p></div>
+        <div class="form-grid">
+          <label>Game mode<select id="new-server-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select></label>
+          <label>Maximum players<input id="new-server-players" type="number" min="1" max="1000" value="20" required></label>
+          <label class="span-two">Server message<input id="new-server-motd" maxlength="160" value="Welcome to your Hytale server!"></label>
+          <label class="span-two">Server password (optional)<input id="new-server-password" type="password" autocomplete="new-password" placeholder="Leave empty for an open server"></label>
+        </div>
+        <div class="wizard-note">Whitelist management is available through the server's whitelist.json file after installation. This wizard won't claim to enable it automatically.</div>
+      </div>
+      <div class="wizard-step hidden" data-wizard-step="3">
+        <div class="wizard-heading"><p class="eyebrow">FINAL TOUCHES</p><h2>Ready to create?</h2><p>You can change these settings later.</p></div>
+        <div class="form-grid">
+          <label>Minimum memory<input id="new-server-xms" value="2G" required></label>
+          <label>Maximum memory<input id="new-server-xmx" value="4G" required></label>
+          <label>Backup frequency (minutes)<input id="new-server-backup" type="number" min="5" max="10080" value="30" required></label>
+          <label class="toggle-row"><span><b>Auto-start</b><small>Start when the manager starts.</small></span><input id="new-server-autostart" type="checkbox"></label>
+        </div>
+        <div id="wizard-review" class="wizard-review"></div>
+      </div>
+      <div class="dialog-actions wizard-actions"><button type="button" id="cancel-server-dialog" class="btn">Cancel</button><div class="wizard-nav"><button type="button" id="wizard-back" class="btn hidden">Back</button><button type="button" id="wizard-next" class="btn primary">Continue <span aria-hidden="true">→</span></button><button type="submit" id="wizard-create" class="btn primary hidden">Create server</button></div></div>
     </form>
   </dialog>
 
