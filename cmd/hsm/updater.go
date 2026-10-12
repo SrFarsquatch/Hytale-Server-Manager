@@ -11,8 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
-	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -321,7 +319,7 @@ func performContainerUpdate(ctx context.Context, containerID, targetImage string
 		return fmt.Errorf("pull release image returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(pullLog)))
 	}
 	for _, line := range bytes.Split(pullLog, []byte("\n")) {
-		var item struct { Error string `json:"error"`; Detail struct { Message string `json:"message"` `json:"message"` } `json:"errorDetail"` }
+		var item struct { Error string `json:"error"` }
 		_ = json.Unmarshal(line, &item)
 		if item.Error != "" { return fmt.Errorf("pull release image failed: %s", item.Error) }
 	}
@@ -397,4 +395,3 @@ func rollbackOldContainer(d *dockerAPI, oldID, oldName, originalName string) {
 	_ = oldName
 }
 
-func releaseImageForVersion(v string) string { return path.Join(containerImage, ":"+v) }
