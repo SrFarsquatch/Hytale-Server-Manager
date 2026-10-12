@@ -414,7 +414,6 @@ func (a *App) clearLoginFailures(key string) {
 	a.loginMu.Unlock()
 }
 
-func maxInt(a, b int) int { if a > b { return a }; return b }
 func (a *App) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if c, err := sessionCookie(r); err == nil {
 		a.sessionsMu.Lock()
