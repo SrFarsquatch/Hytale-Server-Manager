@@ -160,6 +160,10 @@ type ServerSummary struct {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--update-helper" {
+		runUpdateHelper()
+		return
+	}
 	dataDir := envFirst([]string{"HSM_DATA_DIR", "ORBIS_DATA_DIR"}, "/data")
 	if err := ensureRootDirs(dataDir); err != nil {
 		log.Fatal(err)
@@ -197,6 +201,8 @@ func main() {
 }
 
 func (a *App) routes(mux *http.ServeMux) {
+	mux.Handle("GET /api/app-update", a.auth(http.HandlerFunc(a.handleAppUpdateCheck)))
+	mux.Handle("POST /api/app-update", a.auth(http.HandlerFunc(a.handleAppUpdateApply)))
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		jsonOut(w, 200, map[string]any{"ok": true, "version": version})
 	})
