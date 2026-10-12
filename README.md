@@ -58,6 +58,14 @@ Existing installations keep their configured servers and legacy single-server se
 
 Game mode, server name, message, player limit, password and join-permission requirements are applied to the Hytale config.json when the server is stopped and settings are saved or before it starts. Hytale's configuration schema can change between game updates, so keep a backup before making advanced manual edits.
 
+## Updating the application
+
+Open **Settings → Application updates** and choose **Check for updates**. When a newer stable GitHub release is available, choose **Update and restart**. The updater pulls the matching versioned image from GitHub Container Registry, stages the existing container for rollback, and recreates the manager with its existing ports, mounts, environment, networks, and restart policy. The persistent `/data` volume is not removed. If the replacement fails to start, the updater attempts to restore the previous container.
+
+In-container updates require the Docker socket mount shown in both Compose files. This is a powerful permission: anyone who compromises the manager can potentially gain host-level control through Docker. Use a strong admin password and keep the web dashboard on a trusted network. If you do not want to grant Docker socket access, update the image through CasaOS instead.
+
+Container images are published for `linux/amd64` and `linux/arm64` when a version tag such as `v0.5.1` is pushed. The tag must correspond to a published stable GitHub Release before it appears in the in-app updater.
+
 ## Networking
 
 The web panel uses TCP `8008` on the host and container. Hytale game servers use UDP/QUIC. The Compose and CasaOS definitions publish only UDP ports `5520`, `5521`, `5522`, `5523`, `5524`, and `5525`, allowing up to six instances to use unique ports.
