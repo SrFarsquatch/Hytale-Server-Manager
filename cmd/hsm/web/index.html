@@ -197,7 +197,8 @@
             <label>Game mode<select id="set-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select><small>Default mode for newly created worlds.</small></label>
             <label>Maximum players<input id="set-players" type="number" min="1" max="1000" required></label>
             <label>Server message<input id="set-motd" maxlength="160" placeholder="Welcome to your server"></label>
-            <label>Server password (optional)<input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label>
+            <label class="toggle-row"><span><b>Require whitelist permission</b><small>Restrict joining to players granted server join access.</small></span><input id="set-whitelist" type="checkbox"></label>
+            <label>Server password (optional><input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label>
             <label>Backup frequency (minutes)<input id="set-backup" type="number" min="5" max="10080" required></label>
             <label>Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
             <label>Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
@@ -231,9 +232,10 @@
           <label>Game mode<select id="new-server-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select></label>
           <label>Maximum players<input id="new-server-players" type="number" min="1" max="1000" value="20" required></label>
           <label class="span-two">Server message<input id="new-server-motd" maxlength="160" value="Welcome to your Hytale server!"></label>
-          <label class="span-two">Server password (optional)<input id="new-server-password" type="password" autocomplete="new-password" placeholder="Leave empty for an open server"></label>
+          <label class="toggle-row span-two"><span><b>Require whitelist permission</b><small>Private server; players need join permission.</small></span><input id="new-server-whitelist" type="checkbox"></label>
+          <label class="span-two">Server password (optional><input id="new-server-password" type="password" autocomplete="new-password" placeholder="Leave empty for an open server"></label>
         </div>
-        <div class="wizard-note">Whitelist management is available through the server's whitelist.json file after installation. This wizard won't claim to enable it automatically.</div>
+        <div class="wizard-note">When enabled, Hytale requires join permission for players. You can manage player permissions from the server console.</div>
       </div>
       <div class="wizard-step hidden" data-wizard-step="3">
         <div class="wizard-heading"><p class="eyebrow">FINAL TOUCHES</p><h2>Ready to create?</h2><p>You can change these settings later.</p></div>
