@@ -56,6 +56,7 @@ type ServerSettings struct {
 	ExtraArgs       string `json:"extraArgs"`
 	PublicHost      string `json:"publicHost"`
 	BackupFrequency int    `json:"backupFrequency"`
+	SnapshotRetention int  `json:"snapshotRetention"`
 	StorageDir      string `json:"storageDir,omitempty"`
 	PortMin         int    `json:"portMin,omitempty"`
 	PortMax         int    `json:"portMax,omitempty"`
@@ -238,6 +239,7 @@ func (a *App) routes(mux *http.ServeMux) {
 	mux.Handle("POST /api/mods/upload", a.auth(http.HandlerFunc(a.handleModUpload)))
 	mux.Handle("DELETE /api/mods/{name}", a.auth(http.HandlerFunc(a.handleModDelete)))
 	mux.Handle("GET /api/backups", a.auth(http.HandlerFunc(a.handleBackupsList)))
+	mux.Handle("POST /api/backups/{name}/verify", a.auth(http.HandlerFunc(a.handleSnapshotVerify)))
 	mux.Handle("POST /api/backups/native", a.auth(http.HandlerFunc(a.handleNativeBackup)))
 	mux.Handle("POST /api/backups/snapshot", a.auth(http.HandlerFunc(a.handleSnapshotCreate)))
 	mux.Handle("POST /api/backups/{name}/restore", a.auth(http.HandlerFunc(a.handleSnapshotRestore)))
@@ -713,6 +715,11 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "backup frequency must be between 5 and 10080 minutes")
 		return
 	}
+	if in.SnapshotRetention == 0 { in.SnapshotRetention = current.SnapshotRetention }
+	if in.SnapshotRetention < 1 || in.SnapshotRetention > 100 {
+		jsonError(w, 400, "snapshot retention must be between 1 and 100 snapshots")
+		return
+	}
 	if m.IsRunning() && in.Port != current.Port {
 		jsonError(w, 409, "stop the server before changing its port")
 		return
@@ -1098,6 +1105,7 @@ func (a *App) handleSnapshotCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 500, err.Error())
 		return
 	}
+	pruneSnapshots(filepath.Join(root, "snapshots"), s.SnapshotRetention)
 	jsonOut(w, 201, map[string]any{"ok": true, "name": name})
 }
 func (a *App) handleSnapshotRestore(w http.ResponseWriter, r *http.Request) {
@@ -1182,6 +1190,40 @@ func replaceSnapshotEntriesFromArchive(archive, dst string, include []string) er
 	}
 	return replaceSnapshotEntries(stage, dst, include)
 }
+func (a *App) handleSnapshotVerify(w http.ResponseWriter, r *http.Request) {
+	_, server, err := a.requestServer(r)
+	if err != nil { jsonError(w, 404, err.Error()); return }
+	name := filepath.Base(r.PathValue("name"))
+	if !strings.HasPrefix(name, "snapshot-") || !strings.HasSuffix(name, ".tar.gz") {
+		jsonError(w, 400, "only restorable snapshots can be verified"); return
+	}
+	src := filepath.Join(a.serverRoot(server), "snapshots", name)
+	if info, err := os.Stat(src); err != nil || !info.Mode().IsRegular() {
+		jsonError(w, 404, "snapshot not found"); return
+	}
+	stage, err := os.MkdirTemp("", "hsm-snapshot-verify-")
+	if err != nil { jsonError(w, 500, "could not create verification workspace: "+err.Error()); return }
+	defer os.RemoveAll(stage)
+	if err := extractTarGz(src, stage); err != nil {
+		jsonOut(w, 200, map[string]any{"ok": true, "valid": false, "name": name, "message": "Verification failed: " + err.Error()}); return
+	}
+	entries := 0
+	_ = filepath.WalkDir(stage, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil { return err }; if !d.IsDir() { entries++ }; return nil
+	})
+	jsonOut(w, 200, map[string]any{"ok": true, "valid": true, "name": name, "entries": entries, "message": fmt.Sprintf("Archive is readable and passed safety checks (%d files).", entries)})
+}
+
+func pruneSnapshots(dir string, retention int) {
+	if retention < 1 { return }
+	files := listFiles(dir, ".tar.gz")
+	var snapshots []FileInfoDTO
+	for _, f := range files { if strings.HasPrefix(f.Name, "snapshot-") { snapshots = append(snapshots, f) } }
+	for _, f := range snapshots[minInt(retention, len(snapshots)):] { _ = os.Remove(filepath.Join(dir, f.Name)) }
+}
+
+func minInt(a, b int) int { if a < b { return a }; return b }
+
 func (a *App) handleSnapshotDelete(w http.ResponseWriter, r *http.Request) {
 	_, s, err := a.requestServer(r)
 	if err != nil {
@@ -1299,7 +1341,7 @@ func (a *App) handleImportLocal(w http.ResponseWriter, r *http.Request) {
 
 func defaultServerSettings(id, name string, port int, storage string) ServerSettings {
 	min, max, _ := deploymentPortRange()
-	return ServerSettings{ID: id, ServerName: name, Port: port, GameMode: "Adventure", MaxPlayers: 20, MOTD: "Welcome to your Hytale server!", MemoryMin: "2G", MemoryMax: "4G", AutoStart: false, ExtraArgs: "", PublicHost: "", BackupFrequency: 30, StorageDir: storage, PortMin: min, PortMax: max}
+	return ServerSettings{ID: id, ServerName: name, Port: port, GameMode: "Adventure", MaxPlayers: 20, MOTD: "Welcome to your Hytale server!", MemoryMin: "2G", MemoryMax: "4G", AutoStart: false, ExtraArgs: "", PublicHost: "", BackupFrequency: 30, SnapshotRetention: 10, StorageDir: storage, PortMin: min, PortMax: max}
 }
 func (a *App) loadConfig() error {
 	path := filepath.Join(a.dataDir, "controller.json")
@@ -1382,6 +1424,9 @@ func (a *App) loadConfig() error {
 		}
 		if cfg.Servers[i].BackupFrequency == 0 {
 			cfg.Servers[i].BackupFrequency = 30
+		}
+		if cfg.Servers[i].SnapshotRetention == 0 {
+			cfg.Servers[i].SnapshotRetention = 10
 		}
 	}
 	a.cfg = cfg
