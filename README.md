@@ -64,7 +64,7 @@ Open **Settings → Application updates** and choose **Check for updates**. When
 
 In-container updates require the Docker socket mount shown in both Compose files. This is a powerful permission: anyone who compromises the manager can potentially gain host-level control through Docker. Use a strong admin password and keep the web dashboard on a trusted network. If you do not want to grant Docker socket access, update the image through CasaOS instead.
 
-Container images are published for `linux/amd64` and `linux/arm64` when a version tag such as `v0.5.1` is pushed. The tag must correspond to a published stable GitHub Release before it appears in the in-app updater.
+Pushing a stable version tag such as `v0.6.1` builds and publishes the `linux/amd64` and `linux/arm64` images, then creates a GitHub Release with generated notes. The updater only offers stable releases. Ensure the GitHub Container Registry package is public so a self-hosted instance can pull release images without registry credentials.
 
 ## Networking
 
