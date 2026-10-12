@@ -95,3 +95,11 @@ button,input,textarea,select{font:inherit}button{color:inherit}.hidden{display:n
 .update-security-note{margin:16px 0 0;border-top:1px solid var(--line);padding-top:12px;color:var(--faint);font-size:10px;line-height:1.6}
 .update-security-note strong{color:#c8a977}
 @media(max-width:640px){.update-version-grid{grid-template-columns:1fr}.update-version-grid>div{display:flex;align-items:center;justify-content:space-between;gap:10px}.update-version-grid span{margin:0}.update-version-grid strong{text-align:right}}
+
+
+/* Process transitions and console log tools */
+.dot.busy{animation:hsm-pulse 1.25s ease-in-out infinite}
+@keyframes hsm-pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.console-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.console-tools label{white-space:nowrap}
+.btn:disabled{opacity:.45;cursor:not-allowed}

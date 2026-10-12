@@ -34,3 +34,15 @@ func TestServerDisplayState(t *testing.T) {
 		})
 	}
 }
+
+
+func TestServerDisplayStateWithPhase(t *testing.T) {
+	for _, phase := range []string{"starting", "stopping"} {
+		t.Run(phase, func(t *testing.T) {
+			got := serverDisplayStateWithPhase(true, phase, false, true, 0, time.Time{})
+			if got != phase {
+				t.Fatalf("serverDisplayStateWithPhase() = %q, want %q", got, phase)
+			}
+		})
+	}
+}

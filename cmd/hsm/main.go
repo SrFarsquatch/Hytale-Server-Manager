@@ -108,6 +108,7 @@ type ServerManager struct {
 	cmd         *exec.Cmd
 	stdin       io.WriteCloser
 	running     bool
+	phase       string
 	startedAt   time.Time
 	exitCode    int
 	lastExitAt  time.Time
@@ -1570,6 +1571,13 @@ func (m *ServerManager) Installed() bool {
 func (m *ServerManager) IsRunning() bool   { m.mu.Lock(); defer m.mu.Unlock(); return m.running }
 func (m *ServerManager) InstallBusy() bool { m.mu.Lock(); defer m.mu.Unlock(); return m.installBusy }
 func serverDisplayState(running, installBusy, installed bool, exitCode int, lastExitAt time.Time) string {
+	return serverDisplayStateWithPhase(running, "", installBusy, installed, exitCode, lastExitAt)
+}
+
+func serverDisplayStateWithPhase(running bool, phase string, installBusy, installed bool, exitCode int, lastExitAt time.Time) string {
+	if running && (phase == "starting" || phase == "stopping") {
+		return phase
+	}
 	if running {
 		return "online"
 	}
@@ -1592,6 +1600,7 @@ func (m *ServerManager) Status() Status {
 	exitCode := m.exitCode
 	lastExit := m.lastExitAt
 	busy := m.installBusy
+	phase := m.phase
 	pid := 0
 	if m.cmd != nil && m.cmd.Process != nil && running {
 		pid = m.cmd.Process.Pid
@@ -1604,7 +1613,7 @@ func (m *ServerManager) Status() Status {
 	if !lastExit.IsZero() {
 		st.LastExitAt = lastExit.Format(time.RFC3339)
 	}
-	st.State = serverDisplayState(running, busy, st.Installed, exitCode, lastExit)
+	st.State = serverDisplayStateWithPhase(running, phase, busy, st.Installed, exitCode, lastExit)
 	if running && pid > 0 {
 		st.MemoryBytes = readProcessGroupMemory(pid)
 	} else {
@@ -1655,11 +1664,20 @@ func (m *ServerManager) Start(args []string) error {
 	m.stdin = stdin
 	m.running = true
 	m.startedAt = time.Now()
+	m.phase = "starting"
 	m.exitCode = 0
 	m.appendLogLocked("controller", fmt.Sprintf("Starting Hytale server on PID %d", cmd.Process.Pid))
 	go m.scanPipe(stdout, "server")
 	go m.scanPipe(stderr, "stderr")
 	go m.wait(cmd)
+	go func() {
+		time.Sleep(5 * time.Second)
+		m.mu.Lock()
+		if m.cmd == cmd && m.running && m.phase == "starting" {
+			m.phase = "running"
+		}
+		m.mu.Unlock()
+	}()
 	return nil
 }
 func (m *ServerManager) wait(cmd *exec.Cmd) {
@@ -1675,6 +1693,7 @@ func (m *ServerManager) wait(cmd *exec.Cmd) {
 	m.mu.Lock()
 	if m.cmd == cmd {
 		m.running = false
+		m.phase = ""
 		m.stdin = nil
 		m.exitCode = code
 		m.lastExitAt = time.Now()
@@ -1717,6 +1736,9 @@ func (m *ServerManager) Stop() error {
 	stdin := m.stdin
 	m.appendLogLocked("controller", "Requesting graceful shutdown with /stop")
 	_, err := io.WriteString(stdin, "/stop\n")
+	if err == nil {
+		m.phase = "stopping"
+	}
 	m.mu.Unlock()
 	if err != nil {
 		return err
