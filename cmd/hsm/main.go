@@ -49,6 +49,7 @@ type ServerSettings struct {
 	MaxPlayers      int    `json:"maxPlayers"`
 	MOTD            string `json:"motd"`
 	Password        string `json:"password"`
+	WhitelistEnabled bool   `json:"whitelistEnabled"`
 	MemoryMin       string `json:"memoryMin"`
 	MemoryMax       string `json:"memoryMax"`
 	AutoStart       bool   `json:"autoStart"`
@@ -397,6 +398,8 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		MaxPlayers      int    `json:"maxPlayers"`
 		MOTD            string `json:"motd"`
 		Password        string `json:"password"`
+		WhitelistEnabled bool `json:"whitelistEnabled"`
+		PublicHost      string `json:"publicHost"`
 		MemoryMin       string `json:"memoryMin"`
 		MemoryMax       string `json:"memoryMax"`
 		BackupFrequency int    `json:"backupFrequency"`
@@ -462,6 +465,8 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	s.MaxPlayers = body.MaxPlayers
 	s.MOTD = body.MOTD
 	s.Password = body.Password
+	s.WhitelistEnabled = body.WhitelistEnabled
+	s.PublicHost = strings.TrimSpace(body.PublicHost)
 	s.MemoryMin = body.MemoryMin
 	s.MemoryMax = body.MemoryMax
 	s.BackupFrequency = body.BackupFrequency
@@ -698,6 +703,7 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.MOTD == "" { in.MOTD = current.MOTD }
 	if in.Password == "" && current.Password != "" { in.Password = current.Password }
+	if in.PublicHost == "" { in.PublicHost = current.PublicHost }
 	if in.BackupFrequency < 5 || in.BackupFrequency > 10080 {
 		jsonError(w, 400, "backup frequency must be between 5 and 10080 minutes")
 		return
@@ -1339,6 +1345,7 @@ func (a *App) applyHytaleConfig(s ServerSettings) error {
 	cfg["MOTD"] = s.MOTD
 	cfg["Password"] = s.Password
 	cfg["MaxPlayers"] = s.MaxPlayers
+	cfg["RequireJoinPermission"] = s.WhitelistEnabled
 	defaults, ok := cfg["Defaults"].(map[string]any)
 	if !ok { defaults = map[string]any{}; cfg["Defaults"] = defaults }
 	defaults["GameMode"] = s.GameMode
