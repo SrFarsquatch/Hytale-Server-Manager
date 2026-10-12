@@ -16,6 +16,9 @@ services:
       - type: bind
         source: /DATA/AppData/hytale-server-manager
         target: /data
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
     environment:
       HSM_DATA_DIR: /data
       HSM_LISTEN: ":8008"

@@ -50,6 +50,22 @@ The first server remains compatible with the original single-server storage layo
 
 Each instance keeps its own `game/`, imports, snapshots, Hytale world/universe data, mods, configuration and backups.
 
+## First-run setup
+
+A new installation starts with an empty server list. Sign in with the admin account you create on first launch, then use **Create your first server** to configure a Hytale instance. The guided setup covers server name, UDP port, public address, game mode, player limit, optional join password, whitelist permission, JVM memory, backups and autostart. After creation, follow the Install page to download or import authorized Hytale server files.
+
+Existing installations keep their configured servers and legacy single-server settings are migrated automatically. The new server settings are saved separately from the Hytale world data.
+
+Game mode, server name, message, player limit, password and join-permission requirements are applied to the Hytale config.json when the server is stopped and settings are saved or before it starts. Hytale's configuration schema can change between game updates, so keep a backup before making advanced manual edits.
+
+## Updating the application
+
+Open **Settings → Application updates** and choose **Check for updates**. When a newer stable GitHub release is available, choose **Update and restart**. The updater pulls the published stable image from GitHub Container Registry, stages the existing container for rollback, and recreates the manager with its existing ports, mounts, environment, networks, and restart policy. The persistent `/data` volume is not removed. If the replacement fails to start, the updater attempts to restore the previous container.
+
+In-container updates require the Docker socket mount shown in both Compose files. This is a powerful permission: anyone who compromises the manager can potentially gain host-level control through Docker. Use a strong admin password and keep the web dashboard on a trusted network. If you do not want to grant Docker socket access, update the image through CasaOS instead.
+
+Pushing a stable version tag such as `v0.6.1` builds and publishes the `linux/amd64` and `linux/arm64` images, then creates a GitHub Release with generated notes. The updater only offers stable releases. Ensure the GitHub Container Registry package is public so a self-hosted instance can pull release images without registry credentials.
+
 ## Networking
 
 The web panel uses TCP `8008` on the host and container. Hytale game servers use UDP/QUIC. The Compose and CasaOS definitions publish only UDP ports `5520`, `5521`, `5522`, `5523`, `5524`, and `5525`, allowing up to six instances to use unique ports.

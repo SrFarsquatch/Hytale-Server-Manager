@@ -1,8 +1,9 @@
 FROM golang:1.23-bookworm AS builder
 WORKDIR /src
+ARG APP_VERSION=0.6.0
 COPY go.mod ./
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/hytale-server-manager ./cmd/hsm
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X main.version=${APP_VERSION}" -o /out/hytale-server-manager ./cmd/hsm
 
 FROM eclipse-temurin:25-jre-noble
 RUN apt-get update \

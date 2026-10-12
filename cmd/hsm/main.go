@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-const version = "0.5.0"
+var version = "0.6.0"
 
 //go:embed web/*
 var webFS embed.FS
@@ -45,6 +45,11 @@ type ServerSettings struct {
 	ID              string `json:"id"`
 	ServerName      string `json:"serverName"`
 	Port            int    `json:"port"`
+	GameMode        string `json:"gameMode"`
+	MaxPlayers      int    `json:"maxPlayers"`
+	MOTD            string `json:"motd"`
+	Password        string `json:"password"`
+	WhitelistEnabled bool   `json:"whitelistEnabled"`
 	MemoryMin       string `json:"memoryMin"`
 	MemoryMax       string `json:"memoryMax"`
 	AutoStart       bool   `json:"autoStart"`
@@ -155,6 +160,10 @@ type ServerSummary struct {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--update-helper" {
+		runUpdateHelper()
+		return
+	}
 	dataDir := envFirst([]string{"HSM_DATA_DIR", "ORBIS_DATA_DIR"}, "/data")
 	if err := ensureRootDirs(dataDir); err != nil {
 		log.Fatal(err)
@@ -192,6 +201,8 @@ func main() {
 }
 
 func (a *App) routes(mux *http.ServeMux) {
+	mux.Handle("GET /api/app-update", a.auth(http.HandlerFunc(a.handleAppUpdateCheck)))
+	mux.Handle("POST /api/app-update", a.auth(http.HandlerFunc(a.handleAppUpdateApply)))
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		jsonOut(w, 200, map[string]any{"ok": true, "version": version})
 	})
@@ -386,17 +397,56 @@ func (a *App) handleServersList(w http.ResponseWriter, r *http.Request) {
 }
 func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Name           string `json:"name"`
-		Port           int    `json:"port"`
-		SourceServerID string `json:"sourceServerId"`
+		Game            string `json:"game"`
+		Name            string `json:"name"`
+		Port            int    `json:"port"`
+		GameMode        string `json:"gameMode"`
+		MaxPlayers      int    `json:"maxPlayers"`
+		MOTD            string `json:"motd"`
+		Password        string `json:"password"`
+		WhitelistEnabled bool `json:"whitelistEnabled"`
+		PublicHost      string `json:"publicHost"`
+		MemoryMin       string `json:"memoryMin"`
+		MemoryMax       string `json:"memoryMax"`
+		BackupFrequency int    `json:"backupFrequency"`
+		AutoStart       bool   `json:"autoStart"`
+		SourceServerID  string `json:"sourceServerId"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		jsonError(w, 400, err.Error())
 		return
 	}
+	game := strings.TrimSpace(body.Game)
+	if game != "" && game != "hytale" {
+		jsonError(w, 400, "this release supports Hytale servers only")
+		return
+	}
 	name := strings.TrimSpace(body.Name)
-	if name == "" {
-		name = "New Hytale Server"
+	if len(name) < 2 || len(name) > 64 {
+		jsonError(w, 400, "server name must be between 2 and 64 characters")
+		return
+	}
+	if body.GameMode == "" { body.GameMode = "Adventure" }
+	if body.GameMode != "Adventure" && body.GameMode != "Creative" {
+		jsonError(w, 400, "game mode must be Adventure or Creative")
+		return
+	}
+	if body.MaxPlayers == 0 { body.MaxPlayers = 20 }
+	if body.MaxPlayers < 1 || body.MaxPlayers > 1000 {
+		jsonError(w, 400, "maximum players must be between 1 and 1000")
+		return
+	}
+	if body.MOTD == "" { body.MOTD = "Welcome to your Hytale server!" }
+	if body.MemoryMin == "" { body.MemoryMin = "2G" }
+	if body.MemoryMax == "" { body.MemoryMax = "4G" }
+	if !validMemory(body.MemoryMin) || !validMemory(body.MemoryMax) {
+		jsonError(w, 400, "memory values must look like 2G, 4096M, or 1024K")
+		return
+	}
+	if body.BackupFrequency == 0 { body.BackupFrequency = 30 }
+	if body.BackupFrequency < 5 || body.BackupFrequency > 10080 {
+		jsonError(w, 400, "backup frequency must be between 5 and 10080 minutes")
+		return
 	}
 	id := a.uniqueServerID(slugify(name))
 	if id == "" {
@@ -417,6 +467,16 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := defaultServerSettings(id, name, port, filepath.Join("servers", id))
+	s.GameMode = body.GameMode
+	s.MaxPlayers = body.MaxPlayers
+	s.MOTD = body.MOTD
+	s.Password = body.Password
+	s.WhitelistEnabled = body.WhitelistEnabled
+	s.PublicHost = strings.TrimSpace(body.PublicHost)
+	s.MemoryMin = body.MemoryMin
+	s.MemoryMax = body.MemoryMax
+	s.BackupFrequency = body.BackupFrequency
+	s.AutoStart = body.AutoStart
 	if err := ensureServerDirs(a.serverRoot(s)); err != nil {
 		jsonError(w, 500, err.Error())
 		return
@@ -637,6 +697,17 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "memory values must look like 2G, 4096M, or 1024K")
 		return
 	}
+	if in.GameMode == "" { in.GameMode = current.GameMode }
+	if in.GameMode != "Adventure" && in.GameMode != "Creative" {
+		jsonError(w, 400, "game mode must be Adventure or Creative")
+		return
+	}
+	if in.MaxPlayers == 0 { in.MaxPlayers = current.MaxPlayers }
+	if in.MaxPlayers < 1 || in.MaxPlayers > 1000 {
+		jsonError(w, 400, "maximum players must be between 1 and 1000")
+		return
+	}
+	if in.MOTD == "" { in.MOTD = current.MOTD }
 	if in.BackupFrequency < 5 || in.BackupFrequency > 10080 {
 		jsonError(w, 400, "backup frequency must be between 5 and 10080 minutes")
 		return
@@ -662,6 +733,12 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 500, err.Error())
 		return
 	}
+	if !m.IsRunning() {
+		if err := a.applyHytaleConfig(in); err != nil {
+			jsonError(w, 500, "settings saved, but Hytale config could not be updated: "+err.Error())
+			return
+		}
+	}
 	jsonOut(w, 200, in)
 }
 func (a *App) handleStart(w http.ResponseWriter, r *http.Request) {
@@ -683,6 +760,9 @@ func (a *App) startServerByID(id string) error {
 	}
 	if err := a.writeJVMOptionsFor(s); err != nil {
 		return err
+	}
+	if err := a.applyHytaleConfig(s); err != nil {
+		return fmt.Errorf("could not apply Hytale settings: %w", err)
 	}
 	args := []string{"--bind", fmt.Sprintf("0.0.0.0:%d", s.Port), "--backup-frequency", strconv.Itoa(s.BackupFrequency)}
 	args = append(args, splitArgs(s.ExtraArgs)...)
@@ -1166,14 +1246,13 @@ func (a *App) handleImportLocal(w http.ResponseWriter, r *http.Request) {
 
 func defaultServerSettings(id, name string, port int, storage string) ServerSettings {
 	min, max, _ := deploymentPortRange()
-	return ServerSettings{ID: id, ServerName: name, Port: port, MemoryMin: "2G", MemoryMax: "4G", AutoStart: false, ExtraArgs: "", PublicHost: "", BackupFrequency: 30, StorageDir: storage, PortMin: min, PortMax: max}
+	return ServerSettings{ID: id, ServerName: name, Port: port, GameMode: "Adventure", MaxPlayers: 20, MOTD: "Welcome to your Hytale server!", MemoryMin: "2G", MemoryMax: "4G", AutoStart: false, ExtraArgs: "", PublicHost: "", BackupFrequency: 30, StorageDir: storage, PortMin: min, PortMax: max}
 }
 func (a *App) loadConfig() error {
 	path := filepath.Join(a.dataDir, "controller.json")
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		min, _, _ := deploymentPortRange()
-		a.cfg = ControllerConfig{Servers: []ServerSettings{defaultServerSettings("main", "My Hytale Server", min, ".")}}
+		a.cfg = ControllerConfig{Servers: []ServerSettings{}}
 		return a.saveConfigUnlocked()
 	}
 	if err != nil {
@@ -1183,7 +1262,11 @@ func (a *App) loadConfig() error {
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return err
 	}
-	if len(cfg.Servers) == 0 {
+	var rawCfg struct {
+		Servers []map[string]json.RawMessage `json:"servers"`
+	}
+	_ = json.Unmarshal(b, &rawCfg)
+	if len(cfg.Servers) == 0 && cfg.Settings != nil {
 		port := 5520
 		name := "My Hytale Server"
 		ls := cfg.Settings
@@ -1221,11 +1304,23 @@ func (a *App) loadConfig() error {
 				cfg.Servers[i].StorageDir = filepath.Join("servers", cfg.Servers[i].ID)
 			}
 		}
+		var rawFields map[string]json.RawMessage
+		if i < len(rawCfg.Servers) { rawFields = rawCfg.Servers[i] }
+		a.migrateMissingHytaleSettings(&cfg.Servers[i], rawFields)
 		if cfg.Servers[i].Port == 0 {
 			cfg.Servers[i].Port = min + i
 		}
 		cfg.Servers[i].PortMin = min
 		cfg.Servers[i].PortMax = max
+		if cfg.Servers[i].GameMode != "Creative" && cfg.Servers[i].GameMode != "Adventure" {
+			cfg.Servers[i].GameMode = "Adventure"
+		}
+		if cfg.Servers[i].MaxPlayers < 1 || cfg.Servers[i].MaxPlayers > 1000 {
+			cfg.Servers[i].MaxPlayers = 20
+		}
+		if cfg.Servers[i].MOTD == "" {
+			cfg.Servers[i].MOTD = "Welcome to your Hytale server!"
+		}
 		if cfg.Servers[i].MemoryMin == "" {
 			cfg.Servers[i].MemoryMin = "2G"
 		}
@@ -1239,6 +1334,37 @@ func (a *App) loadConfig() error {
 	a.cfg = cfg
 	return a.saveConfigUnlocked()
 }
+func (a *App) migrateMissingHytaleSettings(s *ServerSettings, raw map[string]json.RawMessage) {
+	missing := func(key string) bool {
+		_, present := raw[key]
+		return !present
+	}
+	path := filepath.Join(a.serverRoot(*s), "game", "Server", "config.json")
+	b, err := os.ReadFile(path)
+	if err != nil { return }
+	var gameCfg map[string]any
+	if json.Unmarshal(b, &gameCfg) != nil { return }
+	if missing("gameMode") {
+		if defaults, ok := gameCfg["Defaults"].(map[string]any); ok {
+			if mode, ok := defaults["GameMode"].(string); ok && (mode == "Adventure" || mode == "Creative") { s.GameMode = mode }
+		}
+	}
+	if missing("maxPlayers") {
+		if players, ok := gameCfg["MaxPlayers"].(float64); ok && players >= 1 && players <= 1000 { s.MaxPlayers = int(players) }
+	}
+	if missing("motd") {
+		if motd, ok := gameCfg["MOTD"].(string); ok { s.MOTD = motd }
+	}
+	if missing("password") {
+		if password, ok := gameCfg["Password"].(string); ok { s.Password = password }
+	}
+	if missing("whitelistEnabled") {
+		if required, ok := gameCfg["RequireJoinPermission"].(bool); ok {
+			s.WhitelistEnabled = required
+		}
+	}
+}
+
 func (a *App) saveConfigUnlocked() error {
 	b, err := json.MarshalIndent(a.cfg, "", "  ")
 	if err != nil {
@@ -1247,6 +1373,56 @@ func (a *App) saveConfigUnlocked() error {
 	return atomicWrite(filepath.Join(a.dataDir, "controller.json"), b, 0600)
 }
 func (a *App) saveConfigLocked() error { return a.saveConfigUnlocked() }
+func (a *App) applyHytaleConfig(s ServerSettings) error {
+	serverDir := filepath.Join(a.serverRoot(s), "game", "Server")
+	path := filepath.Join(serverDir, "config.json")
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		// Avoid writing game configuration before the authorized server files are installed.
+		if !fileExists(filepath.Join(serverDir, "HytaleServer.jar")) {
+			return nil
+		}
+		// Create a minimal current-schema config so first startup honors the wizard choices.
+		cfg := map[string]any{
+			"Version": 4,
+			"ServerName": s.ServerName,
+			"MOTD": s.MOTD,
+			"Password": s.Password,
+			"Port": s.Port,
+			"MaxPlayers": s.MaxPlayers,
+			"MaxViewRadius": 12,
+			"RequireJoinPermission": s.WhitelistEnabled,
+			"Defaults": map[string]any{"World": "default", "GameMode": s.GameMode},
+			"ConnectionTimeouts": map[string]any{"JoinTimeouts": map[string]any{}},
+			"RateLimit": map[string]any{},
+			"Modules": map[string]any{},
+			"LogLevels": map[string]any{},
+			"Mods": map[string]any{},
+			"DisplayTmpTagsInStrings": false,
+			"PlayerStorage": map[string]any{"Type": "Hytale"},
+			"AuthCredentialStore": map[string]any{"Type": "Encrypted", "Path": "auth.enc"},
+		}
+		out, err := json.MarshalIndent(cfg, "", "  ")
+		if err != nil { return err }
+		return atomicWrite(path, out, 0644)
+	}
+	if err != nil { return err }
+	var cfg map[string]any
+	if err := json.Unmarshal(b, &cfg); err != nil { return fmt.Errorf("invalid config.json: %w", err) }
+	cfg["ServerName"] = s.ServerName
+	cfg["Port"] = s.Port
+	cfg["MOTD"] = s.MOTD
+	cfg["Password"] = s.Password
+	cfg["MaxPlayers"] = s.MaxPlayers
+	cfg["RequireJoinPermission"] = s.WhitelistEnabled
+	defaults, ok := cfg["Defaults"].(map[string]any)
+	if !ok { defaults = map[string]any{}; cfg["Defaults"] = defaults }
+	defaults["GameMode"] = s.GameMode
+	out, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil { return err }
+	return atomicWrite(path, out, 0644)
+}
+
 func (a *App) writeJVMOptionsFor(s ServerSettings) error {
 	if !validMemory(s.MemoryMin) || !validMemory(s.MemoryMax) {
 		return errors.New("invalid JVM memory settings")
