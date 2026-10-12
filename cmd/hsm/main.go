@@ -220,6 +220,7 @@ func (a *App) routes(mux *http.ServeMux) {
 
 	mux.Handle("GET /api/status", a.auth(http.HandlerFunc(a.handleStatus)))
 	mux.Handle("GET /api/resources", a.auth(http.HandlerFunc(a.handleResources)))
+	mux.Handle("GET /api/diagnostics", a.auth(http.HandlerFunc(a.handleDiagnostics)))
 	mux.Handle("GET /api/settings", a.auth(http.HandlerFunc(a.handleSettingsGet)))
 	mux.Handle("PUT /api/settings", a.auth(http.HandlerFunc(a.handleSettingsPut)))
 	mux.Handle("POST /api/server/start", a.auth(http.HandlerFunc(a.handleStart)))
@@ -1122,7 +1123,10 @@ func (a *App) handleSnapshotRestore(w http.ResponseWriter, r *http.Request) {
 	}
 	serverDir := filepath.Join(root, "game", "Server")
 	safety := filepath.Join(root, "snapshots", "pre-restore-"+time.Now().Format("20060102-150405")+".tar.gz")
-	_ = createTarGz(safety, serverDir, []string{"universe", "mods", "config.json", "permissions.json", "whitelist.json", "bans.json"})
+	if err := createTarGz(safety, serverDir, []string{"universe", "mods", "config.json", "permissions.json", "whitelist.json", "bans.json"}); err != nil {
+		jsonError(w, 500, "could not create safety snapshot; restore was not attempted: "+err.Error())
+		return
+	}
 	if err := extractTarGz(src, serverDir); err != nil {
 		jsonError(w, 500, err.Error())
 		return
@@ -2348,17 +2352,25 @@ func extractTarGz(src, dst string) error {
 		if err != nil {
 			return err
 		}
-		clean := filepath.Clean(h.Name)
-		if clean == "." || strings.HasPrefix(clean, "..") || filepath.IsAbs(clean) {
+		clean := filepath.Clean(filepath.FromSlash(h.Name))
+		if clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(os.PathSeparator)) || filepath.IsAbs(clean) || h.Name == "" {
 			return fmt.Errorf("unsafe snapshot path: %s", h.Name)
 		}
+		// Snapshots only contain ordinary files and directories. Refuse links and
+		// special files so a crafted archive cannot write outside the server tree.
+		if h.Typeflag != tar.TypeDir && h.Typeflag != tar.TypeReg && h.Typeflag != tar.TypeRegA {
+			return fmt.Errorf("unsupported snapshot entry type for %s", h.Name)
+		}
 		target := filepath.Join(dst, clean)
+		if rel, err := filepath.Rel(dst, target); err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+			return fmt.Errorf("unsafe snapshot path: %s", h.Name)
+		}
 		switch h.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(target, 0755); err != nil {
 				return err
 			}
-		case tar.TypeReg:
+		case tar.TypeReg, tar.TypeRegA:
 			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 				return err
 			}
