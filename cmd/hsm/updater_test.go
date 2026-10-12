@@ -34,3 +34,25 @@ func TestValidReleaseVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestIsDockerContainerID(t *testing.T) {
+	for _, value := range []string{
+		"0123456789ab",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+	} {
+		if !isDockerContainerID(value) {
+			t.Errorf("isDockerContainerID(%q) = false, want true", value)
+		}
+	}
+	for _, value := range []string{
+		"",
+		"hytale-server-manager",
+		"0123456789",
+		"0123456789az",
+		"container-0123456789ab",
+	} {
+		if isDockerContainerID(value) {
+			t.Errorf("isDockerContainerID(%q) = true, want false", value)
+		}
+	}
+}
