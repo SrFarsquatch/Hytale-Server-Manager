@@ -31,15 +31,8 @@
       <div id="server-list" class="server-list"></div>
 
       <nav id="nav" aria-label="Main navigation">
-        <button data-view="servers" class="active">Servers</button>
+        <button data-view="servers" class="active">All servers</button>
         <div class="nav-divider"></div>
-        <button data-view="dashboard">Overview</button>
-        <button data-view="console">Console</button>
-        <button data-view="config">Files</button>
-        <button data-view="mods">Mods</button>
-        <button data-view="backups">Backups</button>
-        <button data-view="setup">Install</button>
-        <button data-view="settings">Server settings</button>
         <button data-view="app-settings">Application settings</button>
       </nav>
 
@@ -61,6 +54,16 @@
           <button id="top-start" class="btn primary">Start</button>
         </div>
       </header>
+
+      <nav id="server-tabs" class="server-tabs hidden" aria-label="Selected server workspace">
+        <button data-view-tab="dashboard" class="active">Overview</button>
+        <button data-view-tab="console">Console</button>
+        <button data-view-tab="config">Files</button>
+        <button data-view-tab="mods">Mods</button>
+        <button data-view-tab="backups">Backups</button>
+        <button data-view-tab="setup">Install</button>
+        <button data-view-tab="settings">Settings</button>
+      </nav>
 
       <section id="view-servers" class="view active">
         <div id="first-run" class="welcome-shell hidden">
