@@ -1330,11 +1330,37 @@ func (a *App) saveConfigUnlocked() error {
 }
 func (a *App) saveConfigLocked() error { return a.saveConfigUnlocked() }
 func (a *App) applyHytaleConfig(s ServerSettings) error {
-	path := filepath.Join(a.serverRoot(s), "game", "Server", "config.json")
+	serverDir := filepath.Join(a.serverRoot(s), "game", "Server")
+	path := filepath.Join(serverDir, "config.json")
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		// Hytale creates this file during first startup; saved options are applied on the next start.
-		return nil
+		// Avoid writing game configuration before the authorized server files are installed.
+		if !fileExists(filepath.Join(serverDir, "HytaleServer.jar")) {
+			return nil
+		}
+		// Create a minimal current-schema config so first startup honors the wizard choices.
+		cfg := map[string]any{
+			"Version": 4,
+			"ServerName": s.ServerName,
+			"MOTD": s.MOTD,
+			"Password": s.Password,
+			"Port": s.Port,
+			"MaxPlayers": s.MaxPlayers,
+			"MaxViewRadius": 12,
+			"RequireJoinPermission": s.WhitelistEnabled,
+			"Defaults": map[string]any{"World": "default", "GameMode": s.GameMode},
+			"ConnectionTimeouts": map[string]any{"JoinTimeouts": map[string]any{}},
+			"RateLimit": map[string]any{},
+			"Modules": map[string]any{},
+			"LogLevels": map[string]any{},
+			"Mods": map[string]any{},
+			"DisplayTmpTagsInStrings": false,
+			"PlayerStorage": map[string]any{"Type": "Hytale"},
+			"AuthCredentialStore": map[string]any{"Type": "Encrypted", "Path": "auth.enc"},
+		}
+		out, err := json.MarshalIndent(cfg, "", "  ")
+		if err != nil { return err }
+		return atomicWrite(path, out, 0644)
 	}
 	if err != nil { return err }
 	var cfg map[string]any
