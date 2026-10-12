@@ -114,7 +114,7 @@ func (a *App) handleAppUpdateApply(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
-	targetImage := containerImage + ":" + info.LatestVersion
+	targetImage := containerImage + ":v" + info.LatestVersion
 	setUpdateState("updating", "Starting the updater helper. The dashboard will briefly reconnect when the new version starts.", info.LatestVersion)
 	if err := launchUpdateHelper(containerID, targetImage); err != nil {
 		setUpdateState("failed", err.Error(), "")
@@ -304,11 +304,14 @@ func runUpdateHelper() {
 }
 
 func performContainerUpdate(ctx context.Context, containerID, targetImage string) error {
-	if !strings.HasPrefix(targetImage, containerImage+":") || !validReleaseVersion(strings.TrimPrefix(targetImage, containerImage+":")) {
+	if !strings.HasPrefix(targetImage, containerImage+":") {
 		return errors.New("refusing to install an image outside the official versioned image repository")
 	}
 	d := newDockerAPI()
 	repo, tag, hasTag := strings.Cut(targetImage, ":")
+	if !hasTag || !strings.HasPrefix(tag, "v") || !validReleaseVersion(strings.TrimPrefix(tag, "v")) {
+		return errors.New("refusing to install an invalid release tag")
+	}
 	if !hasTag || repo != containerImage { return errors.New("invalid target image") }
 	resp, err := d.request(ctx, http.MethodPost, "/images/create?fromImage="+url.QueryEscape(repo)+"&tag="+url.QueryEscape(tag), nil)
 	if err != nil { return fmt.Errorf("pull release image: %w", err) }
