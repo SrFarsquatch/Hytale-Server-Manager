@@ -318,3 +318,13 @@ button:disabled{filter:saturate(.65)}
 /* Explicit first-load and cleared-console messages */
 .fleet-grid:empty::before{content:"Loading server list…";display:block;padding:22px 16px;color:#9eacbc;font-size:11px}
 .console-output[data-cleared="true"]:empty::before{content:"Console cleared. New server output will appear here."}
+
+
+/* Selected-server workspace: keep primary server tools together in a compact tab bar. */
+#nav button[data-view="dashboard"],#nav button[data-view="console"],#nav button[data-view="config"],#nav button[data-view="mods"],#nav button[data-view="backups"],#nav button[data-view="setup"],#nav button[data-view="settings"]{display:none}
+.server-tabs{display:flex;align-items:center;gap:5px;overflow-x:auto;overscroll-behavior-x:contain;white-space:nowrap;margin:-8px 0 24px;padding:5px;border-bottom:1px solid var(--line);scrollbar-width:thin}
+.server-tabs button{position:relative;flex:0 0 auto;height:37px;padding:0 14px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--muted);font:inherit;font-size:12px;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.server-tabs button:hover{background:var(--surface-2);color:var(--text)}
+.server-tabs button.active{background:var(--surface-2);border-color:var(--line-strong);color:var(--text)}
+.server-tabs button.active::after{content:"";position:absolute;left:12px;right:12px;bottom:-6px;height:2px;background:var(--accent);border-radius:2px}
+@media(max-width:700px){.server-tabs{margin:-4px 0 17px;gap:3px;padding:3px 0}.server-tabs button{height:35px;padding:0 11px;font-size:11px}}
