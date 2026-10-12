@@ -27,3 +27,9 @@ jobs:
         run: go vet ./...
       - name: Build application
         run: go build -trimpath -o /tmp/hytale-server-manager ./cmd/hsm
+      - name: Validate Compose configurations
+        run: |
+          docker compose -f docker-compose.yml config -q
+          docker compose -f docker-compose.casaos.yml config -q
+      - name: Build Docker image
+        run: docker build --build-arg APP_VERSION=0.6.0 -t hytale-server-manager:ci .
