@@ -21,6 +21,8 @@ jobs:
           cache: true
       - name: Run tests
         run: go test ./...
+      - name: Check browser JavaScript syntax
+        run: node --check cmd/hsm/web/app.js
       - name: Run vet
         run: go vet ./...
       - name: Build application
