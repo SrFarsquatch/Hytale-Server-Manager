@@ -113,6 +113,36 @@ func TestApplyHytaleConfigUpdatesWizardSettings(t *testing.T) {
 	}
 }
 
+func TestApplyHytaleConfigCreatesConfigForInstalledServer(t *testing.T) {
+	dir := t.TempDir()
+	server := defaultServerSettings("first", "First World", 5520, "servers/first")
+	server.GameMode = "Creative"
+	server.MaxPlayers = 32
+	a := &App{dataDir: dir}
+	serverDir := filepath.Join(a.serverRoot(server), "game", "Server")
+	if err := os.MkdirAll(serverDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(serverDir, "HytaleServer.jar"), []byte("test"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.applyHytaleConfig(server); err != nil {
+		t.Fatalf("applyHytaleConfig() error = %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(serverDir, "config.json"))
+	if err != nil {
+		t.Fatalf("first-start config was not created: %v", err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatal(err)
+	}
+	defaults := got["Defaults"].(map[string]any)
+	if got["ServerName"] != "First World" || got["Port"] != float64(5520) || got["MaxPlayers"] != float64(32) || defaults["GameMode"] != "Creative" {
+		t.Fatalf("wizard settings missing from generated config: %#v", got)
+	}
+}
+
 func TestApplyHytaleConfigAllowsFirstInstallWithoutConfig(t *testing.T) {
 	a := &App{dataDir: t.TempDir()}
 	server := defaultServerSettings("first", "First World", 5520, "servers/first")
