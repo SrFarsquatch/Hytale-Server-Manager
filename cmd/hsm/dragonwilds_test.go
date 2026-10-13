@@ -31,6 +31,8 @@ func TestWriteDragonwildsConfig(t *testing.T) {
 	path := filepath.Join(root, "game", "RSDragonwilds", "Saved", "Config", "LinuxServer", "DedicatedServer.ini")
 	data, err := os.ReadFile(path)
 	if err != nil { t.Fatalf("read config: %v", err) }
+	documentedPath := filepath.Join(root, "game", "RSDragonwilds", "Saved", "Config", "Linux", "DedicatedServer.ini")
+	if _, err := os.Stat(documentedPath); err != nil { t.Fatalf("officially documented Linux config path missing: %v", err) }
 	text := string(data)
 	for _, expected := range []string{
 		"[/script/dominion.dedicatedserversettings]",
