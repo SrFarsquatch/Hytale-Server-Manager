@@ -894,17 +894,35 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	}
 	in.ID = current.ID
 	in.GameType = current.GameType // game identity is immutable through generic settings updates
-	in.DragonwildsOwnerID = current.DragonwildsOwnerID
-	in.DragonwildsWorldName = current.DragonwildsWorldName
-	in.DragonwildsAdminPassword = current.DragonwildsAdminPassword
-	in.DragonwildsWorldPassword = current.DragonwildsWorldPassword
-	in.DragonwildsPublic = current.DragonwildsPublic
 	in.StorageDir = current.StorageDir
+	if current.GameType == "runescape-dragonwilds" {
+		in.DragonwildsOwnerID = strings.TrimSpace(in.DragonwildsOwnerID)
+		in.DragonwildsWorldName = strings.TrimSpace(in.DragonwildsWorldName)
+		if in.DragonwildsOwnerID == "" || len(in.DragonwildsOwnerID) > 128 || strings.ContainsAny(in.DragonwildsOwnerID, "\r\n\x00") {
+			jsonError(w, 400, "Dragonwilds Owner ID is required and must be valid")
+			return
+		}
+		if in.DragonwildsWorldName == "" || len(in.DragonwildsWorldName) > 32 || strings.ContainsAny(in.DragonwildsWorldName, "\r\n\x00") {
+			jsonError(w, 400, "Dragonwilds default world name is required and must be 1–32 characters")
+			return
+		}
+		if in.DragonwildsAdminPassword == "" || len(in.DragonwildsAdminPassword) > 128 || len(in.DragonwildsWorldPassword) > 128 || strings.ContainsAny(in.DragonwildsAdminPassword, "\r\n\x00") || strings.ContainsAny(in.DragonwildsWorldPassword, "\r\n\x00") {
+			jsonError(w, 400, "Dragonwilds admin password is required; passwords must be 128 characters or fewer")
+			return
+		}
+	} else {
+		in.DragonwildsOwnerID = current.DragonwildsOwnerID
+		in.DragonwildsWorldName = current.DragonwildsWorldName
+		in.DragonwildsAdminPassword = current.DragonwildsAdminPassword
+		in.DragonwildsWorldPassword = current.DragonwildsWorldPassword
+		in.DragonwildsPublic = current.DragonwildsPublic
+	}
 	min, max := portRangeForGame(current.GameType)
 	in.PortMin = min
 	in.PortMax = max
-	if in.ServerName == "" {
-		jsonError(w, 400, "server name is required")
+	in.ServerName = strings.TrimSpace(in.ServerName)
+	if len(in.ServerName) < 2 || len(in.ServerName) > 64 || strings.ContainsAny(in.ServerName, "\r\n\x00") {
+		jsonError(w, 400, "server name must be between 2 and 64 characters")
 		return
 	}
 	if in.Port < min || in.Port > max {
@@ -927,6 +945,10 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	if in.MaxPlayers == 0 { in.MaxPlayers = current.MaxPlayers }
 	if in.MaxPlayers < 1 || in.MaxPlayers > 1000 {
 		jsonError(w, 400, "maximum players must be between 1 and 1000")
+		return
+	}
+	if current.GameType == "runescape-dragonwilds" && in.MaxPlayers > 6 {
+		jsonError(w, 400, "RuneScape: Dragonwilds currently supports up to 6 players")
 		return
 	}
 	if in.MOTD == "" { in.MOTD = current.MOTD }
@@ -962,14 +984,26 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 500, err.Error())
 		return
 	}
-	if err := a.writeJVMOptionsFor(in); err != nil {
-		jsonError(w, 500, err.Error())
-		return
-	}
-	if !m.IsRunning() {
-		if err := a.applyHytaleConfig(in); err != nil {
-			jsonError(w, 500, "settings saved, but Hytale config could not be updated: "+err.Error())
+	if current.GameType == "runescape-dragonwilds" {
+		// Never edit DedicatedServer.ini while the game is running: the game may
+		// discard live edits. PrepareLaunch writes the persisted values before the
+		// next start; when stopped and installed, also keep the file in sync now.
+		if !m.IsRunning() && m.Installed() {
+			if err := writeDragonwildsConfig(a.serverRoot(in), in); err != nil {
+				jsonError(w, 500, "settings saved, but Dragonwilds config could not be updated: "+err.Error())
+				return
+			}
+		}
+	} else {
+		if err := a.writeJVMOptionsFor(in); err != nil {
+			jsonError(w, 500, err.Error())
 			return
+		}
+		if !m.IsRunning() {
+			if err := a.applyHytaleConfig(in); err != nil {
+				jsonError(w, 500, "settings saved, but Hytale config could not be updated: "+err.Error())
+				return
+			}
 		}
 	}
 	jsonOut(w, 200, in)
