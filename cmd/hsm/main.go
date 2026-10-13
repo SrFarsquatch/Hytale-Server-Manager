@@ -769,6 +769,7 @@ func (a *App) handlePlayers(w http.ResponseWriter, r *http.Request) {
 var (
 	whoCountLine = regexp.MustCompile("(?i)(?:online players|players online|players)\\s*[(:]\\s*(\\d+)(?:\\s*/\\s*(\\d+))?\\s*\\)?\\s*:?\\s*(.*)")
 	whoSentence = regexp.MustCompile("(?i)(?:there are|total of)\\s+(\\d+)\\s+players?\\s+online\\s*[:\\-]?\\s*(.*)")
+	whoNamesLine = regexp.MustCompile("(?i)(?:online players|players online|connected players)\\s*:\\s*(.+)")
 )
 
 func parseWhoOutput(lines []LogLine) ([]string, bool) {
@@ -778,7 +779,13 @@ func parseWhoOutput(lines []LogLine) ([]string, bool) {
 		if strings.Contains(lower, "no players online") || strings.Contains(lower, "0 players online") { return []string{}, true }
 		match := whoCountLine.FindStringSubmatch(line)
 		if match == nil { match = whoSentence.FindStringSubmatch(line) }
-		if match == nil { continue }
+		if match == nil {
+			if names := whoNamesLine.FindStringSubmatch(line); names != nil {
+				players := parsePlayerNames(names[1])
+				if len(players) > 0 && !(len(players) == 1 && strings.TrimSpace(players[0]) == "0") { return players, true }
+			}
+			continue
+		}
 		count, err := strconv.Atoi(match[1])
 		if err != nil || count < 0 || count > 1000 { continue }
 		players := parsePlayerNames(strings.TrimSpace(match[len(match)-1]))
