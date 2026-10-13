@@ -220,6 +220,7 @@ func (a *App) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/login", a.handleLogin)
 	mux.HandleFunc("POST /api/logout", a.handleLogout)
 
+	mux.Handle("GET /api/games", a.auth(http.HandlerFunc(a.handleGameCatalog)))
 	mux.Handle("GET /api/servers", a.auth(http.HandlerFunc(a.handleServersList)))
 	mux.Handle("POST /api/servers", a.auth(http.HandlerFunc(a.handleServersCreate)))
 	mux.Handle("DELETE /api/servers/{id}", a.auth(http.HandlerFunc(a.handleServersDelete)))
@@ -501,7 +502,7 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	game := strings.TrimSpace(body.Game)
 	if game != "" && game != "hytale" {
-		jsonError(w, 400, "this release supports Hytale servers only")
+		jsonError(w, 400, "this release can create Hytale servers only; see GET /api/games for supported games")
 		return
 	}
 	name := strings.TrimSpace(body.Name)
