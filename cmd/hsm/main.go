@@ -21,6 +21,7 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+	"regexp"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -223,6 +224,7 @@ func (a *App) routes(mux *http.ServeMux) {
 	mux.Handle("POST /api/servers/{id}/restart", a.auth(http.HandlerFunc(a.handleServerRestartByPath)))
 
 	mux.Handle("GET /api/status", a.auth(http.HandlerFunc(a.handleStatus)))
+	mux.Handle("GET /api/players", a.auth(http.HandlerFunc(a.handlePlayers)))
 	mux.Handle("GET /api/resources", a.auth(http.HandlerFunc(a.handleResources)))
 	mux.Handle("GET /api/settings", a.auth(http.HandlerFunc(a.handleSettingsGet)))
 	mux.Handle("PUT /api/settings", a.auth(http.HandlerFunc(a.handleSettingsPut)))
@@ -738,6 +740,65 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOut(w, 200, m.Status())
+}
+
+func (a *App) handlePlayers(w http.ResponseWriter, r *http.Request) {
+	m, settings, err := a.requestServer(r)
+	if err != nil { jsonError(w, 404, err.Error()); return }
+	maxPlayers := settings.MaxPlayers
+	if maxPlayers < 1 { maxPlayers = 100 }
+	if !m.IsRunning() {
+		jsonOut(w, 200, map[string]any{"known": true, "count": 0, "maxPlayers": maxPlayers, "players": []string{}, "message": "Server is stopped"})
+		return
+	}
+	before := m.logs.Snapshot()
+	if err := m.SendCommand("/who"); err != nil {
+		jsonOut(w, 200, map[string]any{"known": false, "maxPlayers": maxPlayers, "players": []string{}, "message": "Could not query the server"})
+		return
+	}
+	// Hytale prints command output asynchronously. Give /who a moment to reach the log.
+	time.Sleep(1200 * time.Millisecond)
+	after := m.logs.Snapshot()
+	if len(after) > len(before) { after = after[len(before):] } else { after = nil }
+	players, known := parseWhoOutput(after)
+	message := "Waiting for a recognizable /who response"
+	if known { message = "Player list updated" }
+	jsonOut(w, 200, map[string]any{"known": known, "count": len(players), "maxPlayers": maxPlayers, "players": players, "message": message})
+}
+
+var (
+	whoCountLine = regexp.MustCompile("(?i)(?:online players|players online|players)\\s*[(:]\\s*(\\d+)(?:\\s*/\\s*(\\d+))?\\s*\\)?\\s*:?\\s*(.*)")
+	whoSentence = regexp.MustCompile("(?i)(?:there are|total of)\\s+(\\d+)\\s+players?\\s+online\\s*[:\\-]?\\s*(.*)")
+)
+
+func parseWhoOutput(lines []LogLine) ([]string, bool) {
+	for i := len(lines)-1; i >= 0; i-- {
+		line := strings.TrimSpace(stripANSI(lines[i].Line))
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "no players online") || strings.Contains(lower, "0 players online") { return []string{}, true }
+		match := whoCountLine.FindStringSubmatch(line)
+		if match == nil { match = whoSentence.FindStringSubmatch(line) }
+		if match == nil { continue }
+		count, err := strconv.Atoi(match[1])
+		if err != nil || count < 0 || count > 1000 { continue }
+		players := parsePlayerNames(strings.TrimSpace(match[len(match)-1]))
+		if count == 0 { return []string{}, true }
+		if len(players) > 0 { return players, true }
+		return nil, false
+	}
+	return nil, false
+}
+
+func parsePlayerNames(s string) []string {
+	s = strings.TrimSpace(strings.Trim(s, "[]{}"))
+	if s == "" { return nil }
+	parts := strings.Split(s, ",")
+	players := make([]string, 0, len(parts))
+	for _, part := range parts {
+		name := strings.TrimSpace(strings.Trim(part, "[]{}•*- "))
+		if name != "" { players = append(players, name) }
+	}
+	return players
 }
 
 func (a *App) handleResources(w http.ResponseWriter, r *http.Request) {
