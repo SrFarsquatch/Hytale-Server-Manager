@@ -153,6 +153,7 @@ type Status struct {
 
 type ServerSummary struct {
 	ID            string `json:"id"`
+	GameType      string `json:"gameType"`
 	ServerName    string `json:"serverName"`
 	Port          int    `json:"port"`
 	PublicHost    string `json:"publicHost"`
@@ -475,7 +476,7 @@ func (a *App) handleServersList(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		st := m.Status()
-		out = append(out, ServerSummary{ID: s.ID, ServerName: s.ServerName, Port: s.Port, PublicHost: s.PublicHost, Running: st.Running, Installed: st.Installed, InstallBusy: st.InstallBusy, State: st.State, ExitCode: st.ExitCode, LastExitAt: st.LastExitAt, UptimeSeconds: st.UptimeSeconds, StorageDir: s.StorageDir, Primary: i == 0})
+		out = append(out, ServerSummary{ID: s.ID, GameType: s.GameType, ServerName: s.ServerName, Port: s.Port, PublicHost: s.PublicHost, Running: st.Running, Installed: st.Installed, InstallBusy: st.InstallBusy, State: st.State, ExitCode: st.ExitCode, LastExitAt: st.LastExitAt, UptimeSeconds: st.UptimeSeconds, StorageDir: s.StorageDir, Primary: i == 0})
 	}
 	jsonOut(w, 200, out)
 }
