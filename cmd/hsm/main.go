@@ -537,7 +537,7 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, 400, "Dragonwilds requires an admin password")
 			return
 		}
-		if len(body.DragonwildsAdminPassword) > 128 || strings.ContainsAny(body.DragonwildsAdminPassword, "\r\n\x00") || strings.ContainsAny(body.DragonwildsWorldPassword, "\r\n\x00") {
+		if len(body.DragonwildsAdminPassword) > 128 || len(body.DragonwildsWorldPassword) > 128 || strings.ContainsAny(body.DragonwildsAdminPassword, "\r\n\x00") || strings.ContainsAny(body.DragonwildsWorldPassword, "\r\n\x00") {
 			jsonError(w, 400, "invalid Dragonwilds password")
 			return
 		}
