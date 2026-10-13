@@ -1206,3 +1206,20 @@ body {
  .server-list-item { flex:0 0 auto; min-height:46px; }
  .server-select-arrow { opacity:1; }
 }
+
+/* Game-grouped All Servers inventory. */
+.fleet-grouped{display:flex;flex-direction:column;gap:24px}
+.fleet-game-section{min-width:0}
+.fleet-game-heading{display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:0 0 11px;border-bottom:1px solid #253542}
+.fleet-game-logo{display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:5px;flex:0 0 38px;border:1px solid #293b49;border-radius:10px;background:#111b24}
+.fleet-game-logo img{width:100%;height:100%;object-fit:contain}
+.fleet-game-heading>div{flex:1;min-width:0}
+.fleet-game-heading h2{margin:0;color:#eaf2f8;font-size:14px;font-weight:800;letter-spacing:-.02em}
+.fleet-game-heading p{margin:4px 0 0;color:#8296a7;font-size:10px}
+.fleet-game-count{display:grid;place-items:center;min-width:28px;height:26px;padding:0 8px;border:1px solid #2b3d4b;border-radius:8px;color:#b7c7d3;background:#111b24;font-size:11px;font-weight:800}
+.fleet-game-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.fleet-game-cards .fleet-card{min-width:0}
+.fleet-grouped .fleet-name small{color:#8296a7}
+.fleet-grouped .fleet-card.selected{border-color:#3c8b70;box-shadow:0 0 0 1px #3c8b7040,inset 3px 0 0 var(--accent)}
+@media(max-width:900px){.fleet-game-cards{grid-template-columns:1fr}}
+@media(max-width:760px){.fleet-grouped{gap:20px}.fleet-game-heading{gap:9px}.fleet-game-logo{width:34px;height:34px;flex-basis:34px}.fleet-game-heading h2{font-size:13px}.fleet-game-cards{gap:9px}}
