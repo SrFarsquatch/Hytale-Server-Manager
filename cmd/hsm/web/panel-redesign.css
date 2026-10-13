@@ -413,3 +413,10 @@ button:disabled { opacity:.42;cursor:not-allowed;transform:none!important; }
 .setup-help>div { padding:4px 15px 13px; }
 .setup-help p { margin:10px 0 0; line-height:1.65; font-size:11px; }
 .setup-help code { color:var(--accent);font-size:10px;overflow-wrap:anywhere; }
+
+/* Hidden state must win over responsive layout rules using !important. */
+.hidden,
+.app.hidden,
+.auth-shell.hidden {
+  display: none !important;
+}
