@@ -209,6 +209,16 @@
           <div id="dragonwilds-install-controls" class="hidden">
             <div class="setup-row"><div class="step-index">1</div><div><h4>Install or update Dragonwilds</h4><p>Downloads the official Linux dedicated-server files through Valve SteamCMD. Progress and any SteamCMD errors appear in Console.</p></div><div class="setup-buttons"><button class="btn primary" id="dragonwilds-install">Install dedicated server</button></div></div>
             <p class="help">The first download is several gigabytes. UDP ports 7777–7782 must be published and forwarded for players to join. If SteamCMD reports that anonymous access is unavailable, claim the free dedicated-server tool in Steam first.</p>
+            <details class="setup-help">
+              <summary>World saves, discovery, and troubleshooting</summary>
+              <div>
+                <p><b>Finding the server:</b> In Dragonwilds, open Worlds → Public and search for the exact default world name. Search is case-sensitive. Keep the server and game client on matching versions.</p>
+                <p><b>New worlds:</b> If <code>RSDragonwilds/Saved/Savegames</code> has no <code>.sav</code> file, the game creates a new Standard world. World difficulty and custom gameplay sliders live in the world save, not in the five documented dedicated-server settings.</p>
+                <p><b>Importing a world:</b> Stop the server first, back up the server's <code>RSDragonwilds/Saved/Savegames</code> directory, then copy your chosen <code>.sav</code> into that folder. Start the server and search using the world name shown by the save. Never replace saves without a backup.</p>
+                <p><b>Logs:</b> <code>RSDragonwilds/Saved/Logs/RSDragonwilds.log</code>. HSM's Console also shows server and SteamCMD output.</p>
+                <p><b>Config:</b> HSM writes <code>DedicatedServer.ini</code> under the Linux config directories before launch. Stop the server before making manual edits; the game may discard INI changes made while it is running.</p>
+              </div>
+            </details>
           </div>
         </div>
       </section>
@@ -322,6 +332,6 @@
   </dialog>
 
   <div id="toast" class="toast"></div>
-  <script src="/app.js?v=20261013-control-room"></script>
+  <script src="/app.js?v=20261013-dragonwilds-settings"></script>
 </body>
 </html>
