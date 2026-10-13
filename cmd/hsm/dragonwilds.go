@@ -83,7 +83,6 @@ func writeDragonwildsConfig(root string, settings ServerSettings) error {
 	values := []struct{ key, value string }{
 		{"AdminPassword", settings.DragonwildsAdminPassword},
 		{"OwnerId", settings.DragonwildsOwnerID},
-		{"Public", boolDigit(settings.DragonwildsPublic)},
 		{"WorldPassword", settings.DragonwildsWorldPassword},
 		{"ServerName", nameSafeDefault(settings.ServerName)},
 		{"DefaultWorldName", worldName},
