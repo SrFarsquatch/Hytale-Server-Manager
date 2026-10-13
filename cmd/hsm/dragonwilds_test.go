@@ -34,6 +34,9 @@ func TestWriteDragonwildsConfig(t *testing.T) {
 	documentedPath := filepath.Join(root, "game", "RSDragonwilds", "Saved", "Config", "Linux", "DedicatedServer.ini")
 	if _, err := os.Stat(documentedPath); err != nil { t.Fatalf("officially documented Linux config path missing: %v", err) }
 	text := string(data)
+	if strings.Contains(text, "\nPublic=") {
+		t.Errorf("wrote undocumented Public setting to DedicatedServer.ini:\n%s", text)
+	}
 	for _, expected := range []string{
 		"[/script/dominion.dedicatedserversettings]",
 		"OwnerId=player-id-123",
