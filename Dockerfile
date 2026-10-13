@@ -7,7 +7,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X main.version=
 
 FROM eclipse-temurin:25-jre-noble
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends bash ca-certificates tini procps unzip gosu libc6-i386 lib32gcc-s1 lib32stdc++6 \
+    && apt-get install -y --no-install-recommends bash ca-certificates tini procps unzip gosu \
+    && if [ "$(dpkg --print-architecture)" = "amd64" ]; then apt-get install -y --no-install-recommends libc6-i386 lib32gcc-s1 lib32stdc++6; fi \
     && rm -rf /var/lib/apt/lists/*
 RUN useradd --create-home --shell /bin/bash hsm \
     && mkdir -p /data \
