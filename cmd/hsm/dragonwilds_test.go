@@ -72,3 +72,19 @@ func TestExtractSteamCMDArchiveRejectsTraversal(t *testing.T) {
 	if err := out.Close(); err != nil { t.Fatal(err) }
 	if err := extractSteamCMDArchive(src, filepath.Join(root, "out")); err == nil { t.Fatal("expected traversal path to be rejected") }
 }
+
+func TestWriteDragonwildsConfigPreservesUnmanagedEntries(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "game", "RSDragonwilds", "Saved", "Config", "LinuxServer", "DedicatedServer.ini")
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil { t.Fatal(err) }
+	existing := "; game metadata\n[/script/dominion.dedicatedserversettings]\nOwnerId=old-owner\nGeneratedAdminAccount=keep-me\n[OtherSection]\nKeep=also-me\n"
+	if err := os.WriteFile(path, []byte(existing), 0600); err != nil { t.Fatal(err) }
+	settings := ServerSettings{ServerName: "New Name", DragonwildsOwnerID: "new-owner", DragonwildsAdminPassword: "new-admin", DragonwildsWorldName: "World"}
+	if err := writeDragonwildsConfig(root, settings); err != nil { t.Fatal(err) }
+	data, err := os.ReadFile(path)
+	if err != nil { t.Fatal(err) }
+	got := string(data)
+	for _, want := range []string{"OwnerId=new-owner", "GeneratedAdminAccount=keep-me", "[OtherSection]", "Keep=also-me", "AdminPassword=new-admin"} {
+		if !strings.Contains(got, want) { t.Errorf("config lost or missed %q:\n%s", want, got) }
+	}
+}
