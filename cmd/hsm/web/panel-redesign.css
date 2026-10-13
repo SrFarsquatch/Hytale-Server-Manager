@@ -1206,3 +1206,22 @@ body {
  .server-list-item { flex:0 0 auto; min-height:46px; }
  .server-select-arrow { opacity:1; }
 }
+
+
+/* All Servers: grouped sections match the game-organized server picker. */
+.fleet-game-section { display:block; }
+.fleet-game-section + .fleet-game-section { border-top:1px solid var(--line); }
+.fleet-game-heading { display:flex; align-items:center; gap:9px; min-height:42px; padding:9px 18px; color:#a8bac8; background:rgba(18,29,39,.72); border-bottom:1px solid var(--line); }
+.fleet-game-logo { display:flex; width:24px; height:20px; align-items:center; justify-content:center; overflow:hidden; flex:0 0 24px; }
+.fleet-game-logo img { width:100%; height:100%; object-fit:contain; }
+.fleet-game-heading strong { font-size:11px; font-weight:800; }
+.fleet-game-count { margin-left:auto; color:#8fa1b1; font-size:10px; }
+@media(max-width:760px) {
+ .fleet-game-heading { padding:10px 12px; }
+ .fleet-card { padding:12px; }
+ .fleet-card .fleet-open { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:7px; }
+ .fleet-card .fleet-name { grid-column:1 / -1; }
+ .fleet-card .fleet-cell { min-width:0; }
+ .fleet-card .fleet-address { grid-column:1 / -1; }
+ .fleet-actions { margin-top:8px; }
+}
