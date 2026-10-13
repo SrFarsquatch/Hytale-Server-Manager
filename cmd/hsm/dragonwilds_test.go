@@ -52,6 +52,30 @@ func TestWriteDragonwildsConfig(t *testing.T) {
 	if info.Mode().Perm() != 0600 { t.Errorf("config permissions = %o, want 600", info.Mode().Perm()) }
 }
 
+func TestWriteDragonwildsConfigAllowsEmptyWorldPassword(t *testing.T) {
+	root := t.TempDir()
+	settings := ServerSettings{
+		ServerName: "Public World",
+		DragonwildsOwnerID: "owner-id",
+		DragonwildsWorldName: "World",
+		DragonwildsAdminPassword: "admin-secret",
+	}
+	if err := writeDragonwildsConfig(root, settings); err != nil {
+		t.Fatalf("writeDragonwildsConfig() error = %v", err)
+	}
+	path := filepath.Join(root, "game", "RSDragonwilds", "Saved", "Config", "LinuxServer", "DedicatedServer.ini")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "WorldPassword=\n") {
+		t.Fatalf("empty optional WorldPassword was not written:\n%s", data)
+	}
+	if strings.Contains(string(data), "\nPublic=") {
+		t.Fatalf("wrote undocumented Public setting:\n%s", data)
+	}
+}
+
 func TestWriteDragonwildsConfigRejectsNewlineInjection(t *testing.T) {
 	err := writeDragonwildsConfig(t.TempDir(), ServerSettings{
 		ServerName: "Safe", DragonwildsOwnerID: "player\nPublic=1",
