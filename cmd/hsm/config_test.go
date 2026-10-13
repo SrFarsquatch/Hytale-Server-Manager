@@ -174,3 +174,33 @@ func TestApplyHytaleConfigAllowsFirstInstallWithoutConfig(t *testing.T) {
 		t.Fatalf("missing config should be allowed before game files are installed: %v", err)
 	}
 }
+
+
+func TestLoadConfigDefaultsMissingGameTypeToHytale(t *testing.T) {
+	dir := t.TempDir()
+	controller := []byte(`{"servers":[{"id":"legacy","serverName":"Legacy World","port":5520,"storageDir":"."}]}`)
+	if err := os.WriteFile(filepath.Join(dir, "controller.json"), controller, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	a := &App{dataDir: dir}
+	if err := a.loadConfig(); err != nil {
+		t.Fatalf("loadConfig() error = %v", err)
+	}
+	if got := a.cfg.Servers[0].GameType; got != "hytale" {
+		t.Fatalf("legacy gameType = %q, want hytale", got)
+	}
+	if got := a.cfg.Servers[0].ID; got != "legacy" {
+		t.Fatalf("legacy server ID changed to %q", got)
+	}
+	if got := a.cfg.Servers[0].StorageDir; got != "." {
+		t.Fatalf("legacy storage directory changed to %q", got)
+	}
+}
+
+func TestDefaultServerSettingsUsesHytaleGameType(t *testing.T) {
+	got := defaultServerSettings("first", "First World", 5520, "servers/first")
+	if got.GameType != "hytale" {
+		t.Fatalf("default gameType = %q, want hytale", got.GameType)
+	}
+}

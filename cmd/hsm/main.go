@@ -45,6 +45,12 @@ type AdminConfig struct {
 
 type ServerSettings struct {
 	ID              string `json:"id"`
+	GameType        string `json:"gameType,omitempty"`
+	DragonwildsOwnerID string `json:"dragonwildsOwnerId,omitempty"`
+	DragonwildsWorldName string `json:"dragonwildsWorldName,omitempty"`
+	DragonwildsAdminPassword string `json:"dragonwildsAdminPassword,omitempty"`
+	DragonwildsWorldPassword string `json:"dragonwildsWorldPassword,omitempty"`
+	DragonwildsPublic bool `json:"dragonwildsPublic,omitempty"`
 	ServerName      string `json:"serverName"`
 	Port            int    `json:"port"`
 	GameMode        string `json:"gameMode"`
@@ -108,6 +114,7 @@ type ServerManager struct {
 	mu          sync.Mutex
 	rootDir     string
 	toolsDir    string
+	gameType    string
 	cmd         *exec.Cmd
 	stdin       io.WriteCloser
 	running     bool
@@ -152,6 +159,7 @@ type Status struct {
 
 type ServerSummary struct {
 	ID            string `json:"id"`
+	GameType      string `json:"gameType"`
 	ServerName    string `json:"serverName"`
 	Port          int    `json:"port"`
 	PublicHost    string `json:"publicHost"`
@@ -219,6 +227,7 @@ func (a *App) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/login", a.handleLogin)
 	mux.HandleFunc("POST /api/logout", a.handleLogout)
 
+	mux.Handle("GET /api/games", a.auth(http.HandlerFunc(a.handleGameCatalog)))
 	mux.Handle("GET /api/servers", a.auth(http.HandlerFunc(a.handleServersList)))
 	mux.Handle("POST /api/servers", a.auth(http.HandlerFunc(a.handleServersCreate)))
 	mux.Handle("DELETE /api/servers/{id}", a.auth(http.HandlerFunc(a.handleServersDelete)))
@@ -253,6 +262,7 @@ func (a *App) routes(mux *http.ServeMux) {
 	mux.Handle("GET /api/install/status", a.auth(http.HandlerFunc(a.handleInstallStatus)))
 	mux.Handle("POST /api/install/downloader", a.auth(http.HandlerFunc(a.handleDownloaderUpload)))
 	mux.Handle("POST /api/install/run-downloader", a.auth(http.HandlerFunc(a.handleDownloaderRun)))
+	mux.Handle("POST /api/install/dragonwilds", a.auth(http.HandlerFunc(a.handleDragonwildsInstall)))
 	mux.Handle("POST /api/install/import-local", a.auth(http.HandlerFunc(a.handleImportLocal)))
 
 	for _, x := range []struct{ path, cmd string }{
@@ -473,13 +483,18 @@ func (a *App) handleServersList(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		st := m.Status()
-		out = append(out, ServerSummary{ID: s.ID, ServerName: s.ServerName, Port: s.Port, PublicHost: s.PublicHost, Running: st.Running, Installed: st.Installed, InstallBusy: st.InstallBusy, State: st.State, ExitCode: st.ExitCode, LastExitAt: st.LastExitAt, UptimeSeconds: st.UptimeSeconds, StorageDir: s.StorageDir, Primary: i == 0})
+		out = append(out, ServerSummary{ID: s.ID, GameType: s.GameType, ServerName: s.ServerName, Port: s.Port, PublicHost: s.PublicHost, Running: st.Running, Installed: st.Installed, InstallBusy: st.InstallBusy, State: st.State, ExitCode: st.ExitCode, LastExitAt: st.LastExitAt, UptimeSeconds: st.UptimeSeconds, StorageDir: s.StorageDir, Primary: i == 0})
 	}
 	jsonOut(w, 200, out)
 }
 func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Game            string `json:"game"`
+		DragonwildsOwnerID string `json:"dragonwildsOwnerId"`
+		DragonwildsWorldName string `json:"dragonwildsWorldName"`
+		DragonwildsAdminPassword string `json:"dragonwildsAdminPassword"`
+		DragonwildsWorldPassword string `json:"dragonwildsWorldPassword"`
+		DragonwildsPublic bool `json:"dragonwildsPublic"`
 		Name            string `json:"name"`
 		Port            int    `json:"port"`
 		GameMode        string `json:"gameMode"`
@@ -498,10 +513,34 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, err.Error())
 		return
 	}
-	game := strings.TrimSpace(body.Game)
-	if game != "" && game != "hytale" {
-		jsonError(w, 400, "this release supports Hytale servers only")
+	game := strings.ToLower(strings.TrimSpace(body.Game))
+	if game == "" { game = "hytale" }
+	if game != "hytale" && game != "runescape-dragonwilds" {
+		jsonError(w, 400, "this release supports Hytale and RuneScape: Dragonwilds only; see GET /api/games for supported games")
 		return
+	}
+	if game == "runescape-dragonwilds" {
+		if strings.TrimSpace(body.DragonwildsOwnerID) == "" {
+			jsonError(w, 400, "RuneScape: Dragonwilds requires your in-game Player ID as the server Owner ID")
+			return
+		}
+		if len(strings.TrimSpace(body.DragonwildsOwnerID)) > 128 || strings.ContainsAny(body.DragonwildsOwnerID, "\r\n\x00") {
+			jsonError(w, 400, "invalid Dragonwilds Owner ID")
+			return
+		}
+		if strings.TrimSpace(body.DragonwildsWorldName) == "" { body.DragonwildsWorldName = nameSafeDefault(body.Name) }
+		if len(body.DragonwildsWorldName) > 32 || strings.ContainsAny(body.DragonwildsWorldName, "\r\n\x00") {
+			jsonError(w, 400, "Dragonwilds world name must be 1–32 characters")
+			return
+		}
+		if strings.TrimSpace(body.DragonwildsAdminPassword) == "" {
+			jsonError(w, 400, "Dragonwilds requires an admin password")
+			return
+		}
+		if len(body.DragonwildsAdminPassword) > 128 || len(body.DragonwildsWorldPassword) > 128 || strings.ContainsAny(body.DragonwildsAdminPassword, "\r\n\x00") || strings.ContainsAny(body.DragonwildsWorldPassword, "\r\n\x00") {
+			jsonError(w, 400, "invalid Dragonwilds password")
+			return
+		}
 	}
 	name := strings.TrimSpace(body.Name)
 	if len(name) < 2 || len(name) > 64 {
@@ -513,7 +552,8 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "game mode must be Adventure or Creative")
 		return
 	}
-	if body.MaxPlayers == 0 { body.MaxPlayers = 20 }
+	if body.MaxPlayers == 0 { if game == "runescape-dragonwilds" { body.MaxPlayers = 6 } else { body.MaxPlayers = 20 } }
+	if game == "runescape-dragonwilds" && body.MaxPlayers > 6 { jsonError(w, 400, "RuneScape: Dragonwilds supports up to 6 players"); return }
 	if body.MaxPlayers < 1 || body.MaxPlayers > 1000 {
 		jsonError(w, 400, "maximum players must be between 1 and 1000")
 		return
@@ -537,9 +577,10 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	port := body.Port
 	if port == 0 {
-		port = a.nextAvailablePort()
+		if game == "runescape-dragonwilds" { port = a.nextAvailablePortForRange(7777, 7782) } else { port = a.nextAvailablePort() }
 	}
 	min, max, _ := deploymentPortRange()
+	if game == "runescape-dragonwilds" { min, max = 7777, 7782 }
 	if port < min || port > max {
 		jsonError(w, 400, fmt.Sprintf("port must be within the published UDP range %d-%d", min, max))
 		return
@@ -549,6 +590,13 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := defaultServerSettings(id, name, port, filepath.Join("servers", id))
+	s.GameType = game
+	s.DragonwildsOwnerID = strings.TrimSpace(body.DragonwildsOwnerID)
+	s.DragonwildsWorldName = strings.TrimSpace(body.DragonwildsWorldName)
+	s.DragonwildsAdminPassword = body.DragonwildsAdminPassword
+	s.DragonwildsWorldPassword = body.DragonwildsWorldPassword
+	s.DragonwildsPublic = body.DragonwildsPublic
+	if game == "runescape-dragonwilds" { s.MaxPlayers = 6 }
 	s.GameMode = body.GameMode
 	s.MaxPlayers = body.MaxPlayers
 	s.MOTD = body.MOTD
@@ -567,6 +615,10 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		srcM, srcS, err := a.serverByID(body.SourceServerID)
 		if err != nil {
 			jsonError(w, 404, "source server not found")
+			return
+		}
+		if srcS.GameType != s.GameType {
+			jsonError(w, 400, "servers can only be cloned from the same game type")
 			return
 		}
 		if srcM.IsRunning() {
@@ -591,9 +643,9 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.managersMu.Lock()
-	a.managers[id] = NewServerManager(a.serverRoot(s), filepath.Join(a.dataDir, "tools"))
+	a.managers[id] = NewServerManager(a.serverRoot(s), filepath.Join(a.dataDir, "tools"), s.GameType)
 	a.managersMu.Unlock()
-	_ = a.writeJVMOptionsFor(s)
+	if s.GameType == "hytale" { _ = a.writeJVMOptionsFor(s) }
 	jsonOut(w, 201, s)
 }
 func (a *App) handleServersDelete(w http.ResponseWriter, r *http.Request) {
@@ -731,7 +783,7 @@ func (a *App) ensureManagers() {
 	for _, s := range servers {
 		_ = ensureServerDirs(a.serverRoot(s))
 		if a.managers[s.ID] == nil {
-			a.managers[s.ID] = NewServerManager(a.serverRoot(s), filepath.Join(a.dataDir, "tools"))
+			a.managers[s.ID] = NewServerManager(a.serverRoot(s), filepath.Join(a.dataDir, "tools"), s.GameType)
 		}
 	}
 }
@@ -750,6 +802,10 @@ func (a *App) handlePlayers(w http.ResponseWriter, r *http.Request) {
 	if err != nil { jsonError(w, 404, err.Error()); return }
 	maxPlayers := settings.MaxPlayers
 	if maxPlayers < 1 { maxPlayers = 100 }
+	if settings.GameType == "runescape-dragonwilds" {
+		jsonOut(w, 200, map[string]any{"known": false, "count": 0, "maxPlayers": 6, "players": []string{}, "message": "Player list integration is not available for Dragonwilds yet"})
+		return
+	}
 	if !m.IsRunning() {
 		jsonOut(w, 200, map[string]any{"known": true, "count": 0, "maxPlayers": maxPlayers, "players": []string{}, "message": "Server is stopped"})
 		return
@@ -820,7 +876,7 @@ func (a *App) handleSettingsGet(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 404, err.Error())
 		return
 	}
-	min, max, _ := deploymentPortRange()
+	min, max := portRangeForGame(s.GameType)
 	s.PortMin = min
 	s.PortMax = max
 	jsonOut(w, 200, s)
@@ -837,8 +893,14 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.ID = current.ID
+	in.GameType = current.GameType // game identity is immutable through generic settings updates
+	in.DragonwildsOwnerID = current.DragonwildsOwnerID
+	in.DragonwildsWorldName = current.DragonwildsWorldName
+	in.DragonwildsAdminPassword = current.DragonwildsAdminPassword
+	in.DragonwildsWorldPassword = current.DragonwildsWorldPassword
+	in.DragonwildsPublic = current.DragonwildsPublic
 	in.StorageDir = current.StorageDir
-	min, max, _ := deploymentPortRange()
+	min, max := portRangeForGame(current.GameType)
 	in.PortMin = min
 	in.PortMax = max
 	if in.ServerName == "" {
@@ -929,14 +991,14 @@ func (a *App) startServerByID(id string) error {
 	if err != nil {
 		return err
 	}
-	if err := a.writeJVMOptionsFor(s); err != nil {
+	adapter, err := gameAdapterFor(s.GameType)
+	if err != nil {
 		return err
 	}
-	if err := a.applyHytaleConfig(s); err != nil {
-		return fmt.Errorf("could not apply Hytale settings: %w", err)
+	args, err := adapter.PrepareLaunch(a, s)
+	if err != nil {
+		return err
 	}
-	args := []string{"--bind", fmt.Sprintf("0.0.0.0:%d", s.Port), "--backup-frequency", strconv.Itoa(s.BackupFrequency)}
-	args = append(args, splitArgs(s.ExtraArgs)...)
 	return m.Start(args)
 }
 func (a *App) handleStop(w http.ResponseWriter, r *http.Request) {
@@ -1368,6 +1430,10 @@ func (a *App) handleInstallStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	root := a.serverRoot(s)
+	if s.GameType == "runescape-dragonwilds" {
+		jsonOut(w, 200, map[string]any{"installed": m.Installed(), "busy": m.InstallBusy(), "game": s.GameType, "paths": map[string]string{"game": filepath.Join(root, "game"), "steamcmd": filepath.Join(a.dataDir, "tools", "steamcmd", "steamcmd.sh")}})
+		return
+	}
 	downloader := filepath.Join(a.dataDir, "tools", "hytale-downloader")
 	bundle := filepath.Join(root, "imports", "game.zip")
 	jsonOut(w, 200, map[string]any{"installed": m.Installed(), "downloaderPresent": fileExists(downloader), "bundlePresent": fileExists(bundle), "busy": m.InstallBusy(), "paths": map[string]string{"downloader": downloader, "bundle": bundle, "game": filepath.Join(root, "game")}})
@@ -1457,7 +1523,7 @@ func (a *App) handleImportLocal(w http.ResponseWriter, r *http.Request) {
 
 func defaultServerSettings(id, name string, port int, storage string) ServerSettings {
 	min, max, _ := deploymentPortRange()
-	return ServerSettings{ID: id, ServerName: name, Port: port, GameMode: "Adventure", MaxPlayers: 20, MOTD: "Welcome to your Hytale server!", MemoryMin: "2G", MemoryMax: "4G", AutoStart: false, ExtraArgs: "", PublicHost: "", BackupFrequency: 30, BackupRetention: 10, SnapshotRetention: 5, StorageDir: storage, PortMin: min, PortMax: max}
+	return ServerSettings{ID: id, GameType: "hytale", ServerName: name, Port: port, GameMode: "Adventure", MaxPlayers: 20, MOTD: "Welcome to your Hytale server!", MemoryMin: "2G", MemoryMax: "4G", AutoStart: false, ExtraArgs: "", PublicHost: "", BackupFrequency: 30, BackupRetention: 10, SnapshotRetention: 5, StorageDir: storage, PortMin: min, PortMax: max}
 }
 func (a *App) loadConfig() error {
 	path := filepath.Join(a.dataDir, "controller.json")
@@ -1505,6 +1571,10 @@ func (a *App) loadConfig() error {
 	}
 	min, max, _ := deploymentPortRange()
 	for i := range cfg.Servers {
+		// Configs written before multi-game support omit gameType; keep them as Hytale.
+		if strings.TrimSpace(cfg.Servers[i].GameType) == "" {
+			cfg.Servers[i].GameType = "hytale"
+		}
 		if cfg.Servers[i].ID == "" {
 			cfg.Servers[i].ID = fmt.Sprintf("server-%d", i+1)
 		}
@@ -1690,10 +1760,15 @@ func (a *App) portInUse(port int, except string) bool {
 	return false
 }
 
-func NewServerManager(rootDir, toolsDir string) *ServerManager {
-	return &ServerManager{rootDir: rootDir, toolsDir: toolsDir, logs: &LogRing{max: 2500}, hub: &LogHub{clients: map[chan LogLine]struct{}{}}}
+func NewServerManager(rootDir, toolsDir string, gameTypes ...string) *ServerManager {
+	gameType := "hytale"
+	if len(gameTypes) > 0 && strings.TrimSpace(gameTypes[0]) != "" { gameType = strings.ToLower(strings.TrimSpace(gameTypes[0])) }
+	return &ServerManager{rootDir: rootDir, toolsDir: toolsDir, gameType: gameType, logs: &LogRing{max: 2500}, hub: &LogHub{clients: map[chan LogLine]struct{}{}}}
 }
 func (m *ServerManager) Installed() bool {
+	if m.gameType == "runescape-dragonwilds" {
+		return fileExists(filepath.Join(m.rootDir, "game", "RSDragonwildsServer.sh")) || fileExists(filepath.Join(m.rootDir, "game", "RSDragonwilds", "Binaries", "Linux", "RSDragonwildsServer-Linux-Shipping"))
+	}
 	return fileExists(filepath.Join(m.rootDir, "game", "Server", "HytaleServer.jar")) && fileExists(filepath.Join(m.rootDir, "game", "Assets.zip"))
 }
 func (m *ServerManager) IsRunning() bool   { m.mu.Lock(); defer m.mu.Unlock(); return m.running }
@@ -1761,16 +1836,29 @@ func (m *ServerManager) Start(args []string) error {
 		return errors.New("an install job is running")
 	}
 	if !m.Installed() {
-		return errors.New("Hytale server files are not installed yet")
+		return errors.New("server files are not installed yet")
 	}
-	startSh := filepath.Join(m.rootDir, "game", "start.sh")
-	if !fileExists(startSh) {
-		return errors.New("game/start.sh is missing; import an official server bundle or run /update setup first")
+	gameDir := filepath.Join(m.rootDir, "game")
+	var cmd *exec.Cmd
+	if m.gameType == "runescape-dragonwilds" {
+		launcher := filepath.Join(gameDir, "RSDragonwildsServer.sh")
+		if fileExists(launcher) {
+			_ = os.Chmod(launcher, 0755)
+			cmd = exec.Command(launcher, args...)
+		} else {
+			binary := filepath.Join(gameDir, "RSDragonwilds", "Binaries", "Linux", "RSDragonwildsServer-Linux-Shipping")
+			if !fileExists(binary) { return errors.New("Dragonwilds launcher or Linux server binary is missing") }
+			_ = os.Chmod(binary, 0755)
+			cmd = exec.Command(binary, args...)
+		}
+	} else {
+		startSh := filepath.Join(gameDir, "start.sh")
+		if !fileExists(startSh) { return errors.New("game/start.sh is missing; import an official server bundle or run /update setup first") }
+		_ = os.Chmod(startSh, 0755)
+		cmdArgs := append([]string{startSh}, args...)
+		cmd = exec.Command("bash", cmdArgs...)
 	}
-	_ = os.Chmod(startSh, 0755)
-	cmdArgs := append([]string{startSh}, args...)
-	cmd := exec.Command("bash", cmdArgs...)
-	cmd.Dir = filepath.Join(m.rootDir, "game")
+	cmd.Dir = gameDir
 	cmd.Env = append(os.Environ(), "HOME="+filepath.Join(m.rootDir, "home"))
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	stdout, err := cmd.StdoutPipe()
@@ -1794,7 +1882,7 @@ func (m *ServerManager) Start(args []string) error {
 	m.startedAt = time.Now()
 	m.phase = "starting"
 	m.exitCode = 0
-	m.appendLogLocked("controller", fmt.Sprintf("Starting Hytale server on PID %d", cmd.Process.Pid))
+	m.appendLogLocked("controller", fmt.Sprintf("Starting %s server on PID %d", m.gameType, cmd.Process.Pid))
 	go m.scanPipe(stdout, "server")
 	go m.scanPipe(stderr, "stderr")
 	go m.wait(cmd)
@@ -1862,10 +1950,15 @@ func (m *ServerManager) Stop() error {
 	}
 	pid := m.cmd.Process.Pid
 	stdin := m.stdin
-	m.appendLogLocked("controller", "Requesting graceful shutdown with /stop")
-	_, err := io.WriteString(stdin, "/stop\n")
-	if err == nil {
+	var err error
+	if m.gameType == "runescape-dragonwilds" {
+		m.appendLogLocked("controller", "Requesting Dragonwilds shutdown with SIGINT")
 		m.phase = "stopping"
+		err = syscall.Kill(-pid, syscall.SIGINT)
+	} else {
+		m.appendLogLocked("controller", "Requesting graceful shutdown with /stop")
+		_, err = io.WriteString(stdin, "/stop\n")
+		if err == nil { m.phase = "stopping" }
 	}
 	m.mu.Unlock()
 	if err != nil {

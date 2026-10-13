@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#15171b">
-  <title>Hytale Server Manager</title>
-  <link rel="stylesheet" href="/app.css">
+  <meta name="theme-color" content="#0a0d12">
+  <title>HSM · Game Server Control Panel</title>
+  <link rel="stylesheet" href="/app.css?v=20261013-control-room">
+  <link rel="stylesheet" href="/panel-redesign.css?v=20261013-mobile-nav-fix">
 </head>
 <body>
   <div id="auth" class="auth-shell hidden">
     <form id="auth-form" class="auth-card">
-      <div class="auth-product">Hytale Server Manager</div>
+      <div class="auth-product">HSM Game Server Manager</div>
       <h1 id="auth-title">Sign in</h1>
       <p id="auth-copy" class="muted">Manage Hytale servers on this host.</p>
       <label>Username<input id="auth-user" autocomplete="username" value="admin" required></label>
@@ -23,11 +24,11 @@
   <div id="app" class="app hidden">
     <aside class="sidebar">
       <div class="brand">
-        <strong>Hytale Server Manager</strong>
-        <small>v0.6.0</small>
+        <strong>HSM Control Room</strong>
+        <small>SELF-HOSTED GAME PANEL · v0.6.0</small>
       </div>
 
-      <div class="server-picker-head"><span>Servers</span><button id="add-server-side" title="Add server">+</button></div>
+      <div class="server-picker-head"><span>YOUR SERVERS</span><button id="add-server-side" title="Add server">+</button></div>
       <div id="server-list" class="server-list"></div>
 
       <nav id="nav" aria-label="Main navigation">
@@ -67,7 +68,7 @@
 
       <section id="view-servers" class="view active">
         <div id="first-run" class="welcome-shell hidden">
-          <div class="welcome-eyebrow"><span class="welcome-mark">H</span> Hytale Server Manager</div>
+          <div class="welcome-eyebrow"><span class="welcome-mark">H</span> HSM Game Server Manager</div>
           <div class="welcome-copy">
             <p class="eyebrow">YOUR SERVER. YOUR RULES.</p>
             <h2>Let's build your<br><span>first world.</span></h2>
@@ -80,7 +81,7 @@
         </div>
         <div id="fleet-content">
           <div class="page-head">
-            <div><h2>Your servers</h2><p class="help">Manage your game worlds from one place.</p></div>
+            <div><h2>Your servers</h2><p class="help">Your game servers, performance, and controls in one place.</p></div>
             <button id="add-server-main" class="btn primary">+ Create server</button>
           </div>
           <div id="fleet-summary" class="fleet-summary"></div>
@@ -200,9 +201,15 @@
         <div class="panel setup-panel">
           <div class="panel-head"><h3>Install server files</h3></div>
           <div id="install-state" class="install-state">Checking installation…</div>
+          <div id="hytale-install-controls">
           <div class="setup-row"><div class="step-index">1</div><div><h4>Official downloader</h4><p>Upload the Hytale downloader once, then use it to install this server.</p></div><div class="setup-buttons"><label class="btn file-btn">Choose file<input type="file" id="downloader-file" accept=".zip,application/zip,application/octet-stream"></label><button class="btn primary" id="run-downloader">Download & install</button></div></div>
           <div class="setup-row"><div class="step-index">2</div><div><h4>Existing game.zip</h4><p>Import a server bundle already placed in this instance's imports directory.</p></div><div class="setup-buttons"><button class="btn" id="import-local">Import game.zip</button></div></div>
           <div class="setup-row"><div class="step-index">3</div><div><h4>First start</h4><p>Start the server, then authenticate from the Console using the device code.</p></div><div class="setup-buttons"><button class="btn success" id="setup-start">Start</button><button class="btn" id="setup-auth">Authenticate</button></div></div>
+          </div>
+          <div id="dragonwilds-install-controls" class="hidden">
+            <div class="setup-row"><div class="step-index">1</div><div><h4>Install or update Dragonwilds</h4><p>Downloads the official Linux dedicated-server files through Valve SteamCMD. Progress and any SteamCMD errors appear in Console.</p></div><div class="setup-buttons"><button class="btn primary" id="dragonwilds-install">Install dedicated server</button></div></div>
+            <p class="help">The first download is several gigabytes. UDP ports 7777–7782 must be published and forwarded for players to join. If SteamCMD reports that anonymous access is unavailable, claim the free dedicated-server tool in Steam first.</p>
+          </div>
         </div>
       </section>
 
@@ -256,8 +263,10 @@
       <div class="wizard-progress"><span id="wizard-step-label">STEP 1 OF 4</span><span id="wizard-step-title">Choose your game</span><div class="wizard-track"><span id="wizard-progress-fill"></span></div></div>
       <div class="wizard-step" data-wizard-step="0">
         <div class="wizard-heading"><p class="eyebrow">LET'S GET STARTED</p><h2>What are we hosting?</h2><p>We'll tailor the setup to the game you choose.</p></div>
-        <button type="button" class="game-choice selected" data-game-choice="hytale"><span class="game-icon">H</span><span><strong>Hytale</strong><small>Dedicated server · Java runtime</small></span><span class="choice-check">✓</span></button>
-        <div class="wizard-note">More game profiles can be added later. Hytale is the supported game in this release.</div>
+        <div id="game-choice-list" class="game-choice-list">
+          <button type="button" class="game-choice selected" data-game-choice="hytale"><span class="game-icon">H</span><span><strong>Hytale</strong><small>Dedicated server · Java runtime</small></span><span class="choice-check">✓</span></button>
+        </div>
+        <div class="wizard-note">Other games will become selectable when their installers and server controls are ready.</div>
       </div>
       <div class="wizard-step hidden" data-wizard-step="1">
         <div class="wizard-heading"><p class="eyebrow">THE BASICS</p><h2>Name your world.</h2><p>Give this server a name and choose how players connect.</p></div>
@@ -274,15 +283,25 @@
           <label class="span-two">Server message<input id="new-server-motd" maxlength="160" value="Welcome to your Hytale server!"></label>
           <label class="toggle-row span-two"><span><b>Require whitelist permission</b><small>Private server; players need join permission.</small></span><input id="new-server-whitelist" type="checkbox"></label>
           <label class="span-two">Server password (optional)<input id="new-server-password" type="password" autocomplete="new-password" placeholder="Leave empty for an open server"></label>
+          <div id="dragonwilds-fields" class="hidden span-two">
+            <div class="wizard-heading"><p class="eyebrow">DRAGONWILDS SERVER</p><h3>Dedicated server settings</h3><p>Your Owner ID is required by the game. Find it at the bottom of the in-game Settings menu.</p></div>
+            <div class="form-grid">
+              <label class="span-two">Owner ID (required)<input id="new-dragonwilds-owner" maxlength="128" autocomplete="off" placeholder="Your in-game Player ID"></label>
+              <label>Default world name<input id="new-dragonwilds-world" maxlength="32" value="Dragonwilds World"></label>
+              <label>Admin password (required)<input id="new-dragonwilds-admin" type="password" maxlength="128" autocomplete="new-password"></label>
+              <label class="span-two">World password (optional)<input id="new-dragonwilds-password" type="password" maxlength="128" autocomplete="new-password"></label>
+              <label class="toggle-row span-two"><span><b>Public server</b><small>Advertise this server in the in-game browser.</small></span><input id="new-dragonwilds-public" type="checkbox" checked></label>
+            </div>
+          </div>
         </div>
-        <div class="wizard-note">When enabled, Hytale requires join permission for players. You can manage player permissions from the server console.</div>
+        <div class="wizard-note" id="wizard-config-note">When enabled, Hytale requires join permission for players. You can manage player permissions from the server console.</div>
       </div>
       <div class="wizard-step hidden" data-wizard-step="3">
         <div class="wizard-heading"><p class="eyebrow">FINAL TOUCHES</p><h2>Ready to create?</h2><p>You can change these settings later.</p></div>
         <div class="form-grid">
-          <label>Minimum memory<input id="new-server-xms" value="2G" required></label>
-          <label>Maximum memory<input id="new-server-xmx" value="4G" required></label>
-          <label>Backup frequency (minutes)<input id="new-server-backup" type="number" min="5" max="10080" value="30" required></label>
+          <label class="hytale-only">Minimum memory<input id="new-server-xms" value="2G" required></label>
+          <label class="hytale-only">Maximum memory<input id="new-server-xmx" value="4G" required></label>
+          <label class="hytale-only">Backup frequency (minutes)<input id="new-server-backup" type="number" min="5" max="10080" value="30" required></label>
           <label class="toggle-row"><span><b>Auto-start</b><small>Start when the manager starts.</small></span><input id="new-server-autostart" type="checkbox"></label>
         </div>
         <div id="wizard-review" class="wizard-review"></div>
@@ -292,6 +311,6 @@
   </dialog>
 
   <div id="toast" class="toast"></div>
-  <script src="/app.js"></script>
+  <script src="/app.js?v=20261013-control-room"></script>
 </body>
 </html>
