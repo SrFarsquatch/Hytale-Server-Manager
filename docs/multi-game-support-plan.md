@@ -1,6 +1,6 @@
 # Multi-Game Server Support — Implementation Plan
 
-**Status:** Planning / first migration  
+**Status:** Foundation and initial Dragonwilds implementation in progress  
 **Target games:** Hytale, Minecraft Java Edition, Terraria, RuneScape: Dragonwilds  
 **Initial deployment:** One Linux host via Docker/CasaOS  
 **Runtime:** Direct host processes managed by the existing Go application
@@ -101,11 +101,12 @@ Represent unsupported capabilities explicitly. The UI must not show a nonfunctio
 - Do not assume Terraria console semantics match Minecraft or Hytale.
 
 ### 3. RuneScape: Dragonwilds
-- Verify current official dedicated-server distribution, platform support, installation method, required runtime, launch arguments, configuration schema, save locations, client/server version compatibility, and required TCP/UDP ports against current official documentation and releases before coding the installer.
-- Keep SteamCMD or other installation tooling isolated to this adapter and pin/validate app identifiers from authoritative sources.
-- Treat owner/player ID, admin credentials, world settings, and port allocation as validated game-specific configuration.
-- Back up saves before upgrades or restores and stop the process before applying settings that are only read at startup.
-- Initially support the official dedicated-server capabilities only. Do not advertise general mod installation unless a supported and repeatable Dragonwilds mod workflow is verified.
+- Official reference: [Dedicated Servers — A How-To Guide](https://dragonwilds.runescape.com/news/how-to-dedicated-servers). It documents Linux/Windows support, Steam dedicated-server App ID `4019830`, required Owner ID, server/world names, admin password, and UDP ports starting at `7777`.
+- Initial implementation on `feature/multi-game-foundation`: dedicated-server adapter, SteamCMD bootstrap/download, App ID install/update, Linux launch, generated `DedicatedServer.ini`, per-instance owner/admin/world settings, UDP port allocation `7777–7782`, and Docker Compose port publication.
+- SteamCMD is isolated under the manager's shared `tools/steamcmd` directory; each game's files and save data stay under that server's existing `/data/servers/<id>/game` tree.
+- Installation progress is streamed to the manager log ring. Anonymous SteamCMD installation must be verified against the current Steam tool's licensing behavior; if Steam requires an account that has claimed the free tool, the installer reports that limitation rather than prompting for credentials in the dashboard.
+- Initial capabilities are dedicated server, log viewing, and generated configuration only. File browsing, backups/restore, player list, and mod management remain disabled for Dragonwilds until their game-specific paths and behavior are implemented and tested.
+- Before enabling this for production, run automated tests and a live CasaOS smoke test for install, launch, graceful process termination, save persistence, update behavior, and client discovery/version matching. Back up saves before updates once Dragonwilds backup support is implemented.
 
 ## UI changes
 
@@ -147,3 +148,12 @@ Represent unsupported capabilities explicitly. The UI must not show a nonfunctio
 - **Port conflicts and container exposure:** reserve ports centrally, validate protocols/ranges, and document required Compose/CasaOS port publishing before enabling each adapter.
 - **Java/runtime mismatch:** select/check runtime per Minecraft version rather than relying on one bundled runtime.
 - **Mod support overpromising:** only enable mod features for verified distributions and workflows.
+
+
+## Current Dragonwilds implementation notes
+
+- The create-server wizard now requests Owner ID and admin password, with optional world password and public-listing setting.
+- The manager uses the shared Go process supervisor, but sends SIGINT to stop Dragonwilds rather than sending Hytale's `/stop` command.
+- The installer is asynchronous and logs SteamCMD output to Console. The initial installer uses anonymous login in accordance with the official guide; Steam's licensing requirements can change and must be tested on the target host.
+- The container now declares and the Compose example publishes UDP `7777–7782`. Existing Hytale UDP ports and data paths are unchanged.
+- Do not merge or deploy until the newest CI run passes. This code has not yet been live-tested against a downloaded Dragonwilds server or an existing CasaOS deployment.
