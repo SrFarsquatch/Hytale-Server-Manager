@@ -200,9 +200,15 @@
         <div class="panel setup-panel">
           <div class="panel-head"><h3>Install server files</h3></div>
           <div id="install-state" class="install-state">Checking installation…</div>
+          <div id="hytale-install-controls">
           <div class="setup-row"><div class="step-index">1</div><div><h4>Official downloader</h4><p>Upload the Hytale downloader once, then use it to install this server.</p></div><div class="setup-buttons"><label class="btn file-btn">Choose file<input type="file" id="downloader-file" accept=".zip,application/zip,application/octet-stream"></label><button class="btn primary" id="run-downloader">Download & install</button></div></div>
           <div class="setup-row"><div class="step-index">2</div><div><h4>Existing game.zip</h4><p>Import a server bundle already placed in this instance's imports directory.</p></div><div class="setup-buttons"><button class="btn" id="import-local">Import game.zip</button></div></div>
           <div class="setup-row"><div class="step-index">3</div><div><h4>First start</h4><p>Start the server, then authenticate from the Console using the device code.</p></div><div class="setup-buttons"><button class="btn success" id="setup-start">Start</button><button class="btn" id="setup-auth">Authenticate</button></div></div>
+          </div>
+          <div id="dragonwilds-install-controls" class="hidden">
+            <div class="setup-row"><div class="step-index">1</div><div><h4>Install or update Dragonwilds</h4><p>Downloads the official Linux dedicated-server files through Valve SteamCMD. Progress and any SteamCMD errors appear in Console.</p></div><div class="setup-buttons"><button class="btn primary" id="dragonwilds-install">Install dedicated server</button></div></div>
+            <p class="help">The first download is several gigabytes. UDP ports 7777–7782 must be published and forwarded for players to join. If SteamCMD reports that anonymous access is unavailable, claim the free dedicated-server tool in Steam first.</p>
+          </div>
         </div>
       </section>
 
@@ -276,6 +282,16 @@
           <label class="span-two">Server message<input id="new-server-motd" maxlength="160" value="Welcome to your Hytale server!"></label>
           <label class="toggle-row span-two"><span><b>Require whitelist permission</b><small>Private server; players need join permission.</small></span><input id="new-server-whitelist" type="checkbox"></label>
           <label class="span-two">Server password (optional)<input id="new-server-password" type="password" autocomplete="new-password" placeholder="Leave empty for an open server"></label>
+          <div id="dragonwilds-fields" class="hidden span-two">
+            <div class="wizard-heading"><p class="eyebrow">DRAGONWILDS SERVER</p><h3>Dedicated server settings</h3><p>Your Owner ID is required by the game. Find it at the bottom of the in-game Settings menu.</p></div>
+            <div class="form-grid">
+              <label class="span-two">Owner ID (required)<input id="new-dragonwilds-owner" maxlength="128" autocomplete="off" placeholder="Your in-game Player ID"></label>
+              <label>Default world name<input id="new-dragonwilds-world" maxlength="32" value="Dragonwilds World"></label>
+              <label>Admin password (required)<input id="new-dragonwilds-admin" type="password" maxlength="128" autocomplete="new-password"></label>
+              <label class="span-two">World password (optional)<input id="new-dragonwilds-password" type="password" maxlength="128" autocomplete="new-password"></label>
+              <label class="toggle-row span-two"><span><b>Public server</b><small>Advertise this server in the in-game browser.</small></span><input id="new-dragonwilds-public" type="checkbox" checked></label>
+            </div>
+          </div>
         </div>
         <div class="wizard-note">When enabled, Hytale requires join permission for players. You can manage player permissions from the server console.</div>
       </div>
