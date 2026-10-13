@@ -12,11 +12,18 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"strconv"
 	"time"
 )
 
 const dragonwildsSteamAppID = "4019830"
 const steamCMDArchiveURL = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz"
+
+func portRangeForGame(gameType string) (int, int) {
+	if strings.EqualFold(strings.TrimSpace(gameType), "runescape-dragonwilds") { return 7777, 7782 }
+	minPort, maxPort, _ := deploymentPortRange()
+	return minPort, maxPort
+}
 
 func nameSafeDefault(s string) string {
 	s = strings.TrimSpace(s)
@@ -62,7 +69,7 @@ func (DragonwildsAdapter) PrepareLaunch(app *App, settings ServerSettings) ([]st
 	if err := writeDragonwildsConfig(app.serverRoot(settings), settings); err != nil {
 		return nil, err
 	}
-	return []string{"-log", "-NewConsole"}, nil
+	return []string{"-log", "-NewConsole", "-port=" + strconv.Itoa(settings.Port)}, nil
 }
 
 func writeDragonwildsConfig(root string, settings ServerSettings) error {
