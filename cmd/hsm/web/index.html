@@ -169,7 +169,25 @@
       </section>
 
       <section id="view-config" class="view workspace-page">
-        <div class="panel">
+        <div class="panel file-manager-panel">
+          <div class="panel-head"><div><h3>File manager</h3><p class="help">Browse, edit, upload, download, rename, and delete files for this server.</p></div><div class="file-manager-actions"><button class="btn" id="file-new-folder">New folder</button><button class="btn" id="file-new-file">New file</button><label class="btn primary file-btn">Upload<input type="file" id="file-upload" multiple></label><button class="btn" id="file-refresh">Refresh</button></div></div>
+          <div class="file-breadcrumbs" id="file-breadcrumbs" aria-label="Current directory"></div>
+          <div class="file-manager-grid">
+            <div class="file-browser">
+              <div class="file-browser-head"><span>Name</span><span>Size</span><span>Modified</span><span>Actions</span></div>
+              <div id="managed-files" class="managed-files"><div class="empty-state">Loading files…</div></div>
+              <div id="file-manager-note" class="help">Files are scoped to the selected server. Symlinks are blocked for safety.</div>
+            </div>
+            <div id="file-editor" class="file-editor hidden">
+              <div class="file-editor-head"><div><strong id="file-editor-name">Editing file</strong><small id="file-editor-meta" class="muted"></small></div><div><button class="btn" id="file-editor-close">Close</button><button class="btn primary" id="file-editor-save">Save changes</button></div></div>
+              <div id="file-editor-warning" class="inline-notice hidden"></div>
+              <textarea id="managed-file-content" class="code-editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+              <div class="row end"><span id="file-editor-status" class="muted"></span><span id="file-editor-dirty" class="muted"></span></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel hidden">
+
           <div class="panel-head file-head"><div><h3>Server configuration</h3><p class="help">Edit supported JSON files directly in the app. Changes are checked for valid JSON before saving.</p></div><div class="file-actions"><select id="config-file"><option>config.json</option><option>permissions.json</option><option>whitelist.json</option><option>bans.json</option></select><button class="btn" id="reload-config">Reload</button></div></div>
           <div id="config-running-note" class="inline-notice hidden">Stop this server to edit the file.</div><p id="config-mode-note" class="help">Checking whether this file can be edited…</p>
           <textarea id="server-config" class="code-editor" spellcheck="false"></textarea>
