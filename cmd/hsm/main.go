@@ -910,6 +910,17 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, 400, "Dragonwilds admin password is required; passwords must be 128 characters or fewer")
 			return
 		}
+		in.GameMode = current.GameMode
+		in.MaxPlayers = current.MaxPlayers
+		in.MOTD = current.MOTD
+		in.Password = current.Password
+		in.WhitelistEnabled = current.WhitelistEnabled
+		in.MemoryMin = current.MemoryMin
+		in.MemoryMax = current.MemoryMax
+		in.ExtraArgs = current.ExtraArgs
+		in.BackupFrequency = current.BackupFrequency
+		in.BackupRetention = current.BackupRetention
+		in.SnapshotRetention = current.SnapshotRetention
 	} else {
 		in.DragonwildsOwnerID = current.DragonwildsOwnerID
 		in.DragonwildsWorldName = current.DragonwildsWorldName
