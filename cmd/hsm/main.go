@@ -932,14 +932,14 @@ func (a *App) startServerByID(id string) error {
 	if err != nil {
 		return err
 	}
-	if err := a.writeJVMOptionsFor(s); err != nil {
+	adapter, err := gameAdapterFor(s.GameType)
+	if err != nil {
 		return err
 	}
-	if err := a.applyHytaleConfig(s); err != nil {
-		return fmt.Errorf("could not apply Hytale settings: %w", err)
+	args, err := adapter.PrepareLaunch(a, s)
+	if err != nil {
+		return err
 	}
-	args := []string{"--bind", fmt.Sprintf("0.0.0.0:%d", s.Port), "--backup-frequency", strconv.Itoa(s.BackupFrequency)}
-	args = append(args, splitArgs(s.ExtraArgs)...)
 	return m.Start(args)
 }
 func (a *App) handleStop(w http.ResponseWriter, r *http.Request) {
