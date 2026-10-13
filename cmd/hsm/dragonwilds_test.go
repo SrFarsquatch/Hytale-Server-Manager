@@ -34,6 +34,9 @@ func TestWriteDragonwildsConfig(t *testing.T) {
 	documentedPath := filepath.Join(root, "game", "RSDragonwilds", "Saved", "Config", "Linux", "DedicatedServer.ini")
 	if _, err := os.Stat(documentedPath); err != nil { t.Fatalf("officially documented Linux config path missing: %v", err) }
 	text := string(data)
+	if strings.Contains(text, "\nPublic=") {
+		t.Errorf("wrote undocumented Public setting to DedicatedServer.ini:\n%s", text)
+	}
 	for _, expected := range []string{
 		"[/script/dominion.dedicatedserversettings]",
 		"OwnerId=player-id-123",
@@ -41,13 +44,36 @@ func TestWriteDragonwildsConfig(t *testing.T) {
 		"WorldPassword=world-secret",
 		"ServerName=Friends World",
 		"DefaultWorldName=Misty Valley",
-		"Public=1",
 	} {
 		if !strings.Contains(text, expected) { t.Errorf("config missing %q:\n%s", expected, text) }
 	}
 	info, err := os.Stat(path)
 	if err != nil { t.Fatal(err) }
 	if info.Mode().Perm() != 0600 { t.Errorf("config permissions = %o, want 600", info.Mode().Perm()) }
+}
+
+func TestWriteDragonwildsConfigAllowsEmptyWorldPassword(t *testing.T) {
+	root := t.TempDir()
+	settings := ServerSettings{
+		ServerName: "Public World",
+		DragonwildsOwnerID: "owner-id",
+		DragonwildsWorldName: "World",
+		DragonwildsAdminPassword: "admin-secret",
+	}
+	if err := writeDragonwildsConfig(root, settings); err != nil {
+		t.Fatalf("writeDragonwildsConfig() error = %v", err)
+	}
+	path := filepath.Join(root, "game", "RSDragonwilds", "Saved", "Config", "LinuxServer", "DedicatedServer.ini")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "WorldPassword=\n") {
+		t.Fatalf("empty optional WorldPassword was not written:\n%s", data)
+	}
+	if strings.Contains(string(data), "\nPublic=") {
+		t.Fatalf("wrote undocumented Public setting:\n%s", data)
+	}
 }
 
 func TestWriteDragonwildsConfigRejectsNewlineInjection(t *testing.T) {

@@ -392,3 +392,24 @@ button:disabled { opacity:.42;cursor:not-allowed;transform:none!important; }
   .nav-divider,.sidebar-foot { display:none !important; }
   .main { padding-bottom:28px !important; }
 }
+
+
+/* Native disclosure panel used by the Dragonwilds setup guide. */
+.setup-help {
+  margin-top:14px;
+  border:1px solid var(--line);
+  border-radius:11px;
+  background:rgba(11,17,24,.62);
+  color:var(--muted);
+}
+.setup-help summary {
+  padding:13px 15px;
+  color:var(--text);
+  cursor:pointer;
+  font-weight:750;
+  font-size:11px;
+}
+.setup-help[open] summary { border-bottom:1px solid var(--line); }
+.setup-help>div { padding:4px 15px 13px; }
+.setup-help p { margin:10px 0 0; line-height:1.65; font-size:11px; }
+.setup-help code { color:var(--accent);font-size:10px;overflow-wrap:anywhere; }

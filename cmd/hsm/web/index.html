@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0a0d12">
   <title>HSM · Game Server Control Panel</title>
   <link rel="stylesheet" href="/app.css?v=20261013-control-room">
-  <link rel="stylesheet" href="/panel-redesign.css?v=20261013-mobile-nav-fix">
+  <link rel="stylesheet" href="/panel-redesign.css?v=20261013-dragonwilds-guide">
 </head>
 <body>
   <div id="auth" class="auth-shell hidden">
@@ -209,6 +209,16 @@
           <div id="dragonwilds-install-controls" class="hidden">
             <div class="setup-row"><div class="step-index">1</div><div><h4>Install or update Dragonwilds</h4><p>Downloads the official Linux dedicated-server files through Valve SteamCMD. Progress and any SteamCMD errors appear in Console.</p></div><div class="setup-buttons"><button class="btn primary" id="dragonwilds-install">Install dedicated server</button></div></div>
             <p class="help">The first download is several gigabytes. UDP ports 7777–7782 must be published and forwarded for players to join. If SteamCMD reports that anonymous access is unavailable, claim the free dedicated-server tool in Steam first.</p>
+            <details class="setup-help">
+              <summary>World saves, discovery, and troubleshooting</summary>
+              <div>
+                <p><b>Finding the server:</b> In Dragonwilds, open Worlds → Public and search for the exact default world name. Search is case-sensitive. Keep the server and game client on matching versions.</p>
+                <p><b>New worlds:</b> If <code>RSDragonwilds/Saved/Savegames</code> has no <code>.sav</code> file, the game creates a new Standard world. World difficulty and custom gameplay sliders live in the world save, not in the five documented dedicated-server settings.</p>
+                <p><b>Importing a world:</b> Stop the server first, back up the server's <code>RSDragonwilds/Saved/Savegames</code> directory, then copy your chosen <code>.sav</code> into that folder. Start the server and search using the world name shown by the save. Never replace saves without a backup.</p>
+                <p><b>Logs:</b> <code>RSDragonwilds/Saved/Logs/RSDragonwilds.log</code>. HSM's Console also shows server and SteamCMD output.</p>
+                <p><b>Config:</b> HSM writes <code>DedicatedServer.ini</code> under the Linux config directories before launch. Stop the server before making manual edits; the game may discard INI changes made while it is running.</p>
+              </div>
+            </details>
           </div>
         </div>
       </section>
@@ -220,17 +230,28 @@
             <label>Server name<input id="set-name" required></label>
             <label>Public address<input id="set-host" placeholder="play.example.com or public IP"></label>
             <label>UDP game port<input id="set-port" type="number" min="1" max="65535" required><small id="port-help">Each running server needs a unique UDP port.</small></label>
-            <label>Game mode<select id="set-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select><small>Default mode for newly created worlds.</small></label>
-            <label>Maximum players<input id="set-players" type="number" min="1" max="1000" required></label>
-            <label>Server message<input id="set-motd" maxlength="160" placeholder="Welcome to your server"></label>
-            <label class="toggle-row"><span><b>Require whitelist permission</b><small>Restrict joining to players granted server join access.</small></span><input id="set-whitelist" type="checkbox"></label>
-            <label>Server password (optional)<input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label>
-            <label>Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
-            <label>Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
+            <label class="hytale-settings-only">Game mode<select id="set-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select><small>Default mode for newly created worlds.</small></label>
+            <label id="set-players-label" class="hytale-settings-only">Maximum players<input id="set-players" type="number" min="1" max="1000" required></label>
+            <label class="hytale-settings-only">Server message<input id="set-motd" maxlength="160" placeholder="Welcome to your server"></label>
+            <label class="toggle-row hytale-settings-only"><span><b>Require whitelist permission</b><small>Restrict joining to players granted server join access.</small></span><input id="set-whitelist" type="checkbox"></label>
+            <label class="hytale-settings-only">Server password (optional)<input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label>
+            <label class="hytale-settings-only">Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
+            <label class="hytale-settings-only">Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
           </div>
-          <label>Additional server arguments<input id="set-args" placeholder="Only change if you know which flags your server supports"></label>
+          <label class="hytale-settings-only">Additional server arguments<input id="set-args" placeholder="Only change if you know which flags your server supports"></label>
           <label class="toggle-row"><span><b>Auto-start</b><small>Start this instance when the manager starts.</small></span><input id="set-autostart" type="checkbox"></label>
-          <div class="settings-note"><b>Networking</b><span>The container publishes a UDP range. Each server needs a different port in that range.</span></div>
+          <div id="dragonwilds-settings" class="hidden span-two">
+            <div class="settings-note"><b>Dragonwilds dedicated-server settings</b><span>These values are written to DedicatedServer.ini when the server is stopped or next starts. Do not edit the INI while the game is running; the game can discard those changes.</span></div>
+            <div class="form-grid">
+              <label class="span-two">Owner ID (required)<input id="set-dragonwilds-owner" maxlength="128" autocomplete="off" placeholder="Your in-game Player ID"></label>
+              <label>Default world name (required)<input id="set-dragonwilds-world" maxlength="32"></label>
+              <label>Admin password (required)<input id="set-dragonwilds-admin" type="password" maxlength="128" autocomplete="new-password"></label>
+              <label class="span-two">World password (optional)<input id="set-dragonwilds-password" type="password" maxlength="128" autocomplete="new-password" placeholder="Leave empty to allow anyone to join"></label>
+            </div>
+            <p class="help">Find your Owner ID at the bottom of the in-game Settings menu. Players find the server under Worlds → Public by searching for the exact world name, including capitalization. World saves are stored under <code>RSDragonwilds/Saved/Savegames</code>.</p>
+            <p class="help">Network: forward the server's UDP port (7777 by default) through your router/firewall. The official guide's RAM baseline is 2 GB plus about 1 GB per player (up to 6 players in the version documented).</p>
+          </div>
+          <div id="hytale-settings-note" class="settings-note"><b>Networking</b><span>The container publishes a UDP range. Each server needs a different port in that range.</span></div><p id="dragonwilds-player-limit" class="help hidden">RuneScape: Dragonwilds currently supports up to 6 players. The game-managed player limit is not changed by this panel.</p>
         </form>
       </section>
 
@@ -278,11 +299,11 @@
       <div class="wizard-step hidden" data-wizard-step="2">
         <div class="wizard-heading"><p class="eyebrow">YOUR GAME, YOUR WAY</p><h2>Set up the experience.</h2><p>These become the default settings for the new server.</p></div>
         <div class="form-grid">
-          <label>Game mode<select id="new-server-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select></label>
-          <label>Maximum players<input id="new-server-players" type="number" min="1" max="1000" value="20" required></label>
-          <label class="span-two">Server message<input id="new-server-motd" maxlength="160" value="Welcome to your Hytale server!"></label>
-          <label class="toggle-row span-two"><span><b>Require whitelist permission</b><small>Private server; players need join permission.</small></span><input id="new-server-whitelist" type="checkbox"></label>
-          <label class="span-two">Server password (optional)<input id="new-server-password" type="password" autocomplete="new-password" placeholder="Leave empty for an open server"></label>
+          <label class="hytale-only">Game mode<select id="new-server-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select></label>
+          <label class="hytale-only">Maximum players<input id="new-server-players" type="number" min="1" max="1000" value="20" required></label>
+          <label class="span-two hytale-only">Server message<input id="new-server-motd" maxlength="160" value="Welcome to your Hytale server!"></label>
+          <label class="toggle-row span-two hytale-only"><span><b>Require whitelist permission</b><small>Private server; players need join permission.</small></span><input id="new-server-whitelist" type="checkbox"></label>
+          <label class="span-two hytale-only">Server password (optional)<input id="new-server-password" type="password" autocomplete="new-password" placeholder="Leave empty for an open server"></label>
           <div id="dragonwilds-fields" class="hidden span-two">
             <div class="wizard-heading"><p class="eyebrow">DRAGONWILDS SERVER</p><h3>Dedicated server settings</h3><p>Your Owner ID is required by the game. Find it at the bottom of the in-game Settings menu.</p></div>
             <div class="form-grid">
@@ -290,7 +311,7 @@
               <label>Default world name<input id="new-dragonwilds-world" maxlength="32" value="Dragonwilds World"></label>
               <label>Admin password (required)<input id="new-dragonwilds-admin" type="password" maxlength="128" autocomplete="new-password"></label>
               <label class="span-two">World password (optional)<input id="new-dragonwilds-password" type="password" maxlength="128" autocomplete="new-password"></label>
-              <label class="toggle-row span-two"><span><b>Public server</b><small>Advertise this server in the in-game browser.</small></span><input id="new-dragonwilds-public" type="checkbox" checked></label>
+              <p class="help span-two">The game lists dedicated worlds under Worlds → Public. Players must search for the exact world name, including capitalization.</p>
             </div>
           </div>
         </div>
@@ -311,6 +332,6 @@
   </dialog>
 
   <div id="toast" class="toast"></div>
-  <script src="/app.js?v=20261013-control-room"></script>
+  <script src="/app.js?v=20261013-dragonwilds-settings"></script>
 </body>
 </html>
