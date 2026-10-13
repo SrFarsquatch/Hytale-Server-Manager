@@ -872,7 +872,7 @@ func (a *App) handleSettingsGet(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 404, err.Error())
 		return
 	}
-	min, max, _ := deploymentPortRange()
+	min, max := portRangeForGame(s.GameType)
 	s.PortMin = min
 	s.PortMax = max
 	jsonOut(w, 200, s)
@@ -896,7 +896,7 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	in.DragonwildsWorldPassword = current.DragonwildsWorldPassword
 	in.DragonwildsPublic = current.DragonwildsPublic
 	in.StorageDir = current.StorageDir
-	min, max, _ := deploymentPortRange()
+	min, max := portRangeForGame(current.GameType)
 	in.PortMin = min
 	in.PortMax = max
 	if in.ServerName == "" {
