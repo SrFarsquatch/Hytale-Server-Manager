@@ -802,6 +802,10 @@ func (a *App) handlePlayers(w http.ResponseWriter, r *http.Request) {
 	if err != nil { jsonError(w, 404, err.Error()); return }
 	maxPlayers := settings.MaxPlayers
 	if maxPlayers < 1 { maxPlayers = 100 }
+	if settings.GameType == "runescape-dragonwilds" {
+		jsonOut(w, 200, map[string]any{"known": false, "count": 0, "maxPlayers": 6, "players": []string{}, "message": "Player list integration is not available for Dragonwilds yet"})
+		return
+	}
 	if !m.IsRunning() {
 		jsonOut(w, 200, map[string]any{"known": true, "count": 0, "maxPlayers": maxPlayers, "players": []string{}, "message": "Server is stopped"})
 		return
