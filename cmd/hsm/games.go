@@ -1,5 +1,7 @@
 package main
 
+import "net/http"
+
 // GameCapability describes a feature the manager can safely expose for a game.
 // Capabilities are explicit so the UI does not imply support that has not been
 // implemented and verified for a particular server distribution.
