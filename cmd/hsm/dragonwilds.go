@@ -74,9 +74,14 @@ func (DragonwildsAdapter) PrepareLaunch(app *App, settings ServerSettings) ([]st
 }
 
 func writeDragonwildsConfig(root string, settings ServerSettings) error {
-	configDir := filepath.Join(root, "game", "RSDragonwilds", "Saved", "Config", "LinuxServer")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("create Dragonwilds config directory: %w", err)
+	configDirs := []string{
+		filepath.Join(root, "game", "RSDragonwilds", "Saved", "Config", "Linux"),
+		filepath.Join(root, "game", "RSDragonwilds", "Saved", "Config", "LinuxServer"),
+	}
+	for _, configDir := range configDirs {
+		if err := os.MkdirAll(configDir, 0755); err != nil {
+			return fmt.Errorf("create Dragonwilds config directory: %w", err)
+		}
 	}
 	worldName := strings.TrimSpace(settings.DragonwildsWorldName)
 	if worldName == "" { worldName = nameSafeDefault(settings.ServerName) }
@@ -97,10 +102,12 @@ func writeDragonwildsConfig(root string, settings ServerSettings) error {
 		}
 		fmt.Fprintf(&b, "%s=%s\n", item.key, item.value)
 	}
-	path := filepath.Join(configDir, "DedicatedServer.ini")
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, []byte(b.String()), 0600); err != nil { return fmt.Errorf("write Dragonwilds config: %w", err) }
-	if err := os.Rename(tmp, path); err != nil { _ = os.Remove(tmp); return fmt.Errorf("activate Dragonwilds config: %w", err) }
+	for _, configDir := range configDirs {
+		path := filepath.Join(configDir, "DedicatedServer.ini")
+		tmp := path + ".tmp"
+		if err := os.WriteFile(tmp, []byte(b.String()), 0600); err != nil { return fmt.Errorf("write Dragonwilds config: %w", err) }
+		if err := os.Rename(tmp, path); err != nil { _ = os.Remove(tmp); return fmt.Errorf("activate Dragonwilds config: %w", err) }
+	}
 	return nil
 }
 
