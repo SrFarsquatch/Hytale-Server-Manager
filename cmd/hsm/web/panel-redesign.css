@@ -1177,3 +1177,32 @@ body {
   .file-manager-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
   .file-manager-actions>* { width:100%; justify-content:center; }
 }
+
+
+/* Multi-server picker: visually group instances by game and keep every server selectable. */
+.server-list { display:flex; flex-direction:column; gap:12px; overflow-y:auto; overscroll-behavior:contain; }
+.server-game-group { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.server-game-heading { display:flex; align-items:center; gap:8px; padding:2px 7px 5px; color:#a8bac8; }
+.server-game-heading>span { display:flex; width:22px; height:18px; align-items:center; justify-content:center; overflow:hidden; }
+.server-game-heading img { width:100%; height:100%; object-fit:contain; }
+.server-game-heading b { flex:1; font-size:10px; font-weight:800; letter-spacing:.025em; }
+.server-game-heading small { min-width:18px; padding:2px 5px; text-align:center; color:#93a7b6; background:#1a2732; border-radius:999px; font-size:9px; }
+.server-list-item { display:flex; width:100%; text-align:left; cursor:pointer; align-items:center; position:relative; }
+.server-list-item:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.server-list-copy { flex:1; min-width:0; }
+.server-list-copy b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.server-list-copy small { display:flex; align-items:center; gap:5px; }
+.server-status-mark { width:6px; height:6px; flex:0 0 6px; border-radius:50%; background:#738393; }
+.server-status-mark.online { background:#5ce0b0; box-shadow:0 0 7px #5ce0b066; }
+.server-status-mark.busy { background:#e9bf62; }
+.server-status-mark.crashed { background:#ff6578; }
+.server-select-arrow { color:#708697; font-size:20px; opacity:0; transition:opacity .12s,transform .12s; }
+.server-list-item:hover .server-select-arrow,.server-list-item.active .server-select-arrow { opacity:1; }
+.server-list-item.active .server-select-arrow { color:var(--accent); transform:translateX(2px); }
+@media(max-width:760px) {
+ .server-list { flex-direction:row; align-items:stretch; gap:10px; overflow-x:auto; overflow-y:hidden; }
+ .server-game-group { flex:0 0 245px; padding-right:9px; border-right:1px solid var(--line); }
+ .server-game-heading { padding:2px 5px 5px; }
+ .server-list-item { flex:0 0 auto; min-height:46px; }
+ .server-select-arrow { opacity:1; }
+}
