@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"strconv"
 	"time"
@@ -136,6 +137,9 @@ func (m *ServerManager) RunDragonwildsInstaller() error {
 }
 
 func (m *ServerManager) installDragonwilds() error {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		return fmt.Errorf("the official Dragonwilds Linux dedicated server currently requires a Linux x86_64 host; this manager runs on %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
 	steamDir := filepath.Join(m.toolsDir, "steamcmd")
 	steamCMD := filepath.Join(steamDir, "steamcmd.sh")
 	if !fileExists(steamCMD) {
