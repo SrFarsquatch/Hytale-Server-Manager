@@ -58,6 +58,8 @@ type ServerSettings struct {
 	ExtraArgs       string `json:"extraArgs"`
 	PublicHost      string `json:"publicHost"`
 	BackupFrequency int    `json:"backupFrequency"`
+	BackupRetention int    `json:"backupRetention"`
+	SnapshotRetention int  `json:"snapshotRetention"`
 	StorageDir      string `json:"storageDir,omitempty"`
 	PortMin         int    `json:"portMin,omitempty"`
 	PortMax         int    `json:"portMax,omitempty"`
@@ -178,6 +180,7 @@ func main() {
 		log.Printf("config: %v", err)
 	}
 	app.ensureManagers()
+	go app.backupMaintenanceLoop()
 
 	mux := http.NewServeMux()
 	app.routes(mux)
@@ -865,8 +868,19 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.MOTD == "" { in.MOTD = current.MOTD }
+	if in.BackupFrequency == 0 { in.BackupFrequency = current.BackupFrequency }
 	if in.BackupFrequency < 5 || in.BackupFrequency > 10080 {
 		jsonError(w, 400, "backup frequency must be between 5 and 10080 minutes")
+		return
+	}
+	if in.BackupRetention == 0 { in.BackupRetention = current.BackupRetention }
+	if in.BackupRetention < 1 || in.BackupRetention > 100 {
+		jsonError(w, 400, "automatic backup retention must be between 1 and 100")
+		return
+	}
+	if in.SnapshotRetention == 0 { in.SnapshotRetention = current.SnapshotRetention }
+	if in.SnapshotRetention < 1 || in.SnapshotRetention > 100 {
+		jsonError(w, 400, "snapshot retention must be between 1 and 100")
 		return
 	}
 	if m.IsRunning() && in.Port != current.Port {
@@ -1216,11 +1230,49 @@ func (a *App) handleBackupsList(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 404, err.Error())
 		return
 	}
+	a.pruneBackupRetention(s)
 	root := a.serverRoot(s)
 	jsonOut(w, 200, map[string]any{"snapshots": listFiles(filepath.Join(root, "snapshots"), ".tar.gz"), "native": listAllFiles(filepath.Join(root, "game", "Server", "backups"))})
 }
+
+func (a *App) backupMaintenanceLoop() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		a.cfgMu.RLock()
+		servers := append([]ServerSettings(nil), a.cfg.Servers...)
+		a.cfgMu.RUnlock()
+		for _, s := range servers { a.pruneBackupRetention(s) }
+	}
+}
+
+func (a *App) pruneBackupRetention(s ServerSettings) {
+	root := a.serverRoot(s)
+	pruneBackupFiles(filepath.Join(root, "game", "Server", "backups"), s.BackupRetention, func(name string) bool { return true })
+	pruneBackupFiles(filepath.Join(root, "snapshots"), s.SnapshotRetention, func(name string) bool { return strings.HasPrefix(name, "snapshot-") && strings.HasSuffix(name, ".tar.gz") })
+}
+
+func pruneBackupFiles(dir string, keep int, include func(string) bool) {
+	if keep < 1 { return }
+	entries, err := os.ReadDir(dir)
+	if err != nil { return }
+	type backupEntry struct { path string; mod time.Time }
+	var files []backupEntry
+	for _, entry := range entries {
+		if entry.IsDir() || !include(entry.Name()) { continue }
+		info, err := entry.Info()
+		if err != nil || !info.Mode().IsRegular() { continue }
+		files = append(files, backupEntry{path: filepath.Join(dir, entry.Name()), mod: info.ModTime()})
+	}
+	sort.Slice(files, func(i, j int) bool { return files[i].mod.After(files[j].mod) })
+	for _, old := range files[minInt(keep, len(files)):] {
+		if err := os.Remove(old.path); err != nil { log.Printf("backup retention: could not remove %s: %v", old.path, err) }
+	}
+}
+
+func minInt(a, b int) int { if a < b { return a }; return b }
 func (a *App) handleNativeBackup(w http.ResponseWriter, r *http.Request) {
-	m, _, err := a.requestServer(r)
+	m, s, err := a.requestServer(r)
 	if err != nil {
 		jsonError(w, 404, err.Error())
 		return
@@ -1233,6 +1285,7 @@ func (a *App) handleNativeBackup(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 409, err.Error())
 		return
 	}
+	go func(server ServerSettings) { time.Sleep(15 * time.Second); a.pruneBackupRetention(server) }(s)
 	jsonOut(w, 202, map[string]any{"ok": true})
 }
 func (a *App) handleSnapshotCreate(w http.ResponseWriter, r *http.Request) {
@@ -1254,6 +1307,7 @@ func (a *App) handleSnapshotCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 500, err.Error())
 		return
 	}
+	a.pruneBackupRetention(s)
 	jsonOut(w, 201, map[string]any{"ok": true, "name": name})
 }
 func (a *App) handleSnapshotRestore(w http.ResponseWriter, r *http.Request) {
@@ -1403,7 +1457,7 @@ func (a *App) handleImportLocal(w http.ResponseWriter, r *http.Request) {
 
 func defaultServerSettings(id, name string, port int, storage string) ServerSettings {
 	min, max, _ := deploymentPortRange()
-	return ServerSettings{ID: id, ServerName: name, Port: port, GameMode: "Adventure", MaxPlayers: 20, MOTD: "Welcome to your Hytale server!", MemoryMin: "2G", MemoryMax: "4G", AutoStart: false, ExtraArgs: "", PublicHost: "", BackupFrequency: 30, StorageDir: storage, PortMin: min, PortMax: max}
+	return ServerSettings{ID: id, ServerName: name, Port: port, GameMode: "Adventure", MaxPlayers: 20, MOTD: "Welcome to your Hytale server!", MemoryMin: "2G", MemoryMax: "4G", AutoStart: false, ExtraArgs: "", PublicHost: "", BackupFrequency: 30, BackupRetention: 10, SnapshotRetention: 5, StorageDir: storage, PortMin: min, PortMax: max}
 }
 func (a *App) loadConfig() error {
 	path := filepath.Join(a.dataDir, "controller.json")
@@ -1486,6 +1540,12 @@ func (a *App) loadConfig() error {
 		}
 		if cfg.Servers[i].BackupFrequency == 0 {
 			cfg.Servers[i].BackupFrequency = 30
+		}
+		if cfg.Servers[i].BackupRetention < 1 || cfg.Servers[i].BackupRetention > 100 {
+			cfg.Servers[i].BackupRetention = 10
+		}
+		if cfg.Servers[i].SnapshotRetention < 1 || cfg.Servers[i].SnapshotRetention > 100 {
+			cfg.Servers[i].SnapshotRetention = 5
 		}
 	}
 	a.cfg = cfg
