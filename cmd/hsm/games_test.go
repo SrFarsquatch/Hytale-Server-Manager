@@ -2,7 +2,7 @@ package main
 
 import "testing"
 
-func TestSupportedGameCatalogListsPlannedGamesWithoutEnablingThem(t *testing.T) {
+func TestSupportedGameCatalogListsGamesAndEnablesImplementedAdapters(t *testing.T) {
 	games := supportedGameCatalog()
 	if len(games) != 4 {
 		t.Fatalf("catalog contains %d games, want 4", len(games))
@@ -19,7 +19,8 @@ func TestSupportedGameCatalogListsPlannedGamesWithoutEnablingThem(t *testing.T) 
 	if !available["hytale"] {
 		t.Fatal("Hytale should remain available")
 	}
-	for _, id := range []string{"minecraft-java", "terraria", "runescape-dragonwilds"} {
+	if !available["runescape-dragonwilds"] { t.Fatal("Dragonwilds should be available after its dedicated-server adapter was added") }
+	for _, id := range []string{"minecraft-java", "terraria"} {
 		if available[id] {
 			t.Errorf("%s should not be marked available before its installer and lifecycle are implemented", id)
 		}
@@ -35,6 +36,10 @@ func TestGameCatalogCapabilitiesDoNotOverstatePlannedGameSupport(t *testing.T) {
 			if !game.Capabilities.Console || !game.Capabilities.Backups || !game.Capabilities.FileManagement {
 				t.Fatalf("Hytale capabilities unexpectedly missing: %#v", game.Capabilities)
 			}
+			continue
+		}
+		if game.ID == "runescape-dragonwilds" {
+			if game.Capabilities.Backups || game.Capabilities.FileManagement || game.Capabilities.Mods || game.Capabilities.PlayerList { t.Errorf("Dragonwilds exposes unimplemented capabilities: %#v", game.Capabilities) }
 			continue
 		}
 		if game.Capabilities.Console || game.Capabilities.Backups || game.Capabilities.FileManagement || game.Capabilities.Mods || game.Capabilities.PlayerList {
