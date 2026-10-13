@@ -256,8 +256,10 @@
       <div class="wizard-progress"><span id="wizard-step-label">STEP 1 OF 4</span><span id="wizard-step-title">Choose your game</span><div class="wizard-track"><span id="wizard-progress-fill"></span></div></div>
       <div class="wizard-step" data-wizard-step="0">
         <div class="wizard-heading"><p class="eyebrow">LET'S GET STARTED</p><h2>What are we hosting?</h2><p>We'll tailor the setup to the game you choose.</p></div>
-        <button type="button" class="game-choice selected" data-game-choice="hytale"><span class="game-icon">H</span><span><strong>Hytale</strong><small>Dedicated server · Java runtime</small></span><span class="choice-check">✓</span></button>
-        <div class="wizard-note">More game profiles can be added later. Hytale is the supported game in this release.</div>
+        <div id="game-choice-list" class="game-choice-list">
+          <button type="button" class="game-choice selected" data-game-choice="hytale"><span class="game-icon">H</span><span><strong>Hytale</strong><small>Dedicated server · Java runtime</small></span><span class="choice-check">✓</span></button>
+        </div>
+        <div class="wizard-note">Other games will become selectable when their installers and server controls are ready.</div>
       </div>
       <div class="wizard-step hidden" data-wizard-step="1">
         <div class="wizard-heading"><p class="eyebrow">THE BASICS</p><h2>Name your world.</h2><p>Give this server a name and choose how players connect.</p></div>
