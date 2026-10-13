@@ -908,3 +908,72 @@ body {
   .server-title-block h2 { font-size:24px; }
   .fleet-summary { grid-template-columns:1fr 1fr; }
 }
+
+
+/* Icon system: consistent line-style glyph tiles for games, navigation and metrics. */
+.game-icon {
+  display:inline-grid; place-items:center; flex:0 0 34px; width:34px; height:34px;
+  border:1px solid #304555; border-radius:10px; background:#15232e;
+  color:#b4e9dc; font-size:17px; line-height:1;
+}
+.game-icon-hytale { color:#8ef0d0; background:linear-gradient(145deg,#173a35,#13242c); border-color:#2d6254; }
+.game-icon-minecraft-java { color:#a9e68c; background:linear-gradient(145deg,#243c2b,#17271f); border-color:#3e6045; }
+.game-icon-terraria { color:#f2c77d; background:linear-gradient(145deg,#3a3021,#241f19); border-color:#655039; }
+.game-icon-runescape-dragonwilds { color:#f1a9a1; background:linear-gradient(145deg,#3c272b,#241c23); border-color:#654047; }
+.server-list-item { display:flex; align-items:center; }
+.server-list-item .dot { order:2; margin-left:auto; }
+.server-list-item .game-icon { flex:0 0 31px; width:31px; height:31px; border-radius:9px; font-size:15px; }
+.server-list-copy { min-width:0; }
+.fleet-card .fleet-open { display:grid; grid-template-columns:minmax(0,1.65fr) .8fr 1.25fr .7fr .65fr; align-items:center; gap:12px; width:100%; text-align:left; }
+.fleet-name { display:flex; align-items:center; gap:11px; min-width:0; }
+.fleet-name>strong { min-width:0; overflow-wrap:anywhere; }
+.fleet-name .game-icon { flex:0 0 36px; width:36px; height:36px; }
+.stat-strip>div { position:relative; padding-top:18px; }
+.stat-strip>div::before {
+  content:""; display:grid; place-items:center; width:28px; height:28px; margin-bottom:13px;
+  border:1px solid #2a4352; border-radius:8px; background:#142430; color:#7ee7c5;
+  font-size:15px; font-weight:800;
+}
+.stat-strip>div:nth-child(1)::before { content:"◷"; }
+.stat-strip>div:nth-child(2)::before { content:"♙"; }
+.stat-strip>div:nth-child(3)::before { content:"▤"; }
+.stat-strip>div:nth-child(4)::before { content:"⌁"; }
+.stat-strip>div:nth-child(5)::before { content:"⇄"; }
+.stat-strip>div:nth-child(6)::before { content:"▧"; }
+.resource-card-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.resource-card-head span { display:flex; align-items:center; gap:9px; }
+.resource-card-head span::before { content:""; display:inline-grid; place-items:center; width:27px; height:27px; border-radius:8px; background:#182a35; border:1px solid #2a4352; color:#83e9c8; font-size:13px; }
+.resource-card:nth-child(1) .resource-card-head span::before { content:"ϟ"; }
+.resource-card:nth-child(2) .resource-card-head span::before { content:"▤"; }
+.resource-card:nth-child(3) .resource-card-head span::before { content:"▰"; }
+.server-tabs button::before { display:inline-block; margin-right:8px; font-size:13px; vertical-align:-1px; color:#7fa3b4; }
+.server-tabs button[data-view-tab="dashboard"]::before { content:"▦"; }
+.server-tabs button[data-view-tab="console"]::before { content:"›_"; font-family:ui-monospace,monospace; }
+.server-tabs button[data-view-tab="config"]::before { content:"▤"; }
+.server-tabs button[data-view-tab="mods"]::before { content:"⬡"; }
+.server-tabs button[data-view-tab="backups"]::before { content:"↶"; }
+.server-tabs button[data-view-tab="setup"]::before { content:"↓"; }
+.server-tabs button[data-view-tab="settings"]::before { content:"⚙"; }
+.server-tabs button.active::before { color:#a5f4d9; }
+.sidebar nav button[data-view="servers"]::before { content:"▦"; }
+.sidebar nav button[data-view="app-settings"]::before { content:"⚙"; }
+.fleet-summary>div { position:relative; padding-left:61px; }
+.fleet-summary>div::before {
+  content:""; position:absolute; left:17px; top:19px; display:grid; place-items:center;
+  width:30px; height:30px; border:1px solid #2b4654; border-radius:9px;
+  background:#152630; color:#8ce9cd; font-size:15px; font-weight:800;
+}
+.fleet-summary>div:nth-child(1)::before { content:"▦"; }
+.fleet-summary>div:nth-child(2)::before { content:"●"; color:#78e9bb; }
+.fleet-summary>div:nth-child(3)::before { content:"✓"; }
+.fleet-summary>div:nth-child(4)::before { content:"Ⅱ"; }
+.operation-list button>span:last-child { display:flex; align-items:center; gap:6px; color:#82e7c4; font-size:10px; font-weight:800; }
+.operation-list button>span:last-child::before { content:"↗"; font-size:13px; }
+@media(max-width:700px) {
+  .fleet-card .fleet-open { grid-template-columns:minmax(0,1fr) auto; gap:8px; }
+  .fleet-card .fleet-name { grid-column:1; }
+  .fleet-card .fleet-status { grid-column:2; grid-row:1; }
+  .fleet-card .fleet-address,.fleet-card .fleet-uptime,.fleet-card .fleet-files { grid-column:1/-1; }
+  .fleet-summary>div { padding-left:50px; }
+  .fleet-summary>div::before { left:11px; top:14px; width:27px; height:27px; }
+}
