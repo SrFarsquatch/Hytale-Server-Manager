@@ -840,6 +840,7 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.ID = current.ID
+	in.GameType = current.GameType // game identity is immutable through generic settings updates
 	in.StorageDir = current.StorageDir
 	min, max, _ := deploymentPortRange()
 	in.PortMin = min
