@@ -23,7 +23,7 @@ func TestGameAdapterForResolvesHytaleCaseInsensitively(t *testing.T) {
 }
 
 func TestGameAdapterForRejectsPlannedGamesUntilImplemented(t *testing.T) {
-	for _, gameType := range []string{"minecraft-java", "terraria", "runescape-dragonwilds"} {
+	for _, gameType := range []string{"minecraft-java", "terraria"} {
 		t.Run(gameType, func(t *testing.T) {
 			adapter, err := gameAdapterFor(gameType)
 			if err == nil {
@@ -34,6 +34,12 @@ func TestGameAdapterForRejectsPlannedGamesUntilImplemented(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGameAdapterForResolvesDragonwilds(t *testing.T) {
+	adapter, err := gameAdapterFor(" RuneScape-Dragonwilds ")
+	if err != nil { t.Fatalf("gameAdapterFor(Dragonwilds) error = %v", err) }
+	if adapter.GameType() != "runescape-dragonwilds" { t.Fatalf("adapter type = %q, want runescape-dragonwilds", adapter.GameType()) }
 }
 
 func TestGameAdapterForRejectsUnknownGame(t *testing.T) {
