@@ -36,6 +36,8 @@ Use `docker-compose.casaos.yml`. It pulls the published multi-architecture image
 /DATA/AppData/hytale-server-manager
 ```
 
+Both supplied Compose files explicitly configure container DNS (Cloudflare `1.1.1.1` and Google `8.8.8.8`) because Hytale's OAuth/device login and token refresh require the manager container to resolve Hytale authentication hosts. Hytale server processes run inside the manager container, so this setting covers their authentication requests too. If your network blocks public DNS or requires a local DNS resolver, replace these entries with DNS servers reachable from your host network.
+
 ## Existing Orbis v0.4 data
 
 The backend still accepts the old `ORBIS_*` environment variables, `X-Orbis-Server` header and `orbis_session` cookie for migration compatibility. If you already have data under an older bind mount, point the new container at that same directory instead of creating a new empty volume.
@@ -65,6 +67,12 @@ Open **Application settings → Application updates** and choose **Check for upd
 In-container updates require the Docker socket mount shown in both Compose files. This is a powerful permission: anyone who compromises the manager can potentially gain host-level control through Docker. Use a strong admin password and keep the web dashboard on a trusted network. If you do not want to grant Docker socket access, update the image through CasaOS instead.
 
 Stable releases are published automatically on each push to `main`. The workflow builds and publishes multi-architecture `linux/amd64` and `linux/arm64` images, updates the `latest` image, and creates a stable GitHub Release with generated notes. Version tags follow `v0.6.N` using the workflow run number. The in-app updater checks the latest stable GitHub Release and applies the `latest` container image. Ensure the GitHub Container Registry package is public so a self-hosted instance can pull release images without registry credentials.
+
+## Troubleshooting Hytale authentication
+
+If `/auth login device` fails with `java.nio.channels.UnresolvedAddressException`, or logs show `OAuth token refresh IO error`, the server process may be unable to resolve or reach Hytale's authentication hosts from inside the manager container. First update/recreate the manager using one of the supplied Compose files so the `dns:` settings take effect. Then retry `/auth login device` and complete the newly generated code promptly. Verify with `/auth status`.
+
+If the error persists, the DNS servers may be unreachable or outbound HTTPS may be blocked by your network. Check the router/firewall DNS and HTTPS rules, and substitute your network's reachable DNS resolver in the Compose file if public DNS is restricted. Do not delete the persistent `/data` directory or authentication files as a first troubleshooting step.
 
 ## Networking
 
