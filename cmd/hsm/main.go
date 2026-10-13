@@ -45,6 +45,7 @@ type AdminConfig struct {
 
 type ServerSettings struct {
 	ID              string `json:"id"`
+	GameType        string `json:"gameType,omitempty"`
 	ServerName      string `json:"serverName"`
 	Port            int    `json:"port"`
 	GameMode        string `json:"gameMode"`
@@ -1457,7 +1458,7 @@ func (a *App) handleImportLocal(w http.ResponseWriter, r *http.Request) {
 
 func defaultServerSettings(id, name string, port int, storage string) ServerSettings {
 	min, max, _ := deploymentPortRange()
-	return ServerSettings{ID: id, ServerName: name, Port: port, GameMode: "Adventure", MaxPlayers: 20, MOTD: "Welcome to your Hytale server!", MemoryMin: "2G", MemoryMax: "4G", AutoStart: false, ExtraArgs: "", PublicHost: "", BackupFrequency: 30, BackupRetention: 10, SnapshotRetention: 5, StorageDir: storage, PortMin: min, PortMax: max}
+	return ServerSettings{ID: id, GameType: "hytale", ServerName: name, Port: port, GameMode: "Adventure", MaxPlayers: 20, MOTD: "Welcome to your Hytale server!", MemoryMin: "2G", MemoryMax: "4G", AutoStart: false, ExtraArgs: "", PublicHost: "", BackupFrequency: 30, BackupRetention: 10, SnapshotRetention: 5, StorageDir: storage, PortMin: min, PortMax: max}
 }
 func (a *App) loadConfig() error {
 	path := filepath.Join(a.dataDir, "controller.json")
@@ -1505,6 +1506,10 @@ func (a *App) loadConfig() error {
 	}
 	min, max, _ := deploymentPortRange()
 	for i := range cfg.Servers {
+		// Configs written before multi-game support omit gameType; keep them as Hytale.
+		if strings.TrimSpace(cfg.Servers[i].GameType) == "" {
+			cfg.Servers[i].GameType = "hytale"
+		}
 		if cfg.Servers[i].ID == "" {
 			cfg.Servers[i].ID = fmt.Sprintf("server-%d", i+1)
 		}
