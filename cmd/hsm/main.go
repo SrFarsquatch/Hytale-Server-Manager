@@ -249,6 +249,15 @@ func (a *App) routes(mux *http.ServeMux) {
 
 	mux.Handle("GET /api/server/config", a.auth(http.HandlerFunc(a.handleServerConfigGet)))
 	mux.Handle("PUT /api/server/config", a.auth(http.HandlerFunc(a.handleServerConfigPut)))
+	mux.Handle("GET /api/files", a.auth(http.HandlerFunc(a.handleFilesList)))
+	mux.Handle("GET /api/files/content", a.auth(http.HandlerFunc(a.handleFilesRead)))
+	mux.Handle("PUT /api/files/content", a.auth(http.HandlerFunc(a.handleFilesWrite)))
+	mux.Handle("POST /api/files/mkdir", a.auth(http.HandlerFunc(a.handleFilesMkdir)))
+	mux.Handle("POST /api/files/upload", a.auth(http.HandlerFunc(a.handleFilesUpload)))
+	mux.Handle("GET /api/files/download", a.auth(http.HandlerFunc(a.handleFilesDownload)))
+	mux.Handle("DELETE /api/files", a.auth(http.HandlerFunc(a.handleFilesDelete)))
+	mux.Handle("POST /api/files/rename", a.auth(http.HandlerFunc(a.handleFilesRename)))
+
 	mux.Handle("GET /api/server/file/{name}", a.auth(http.HandlerFunc(a.handleServerFileGet)))
 	mux.Handle("PUT /api/server/file/{name}", a.auth(http.HandlerFunc(a.handleServerFilePut)))
 	mux.Handle("GET /api/mods", a.auth(http.HandlerFunc(a.handleModsList)))
