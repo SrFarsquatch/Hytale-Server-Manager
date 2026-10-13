@@ -524,12 +524,12 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, 400, "RuneScape: Dragonwilds requires your in-game Player ID as the server Owner ID")
 			return
 		}
-		if len(strings.TrimSpace(body.DragonwildsOwnerID)) > 128 || strings.ContainsAny(body.DragonwildsOwnerID, "\r\n\\x00") {
+		if len(strings.TrimSpace(body.DragonwildsOwnerID)) > 128 || strings.ContainsAny(body.DragonwildsOwnerID, "\r\n\x00") {
 			jsonError(w, 400, "invalid Dragonwilds Owner ID")
 			return
 		}
 		if strings.TrimSpace(body.DragonwildsWorldName) == "" { body.DragonwildsWorldName = nameSafeDefault(body.Name) }
-		if len(body.DragonwildsWorldName) > 32 || strings.ContainsAny(body.DragonwildsWorldName, "\r\n\\x00") {
+		if len(body.DragonwildsWorldName) > 32 || strings.ContainsAny(body.DragonwildsWorldName, "\r\n\x00") {
 			jsonError(w, 400, "Dragonwilds world name must be 1–32 characters")
 			return
 		}
@@ -537,7 +537,7 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, 400, "Dragonwilds requires an admin password")
 			return
 		}
-		if len(body.DragonwildsAdminPassword) > 128 || strings.ContainsAny(body.DragonwildsAdminPassword, "\r\n\\x00") || strings.ContainsAny(body.DragonwildsWorldPassword, "\r\n\\x00") {
+		if len(body.DragonwildsAdminPassword) > 128 || strings.ContainsAny(body.DragonwildsAdminPassword, "\r\n\x00") || strings.ContainsAny(body.DragonwildsWorldPassword, "\r\n\x00") {
 			jsonError(w, 400, "invalid Dragonwilds password")
 			return
 		}
