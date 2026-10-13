@@ -645,7 +645,7 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	a.managersMu.Lock()
 	a.managers[id] = NewServerManager(a.serverRoot(s), filepath.Join(a.dataDir, "tools"), s.GameType)
 	a.managersMu.Unlock()
-	_ = a.writeJVMOptionsFor(s)
+	if s.GameType == "hytale" { _ = a.writeJVMOptionsFor(s) }
 	jsonOut(w, 201, s)
 }
 func (a *App) handleServersDelete(w http.ResponseWriter, r *http.Request) {
