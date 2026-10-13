@@ -220,17 +220,28 @@
             <label>Server name<input id="set-name" required></label>
             <label>Public address<input id="set-host" placeholder="play.example.com or public IP"></label>
             <label>UDP game port<input id="set-port" type="number" min="1" max="65535" required><small id="port-help">Each running server needs a unique UDP port.</small></label>
-            <label>Game mode<select id="set-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select><small>Default mode for newly created worlds.</small></label>
-            <label>Maximum players<input id="set-players" type="number" min="1" max="1000" required></label>
-            <label>Server message<input id="set-motd" maxlength="160" placeholder="Welcome to your server"></label>
-            <label class="toggle-row"><span><b>Require whitelist permission</b><small>Restrict joining to players granted server join access.</small></span><input id="set-whitelist" type="checkbox"></label>
-            <label>Server password (optional)<input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label>
-            <label>Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
-            <label>Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
+            <label class="hytale-only">Game mode<select id="set-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select><small>Default mode for newly created worlds.</small></label>
+            <label id="set-players-label">Maximum players<input id="set-players" type="number" min="1" max="1000" required></label>
+            <label class="hytale-only">Server message<input id="set-motd" maxlength="160" placeholder="Welcome to your server"></label>
+            <label class="toggle-row hytale-only"><span><b>Require whitelist permission</b><small>Restrict joining to players granted server join access.</small></span><input id="set-whitelist" type="checkbox"></label>
+            <label class="hytale-only">Server password (optional)<input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label>
+            <label class="hytale-only">Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
+            <label class="hytale-only">Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
           </div>
-          <label>Additional server arguments<input id="set-args" placeholder="Only change if you know which flags your server supports"></label>
+          <label class="hytale-only">Additional server arguments<input id="set-args" placeholder="Only change if you know which flags your server supports"></label>
           <label class="toggle-row"><span><b>Auto-start</b><small>Start this instance when the manager starts.</small></span><input id="set-autostart" type="checkbox"></label>
-          <div class="settings-note"><b>Networking</b><span>The container publishes a UDP range. Each server needs a different port in that range.</span></div>
+          <div id="dragonwilds-settings" class="hidden span-two">
+            <div class="settings-note"><b>Dragonwilds dedicated-server settings</b><span>These values are written to DedicatedServer.ini when the server is stopped or next starts. Do not edit the INI while the game is running; the game can discard those changes.</span></div>
+            <div class="form-grid">
+              <label class="span-two">Owner ID (required)<input id="set-dragonwilds-owner" maxlength="128" autocomplete="off" placeholder="Your in-game Player ID"></label>
+              <label>Default world name (required)<input id="set-dragonwilds-world" maxlength="32" required></label>
+              <label>Admin password (required)<input id="set-dragonwilds-admin" type="password" maxlength="128" autocomplete="new-password" required></label>
+              <label class="span-two">World password (optional)<input id="set-dragonwilds-password" type="password" maxlength="128" autocomplete="new-password" placeholder="Leave empty to allow anyone to join"></label>
+            </div>
+            <p class="help">Find your Owner ID at the bottom of the in-game Settings menu. Players find the server under Worlds → Public by searching for the exact world name, including capitalization. World saves are stored under <code>RSDragonwilds/Saved/Savegames</code>.</p>
+            <p class="help">Network: forward the server's UDP port (7777 by default) through your router/firewall. The official guide's RAM baseline is 2 GB plus about 1 GB per player (up to 6 players in the version documented).</p>
+          </div>
+          <div id="hytale-settings-note" class="settings-note"><b>Networking</b><span>The container publishes a UDP range. Each server needs a different port in that range.</span></div>
         </form>
       </section>
 
@@ -290,7 +301,7 @@
               <label>Default world name<input id="new-dragonwilds-world" maxlength="32" value="Dragonwilds World"></label>
               <label>Admin password (required)<input id="new-dragonwilds-admin" type="password" maxlength="128" autocomplete="new-password"></label>
               <label class="span-two">World password (optional)<input id="new-dragonwilds-password" type="password" maxlength="128" autocomplete="new-password"></label>
-              <label class="toggle-row span-two"><span><b>Public server</b><small>Advertise this server in the in-game browser.</small></span><input id="new-dragonwilds-public" type="checkbox" checked></label>
+              <p class="help span-two">The game lists dedicated worlds under Worlds → Public. Players must search for the exact world name, including capitalization.</p>
             </div>
           </div>
         </div>
