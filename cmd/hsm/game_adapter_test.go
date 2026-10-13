@@ -5,7 +5,7 @@ import "testing"
 func TestGameAdapterForDefaultsLegacyTypeToHytale(t *testing.T) {
 	adapter, err := gameAdapterFor("")
 	if err != nil {
-		t.Fatalf("gameAdapterFor("") error = %v", err)
+		t.Fatalf("gameAdapterFor(empty) error = %v", err)
 	}
 	if adapter.GameType() != "hytale" {
 		t.Fatalf("adapter type = %q, want hytale", adapter.GameType())
