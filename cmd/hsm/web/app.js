@@ -44,7 +44,7 @@ const dragon=s.gameType==='runescape-dragonwilds';
 $('#dragonwilds-settings').classList.toggle('hidden',!dragon);
 $('#hytale-settings-note').classList.toggle('hidden',dragon);
 $('#dragonwilds-player-limit').classList.toggle('hidden',!dragon);
-$('.hytale-settings-only').forEach(el=>{el.classList.toggle('hidden',dragon);el.querySelectorAll('input,select,textarea').forEach(input=>input.disabled=dragon)});
+$$('.hytale-settings-only').forEach(el=>{el.classList.toggle('hidden',dragon);el.querySelectorAll('input,select,textarea').forEach(input=>input.disabled=dragon)});
 $('#set-players').max=dragon?6:1000;
 $('#set-dragonwilds-owner').value=s.dragonwildsOwnerId||'';
 $('#set-dragonwilds-world').value=s.dragonwildsWorldName||'Dragonwilds World';
