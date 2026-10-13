@@ -6,6 +6,12 @@ services:
       dockerfile: Dockerfile
     container_name: hytale-server-manager
     restart: unless-stopped
+    # Hytale OAuth/device authentication needs working DNS inside this container.
+    # The server processes are launched by the manager, so this resolver config
+    # also applies to their outbound authentication requests.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     ports:
       - "8008:8008/tcp"
       - "5520:5520/udp"
