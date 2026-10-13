@@ -299,11 +299,11 @@
       <div class="wizard-step hidden" data-wizard-step="2">
         <div class="wizard-heading"><p class="eyebrow">YOUR GAME, YOUR WAY</p><h2>Set up the experience.</h2><p>These become the default settings for the new server.</p></div>
         <div class="form-grid">
-          <label>Game mode<select id="new-server-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select></label>
+          <label class="hytale-only">Game mode<select id="new-server-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select></label>
           <label>Maximum players<input id="new-server-players" type="number" min="1" max="1000" value="20" required></label>
-          <label class="span-two">Server message<input id="new-server-motd" maxlength="160" value="Welcome to your Hytale server!"></label>
-          <label class="toggle-row span-two"><span><b>Require whitelist permission</b><small>Private server; players need join permission.</small></span><input id="new-server-whitelist" type="checkbox"></label>
-          <label class="span-two">Server password (optional)<input id="new-server-password" type="password" autocomplete="new-password" placeholder="Leave empty for an open server"></label>
+          <label class="span-two hytale-only">Server message<input id="new-server-motd" maxlength="160" value="Welcome to your Hytale server!"></label>
+          <label class="toggle-row span-two hytale-only"><span><b>Require whitelist permission</b><small>Private server; players need join permission.</small></span><input id="new-server-whitelist" type="checkbox"></label>
+          <label class="span-two hytale-only">Server password (optional)<input id="new-server-password" type="password" autocomplete="new-password" placeholder="Leave empty for an open server"></label>
           <div id="dragonwilds-fields" class="hidden span-two">
             <div class="wizard-heading"><p class="eyebrow">DRAGONWILDS SERVER</p><h3>Dedicated server settings</h3><p>Your Owner ID is required by the game. Find it at the bottom of the in-game Settings menu.</p></div>
             <div class="form-grid">
