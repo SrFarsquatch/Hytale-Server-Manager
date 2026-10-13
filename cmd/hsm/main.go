@@ -552,7 +552,8 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "game mode must be Adventure or Creative")
 		return
 	}
-	if body.MaxPlayers == 0 { body.MaxPlayers = 20 }
+	if body.MaxPlayers == 0 { if game == "runescape-dragonwilds" { body.MaxPlayers = 6 } else { body.MaxPlayers = 20 } }
+	if game == "runescape-dragonwilds" && body.MaxPlayers > 6 { jsonError(w, 400, "RuneScape: Dragonwilds supports up to 6 players"); return }
 	if body.MaxPlayers < 1 || body.MaxPlayers > 1000 {
 		jsonError(w, 400, "maximum players must be between 1 and 1000")
 		return
@@ -614,6 +615,10 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		srcM, srcS, err := a.serverByID(body.SourceServerID)
 		if err != nil {
 			jsonError(w, 404, "source server not found")
+			return
+		}
+		if srcS.GameType != s.GameType {
+			jsonError(w, 400, "servers can only be cloned from the same game type")
 			return
 		}
 		if srcM.IsRunning() {
@@ -1833,9 +1838,15 @@ func (m *ServerManager) Start(args []string) error {
 	var cmd *exec.Cmd
 	if m.gameType == "runescape-dragonwilds" {
 		launcher := filepath.Join(gameDir, "RSDragonwildsServer.sh")
-		if !fileExists(launcher) { return errors.New("Dragonwilds launcher RSDragonwildsServer.sh is missing") }
-		_ = os.Chmod(launcher, 0755)
-		cmd = exec.Command(launcher, args...)
+		if fileExists(launcher) {
+			_ = os.Chmod(launcher, 0755)
+			cmd = exec.Command(launcher, args...)
+		} else {
+			binary := filepath.Join(gameDir, "RSDragonwilds", "Binaries", "Linux", "RSDragonwildsServer-Linux-Shipping")
+			if !fileExists(binary) { return errors.New("Dragonwilds launcher or Linux server binary is missing") }
+			_ = os.Chmod(binary, 0755)
+			cmd = exec.Command(binary, args...)
+		}
 	} else {
 		startSh := filepath.Join(gameDir, "start.sh")
 		if !fileExists(startSh) { return errors.New("game/start.sh is missing; import an official server bundle or run /update setup first") }
