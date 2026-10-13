@@ -44,8 +44,11 @@ func supportedGameCatalog() []GameCatalogEntry {
 			Capabilities: GameCapability{Variants: []string{"vanilla", "tmodloader"}},
 		},
 		{
-			ID: "runescape-dragonwilds", Name: "RuneScape: Dragonwilds", Available: false,
-			Capabilities: GameCapability{Variants: []string{"dedicated"}},
+			ID: "runescape-dragonwilds", Name: "RuneScape: Dragonwilds", Available: true,
+			Capabilities: GameCapability{
+				Console: true, Configuration: true,
+				Variants: []string{"dedicated"},
+			},
 		},
 	}
 }
