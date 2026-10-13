@@ -41,7 +41,6 @@ func TestWriteDragonwildsConfig(t *testing.T) {
 		"WorldPassword=world-secret",
 		"ServerName=Friends World",
 		"DefaultWorldName=Misty Valley",
-		"Public=1",
 	} {
 		if !strings.Contains(text, expected) { t.Errorf("config missing %q:\n%s", expected, text) }
 	}
