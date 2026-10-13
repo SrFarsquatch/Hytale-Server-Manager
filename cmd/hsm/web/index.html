@@ -110,11 +110,17 @@
 
         <div class="stat-strip">
           <div><span>Uptime</span><strong id="metric-uptime">—</strong></div>
+          <div><span>Players online</span><strong id="metric-players">Unknown</strong></div>
           <div><span>Memory</span><strong id="metric-memory">—</strong></div>
           <div><span>Limit</span><strong id="metric-memory-limit">—</strong></div>
           <div><span>UDP port</span><strong id="metric-port">—</strong></div>
           <div><span>Files</span><strong id="metric-installed">—</strong></div>
         </div>
+
+        <section class="panel players-panel">
+          <div class="panel-head"><div><h3>Connected players</h3><p id="players-message" class="help">Checking the live server player list…</p></div><button id="players-refresh" class="btn">Refresh</button></div>
+          <div id="players-list" class="players-list"><span class="muted">Waiting for server response…</span></div>
+        </section>
 
         <section class="panel resource-panel">
           <div class="panel-head"><div><h3>Host resources</h3><p class="help">Container CPU and RAM, plus filesystem capacity for the persistent /data volume.</p></div><span id="resource-sampled" class="muted resource-sampled">Waiting for metrics</span></div>
