@@ -181,9 +181,18 @@
       </section>
 
       <section id="view-backups" class="view">
+        <div class="panel backup-settings-panel">
+          <div class="panel-head"><div><h3>Backup schedule & retention</h3><p class="help">Choose how often Hytale makes automatic backups and how many copies to keep. Oldest automatic backups are removed first.</p></div><button class="btn primary" id="save-backup-settings">Save backup settings</button></div>
+          <div class="form-grid backup-settings-grid">
+            <label>Automatic backup interval<select id="backup-frequency"><option value="5">Every 5 minutes</option><option value="10">Every 10 minutes</option><option value="15">Every 15 minutes</option><option value="30">Every 30 minutes</option><option value="60">Every hour</option><option value="120">Every 2 hours</option><option value="360">Every 6 hours</option><option value="720">Every 12 hours</option><option value="1440">Daily</option><option value="10080">Weekly</option></select><small>Applies when Hytale next starts. Restart a running server to apply a changed interval.</small></label>
+            <label>Keep automatic backups<input id="backup-retention" type="number" min="1" max="100" value="10" required><small>Keep the newest 1–100 native Hytale backup files.</small></label>
+            <label>Keep full snapshots<input id="snapshot-retention" type="number" min="1" max="100" value="5" required><small>Keep the newest 1–100 manager-created snapshots. Restore safety copies are preserved separately.</small></label>
+          </div>
+          <p class="settings-note"><b>Automatic backups</b><span>Created by Hytale while the server runs. Retention cleanup runs automatically. Full snapshots include the world, configuration, permissions and mods, and require the server to be stopped.</span></p>
+        </div>
         <div class="stack-panels">
-          <div class="panel"><div class="panel-head"><div><h3>Native backups</h3><p class="help">Backups created by Hytale.</p></div><button class="btn primary" id="native-backup">Back up now</button></div><div id="native-backups" class="file-list empty-state">No native backups found.</div></div>
-          <div class="panel"><div class="panel-head"><div><h3>Full snapshots</h3><p class="help">World, configuration, permissions and mods. Server must be stopped.</p></div><button class="btn" id="snapshot-backup">Create snapshot</button></div><div id="snapshots" class="file-list empty-state">No snapshots found.</div></div>
+          <div class="panel"><div class="panel-head"><div><h3>Native backups</h3><p class="help">Hytale’s automatic and on-demand backups.</p></div><button class="btn primary" id="native-backup">Back up now</button></div><div id="native-backups" class="file-list empty-state">No native backups found.</div></div>
+          <div class="panel"><div class="panel-head"><div><h3>Full snapshots</h3><p class="help">Restorable copies of the world, configuration, permissions and mods. Server must be stopped.</p></div><button class="btn" id="snapshot-backup">Create snapshot</button></div><div id="snapshots" class="file-list empty-state">No snapshots found.</div></div>
         </div>
       </section>
 
@@ -209,7 +218,6 @@
             <label>Server message<input id="set-motd" maxlength="160" placeholder="Welcome to your server"></label>
             <label class="toggle-row"><span><b>Require whitelist permission</b><small>Restrict joining to players granted server join access.</small></span><input id="set-whitelist" type="checkbox"></label>
             <label>Server password (optional)<input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label>
-            <label>Automatic Hytale backup frequency (minutes)<input id="set-backup" type="number" min="5" max="10080" required><small>Range: 5 minutes to 7 days. Applied when the server next starts; restart a running server after changing this value.</small></label>
             <label>Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
             <label>Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
           </div>
