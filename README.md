@@ -103,4 +103,4 @@ node --check cmd/hsm/web/app.js
 go build -o /tmp/hsm ./cmd/hsm && node tests/browser/workspace-selection.mjs /tmp/hsm
 ```
 
-The browser test starts its own HSM instance against a temporary data directory and uses a fake Hytale `start.sh`, so it never downloads games or touches real server data. See `docs/audit-2026-10-workspace-selection.md` for the current audit and backlog.
+CI runs the same browser test as a separate `browser` job. The browser test starts its own HSM instance against a temporary data directory and uses a fake Hytale `start.sh`, so it never downloads games or touches real server data. See `docs/audit-2026-10-workspace-selection.md` for the current audit and backlog.

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#151a24">
   <title>HSM · Game Server Control Panel</title>
-  <link rel="stylesheet" href="/app.css?v=20261015-panel-ui4">
+  <link rel="stylesheet" href="/app.css?v=20261015-safety1">
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -316,7 +316,7 @@
               <label class="hytale-settings-only">Game mode<select id="set-mode"><option value="Survival">Survival</option><option value="Adventure">Adventure</option><option value="Creative">Creative</option><option value="Spectator">Spectator</option></select><small>Default mode for newly created worlds.</small></label>
               <label id="set-players-label" class="hytale-settings-only">Maximum players<input id="set-players" type="number" min="1" max="1000" required></label>
               <label class="hytale-settings-only">Server message<input id="set-motd" maxlength="160" placeholder="Welcome to your server"></label>
-              <label class="hytale-settings-only">Server password (optional)<input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label>
+              <label class="hytale-settings-only">Server password (optional)<input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label><label id="set-password-clear-row" class="check hidden"><input id="set-password-clear" type="checkbox"> Remove the current server password</label>
               <label class="toggle-row hytale-settings-only"><span><b>Require whitelist permission</b><small>Restrict joining to players granted join access.</small></span><input id="set-whitelist" type="checkbox"></label>
               <label class="hytale-settings-only">Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
               <label class="hytale-settings-only">Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
@@ -329,7 +329,7 @@
                 <label class="span-two">Owner ID (required)<input id="set-dragonwilds-owner" maxlength="128" autocomplete="off" placeholder="Your in-game Player ID"></label>
                 <label>Default world name (required)<input id="set-dragonwilds-world" maxlength="32"></label>
                 <label>Admin password (required)<input id="set-dragonwilds-admin" type="password" maxlength="128" autocomplete="new-password"></label>
-                <label class="span-two">World password (optional)<input id="set-dragonwilds-password" type="password" maxlength="128" autocomplete="new-password" placeholder="Leave empty to allow anyone to join"></label>
+                <label class="span-two">World password (optional)<input id="set-dragonwilds-password" type="password" maxlength="128" autocomplete="new-password" placeholder="Leave empty to allow anyone to join"></label><label id="set-dragonwilds-password-clear-row" class="check span-two hidden"><input id="set-dragonwilds-password-clear" type="checkbox"> Remove the current world password</label>
               </div>
               <p class="muted small">Find your Owner ID at the bottom of the in-game Settings menu. Players find the server under Worlds → Public by searching for the exact world name, including capitalization. World saves are stored under <code>RSDragonwilds/Saved/Savegames</code>.</p>
               <p class="muted small">Network: forward the server's UDP port (7777 by default). The official RAM baseline is 2 GB plus about 1 GB per player (up to 6 players).</p>
@@ -426,6 +426,6 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/app.js?v=20261015-panel-ui4"></script>
+  <script src="/app.js?v=20261015-safety1"></script>
 </body>
 </html>

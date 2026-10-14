@@ -128,6 +128,9 @@ type ServerManager struct {
 	installBusy bool
 	logs        *LogRing
 	hub         *LogHub
+	// Stop escalation delays; zero uses the production defaults.
+	stopGrace     time.Duration
+	stopInterrupt time.Duration
 }
 
 type LogLine struct {
@@ -716,7 +719,7 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	a.managers[id] = NewServerManager(a.serverRoot(s), filepath.Join(a.dataDir, "tools"), s.GameType)
 	a.managersMu.Unlock()
 	if s.GameType == "hytale" { _ = a.writeJVMOptionsFor(s) }
-	jsonOut(w, 201, s)
+	jsonOut(w, 201, settingsView(s))
 }
 func (a *App) handleServersDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
@@ -950,6 +953,51 @@ func parsePlayerNames(s string) []string {
 func (a *App) handleResources(w http.ResponseWriter, r *http.Request) {
 	jsonOut(w, 200, a.resourceMetrics())
 }
+// SettingsView is ServerSettings as sent to the browser. Passwords are never
+// returned; the *Set fields say whether each one is configured.
+type SettingsView struct {
+	ServerSettings
+	PasswordSet                 bool `json:"passwordSet"`
+	DragonwildsAdminPasswordSet bool `json:"dragonwildsAdminPasswordSet"`
+	DragonwildsWorldPasswordSet bool `json:"dragonwildsWorldPasswordSet"`
+}
+
+func settingsView(s ServerSettings) SettingsView {
+	v := SettingsView{
+		ServerSettings:              s,
+		PasswordSet:                 s.Password != "",
+		DragonwildsAdminPasswordSet: s.DragonwildsAdminPassword != "",
+		DragonwildsWorldPasswordSet: s.DragonwildsWorldPassword != "",
+	}
+	v.Password = ""
+	v.DragonwildsAdminPassword = ""
+	v.DragonwildsWorldPassword = ""
+	return v
+}
+
+// settingsUpdate is the PUT /api/settings body. Clear flags remove optional
+// passwords explicitly, because a blank password field means "unchanged".
+type settingsUpdate struct {
+	ServerSettings
+	ClearPassword                 bool `json:"clearPassword"`
+	ClearDragonwildsWorldPassword bool `json:"clearDragonwildsWorldPassword"`
+	// Read-only SettingsView fields, accepted and ignored so a GET response
+	// can be sent back unchanged.
+	PasswordSet                 bool `json:"passwordSet"`
+	DragonwildsAdminPasswordSet bool `json:"dragonwildsAdminPasswordSet"`
+	DragonwildsWorldPasswordSet bool `json:"dragonwildsWorldPasswordSet"`
+}
+
+func keepSecret(submitted, current string, clear bool) string {
+	if clear {
+		return ""
+	}
+	if submitted == "" {
+		return current
+	}
+	return submitted
+}
+
 func (a *App) handleSettingsGet(w http.ResponseWriter, r *http.Request) {
 	_, s, err := a.requestServer(r)
 	if err != nil {
@@ -959,7 +1007,7 @@ func (a *App) handleSettingsGet(w http.ResponseWriter, r *http.Request) {
 	min, max := portRangeForGame(s.GameType)
 	s.PortMin = min
 	s.PortMax = max
-	jsonOut(w, 200, s)
+	jsonOut(w, 200, settingsView(s))
 }
 func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	m, current, err := a.requestServer(r)
@@ -967,11 +1015,16 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 404, err.Error())
 		return
 	}
-	var in ServerSettings
-	if err := decodeJSON(r, &in); err != nil {
+	var req settingsUpdate
+	if err := decodeJSON(r, &req); err != nil {
 		jsonError(w, 400, err.Error())
 		return
 	}
+	in := req.ServerSettings
+	// Secrets are never sent to the browser, so a blank value means "keep".
+	in.Password = keepSecret(in.Password, current.Password, req.ClearPassword)
+	in.DragonwildsAdminPassword = keepSecret(in.DragonwildsAdminPassword, current.DragonwildsAdminPassword, false)
+	in.DragonwildsWorldPassword = keepSecret(in.DragonwildsWorldPassword, current.DragonwildsWorldPassword, req.ClearDragonwildsWorldPassword)
 	in.ID = current.ID
 	in.GameType = current.GameType // game identity is immutable through generic settings updates
 	in.StorageDir = current.StorageDir
@@ -1107,7 +1160,7 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	jsonOut(w, 200, in)
+	jsonOut(w, 200, settingsView(in))
 }
 func (a *App) handleStart(w http.ResponseWriter, r *http.Request) {
 	_, s, err := a.requestServer(r)
@@ -2121,8 +2174,10 @@ func (m *ServerManager) Stop() error {
 		m.mu.Unlock()
 		return errors.New("server is not running")
 	}
-	pid := m.cmd.Process.Pid
+	cmd := m.cmd
+	pid := cmd.Process.Pid
 	stdin := m.stdin
+	graceTimeout, interruptTimeout := m.stopTimeouts()
 	adapter, adapterErr := gameAdapterFor(m.gameType)
 	if adapterErr != nil {
 		m.mu.Unlock()
@@ -2137,19 +2192,39 @@ func (m *ServerManager) Stop() error {
 	if err != nil {
 		return err
 	}
+	// Escalate only against the process this call asked to stop. After a quick
+	// restart a different process is running, and it must not be signalled.
+	stillRunning := func() bool {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		return m.cmd == cmd && m.running
+	}
 	go func() {
-		time.Sleep(75 * time.Second)
-		if m.IsRunning() {
+		time.Sleep(graceTimeout)
+		if stillRunning() {
 			m.appendLog("controller", "Graceful shutdown timed out; sending SIGINT")
 			_ = syscall.Kill(-pid, syscall.SIGINT)
-			time.Sleep(10 * time.Second)
-			if m.IsRunning() {
+			time.Sleep(interruptTimeout)
+			if stillRunning() {
 				m.appendLog("controller", "Server still running; forcing process group to stop")
 				_ = syscall.Kill(-pid, syscall.SIGKILL)
 			}
 		}
 	}()
 	return nil
+}
+
+// stopTimeouts returns how long Stop waits for a graceful exit before SIGINT,
+// then before SIGKILL. Tests shorten them; zero means the production default.
+func (m *ServerManager) stopTimeouts() (time.Duration, time.Duration) {
+	grace, interrupt := m.stopGrace, m.stopInterrupt
+	if grace <= 0 {
+		grace = 75 * time.Second
+	}
+	if interrupt <= 0 {
+		interrupt = 10 * time.Second
+	}
+	return grace, interrupt
 }
 func (m *ServerManager) RunDownloader() error {
 	m.mu.Lock()

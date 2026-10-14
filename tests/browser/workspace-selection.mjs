@@ -86,7 +86,7 @@ let browser;
 try {
   await waitForServer();
   await call('POST', '/api/bootstrap', { username: 'admin', password: 'password123' });
-  await call('POST', '/api/servers', { game: 'hytale', name: 'Alpha Hytale', memoryMin: '1G', memoryMax: '2G', backupFrequency: 30, maxPlayers: 20, gameMode: 'Adventure' });
+  await call('POST', '/api/servers', { game: 'hytale', name: 'Alpha Hytale', memoryMin: '1G', memoryMax: '2G', backupFrequency: 30, maxPlayers: 20, gameMode: 'Adventure', password: 'join-secret-123' });
   await call('POST', '/api/servers', { game: 'minecraft-java', minecraftVariant: 'vanilla', minecraftVersion: 'latest', minecraftEulaAccepted: true, name: 'Bravo Minecraft', memoryMin: '1G', memoryMax: '2G', maxPlayers: 20, gameMode: 'Survival' });
   await call('POST', '/api/servers', { game: 'runescape-dragonwilds', name: 'Charlie Dragonwilds', maxPlayers: 6, dragonwildsOwnerId: 'owner-1', dragonwildsWorldName: 'World', dragonwildsAdminPassword: 'adminpass' });
   fakeHytaleInstall('alpha-hytale');
@@ -94,6 +94,13 @@ try {
   browser = await chromium.launch();
   const page = await browser.newPage();
   const pageErrors = [];
+  // Server passwords must never be sent to the browser.
+  const leakedSecrets = [];
+  page.on('response', async res => {
+    if (!res.url().includes('/api/')) return;
+    const body = await res.text().catch(() => '');
+    if (body.includes('join-secret-123')) leakedSecrets.push(new URL(res.url()).pathname);
+  });
   page.on('pageerror', e => pageErrors.push(e.message));
   // Requests that reach the backend without naming a server would be ambiguous.
   const unscoped = [];
@@ -283,6 +290,23 @@ try {
     await page.waitForTimeout(500);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     assert.ok(overflow <= 0, `page overflows by ${overflow}px`);
+  });
+
+  await check('saved passwords are not sent to the browser and are kept on save', async () => {
+    await page.setViewportSize({ width: 1366, height: 860 });
+    await select('alpha-hytale');
+    await waitForName('Alpha Hytale');
+    await page.click('[data-view-tab="settings"]');
+    assert.equal(await value('#set-password'), '', 'password field starts blank');
+    assert.match(await page.getAttribute('#set-password', 'placeholder'), /Password set/);
+    assert.ok(await visible('#set-password-clear-row'), 'remove-password option is offered');
+    await page.click('#settings-form button:not([type])');
+    await page.waitForTimeout(600);
+    // Saving with a blank password field keeps the existing password; the
+    // server's own config.json (written on save while stopped) shows it.
+    const file = await (await fetch(base + '/api/server/file/config.json', { headers: { Cookie: cookie, 'X-HSM-Server': 'alpha-hytale' } })).json();
+    assert.equal(JSON.parse(file.content).Password, 'join-secret-123', 'password kept after saving with a blank field');
+    assert.deepEqual(leakedSecrets, []);
   });
 
   await check('no uncaught page errors', async () => { assert.deepEqual(pageErrors, []); });
