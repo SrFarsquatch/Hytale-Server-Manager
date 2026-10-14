@@ -581,7 +581,9 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "maximum players must be between 1 and 1000")
 		return
 	}
-	if body.MOTD == "" { body.MOTD = "Welcome to your Hytale server!" }
+	if body.MOTD == "" {
+		if game == "minecraft-java" { body.MOTD = "A Minecraft Server" } else { body.MOTD = "Welcome to your Hytale server!" }
+	}
 	if body.MemoryMin == "" { body.MemoryMin = "2G" }
 	if body.MemoryMax == "" { body.MemoryMax = "4G" }
 	if !validMemory(body.MemoryMin) || !validMemory(body.MemoryMax) {
@@ -605,11 +607,13 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	min, max, _ := deploymentPortRange()
 	if game == "runescape-dragonwilds" { min, max = 7777, 7782 }
 	if port < min || port > max {
-		jsonError(w, 400, fmt.Sprintf("port must be within the published UDP range %d-%d", min, max))
+		protocol := "UDP"
+		if game == "minecraft-java" { protocol = "TCP" }
+		jsonError(w, 400, fmt.Sprintf("port must be within the published %s range %d-%d", protocol, min, max))
 		return
 	}
 	if a.portInUse(port, "") {
-		jsonError(w, 409, "that UDP port is already assigned to another server")
+		jsonError(w, 409, "that game port is already assigned to another server")
 		return
 	}
 	s := defaultServerSettings(id, name, port, filepath.Join("servers", id))
