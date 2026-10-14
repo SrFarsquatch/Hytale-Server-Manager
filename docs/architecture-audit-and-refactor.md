@@ -8,7 +8,7 @@ This is an incremental refactor. Hytale is the compatibility baseline: existing 
 
 ## Baseline findings
 
-- The entry point and server domain are currently concentrated in `cmd/hsm/main.go`. It defines persistent configuration, `App`, `ServerManager`, process/log state, and HTTP handling in the same package/file. This makes game-specific behavior and shared lifecycle behavior difficult to distinguish.
+- The application entry point and much of the domain/HTTP layer are concentrated in `cmd/hsm/main.go`, while the existing `cmd/hsm/game_adapter.go` already provides a first adapter seam for launch preparation. The seam is incomplete: `ServerManager.Installed`, `ServerManager.Start`, and `ServerManager.Stop` still branch on game type, so the supervisor is not yet game-neutral.
 - The UI is embedded from `cmd/hsm/web/*`; edits to the frontend must continue to be shipped in the application image, and cache keys must be bumped when static assets change.
 - Server identity is passed to APIs using `X-HSM-Server`. The frontend keeps selected-server state and uses asynchronous API calls, so selection changes must be treated as a concurrency boundary.
 - The README describes Hytale-specific behavior and legacy data migration. That behavior is a compatibility contract, not disposable scaffolding.
@@ -24,7 +24,7 @@ Do not store mutable per-server UI data globally in a way that survives selectio
 
 ### 2. Shared process supervisor
 
-The shared supervisor owns process creation, stdin/stdout/stderr, logs, start/stop/restart, crash state, exit code, install locks, and cancellation. It must not contain Hytale-only commands or configuration assumptions.
+The shared supervisor owns stdin/stdout/stderr pipes, logs, start/stop/restart orchestration, crash state, exit code, install locks, and cancellation. Game adapters choose the process specification and graceful-stop mechanism; the supervisor owns the mechanics and timeout fallback. The first code step is to remove the game-type branches from `Installed`, `Start`, and `Stop`, without moving the existing Hytale or Dragonwilds configuration/install implementations yet.
 
 All process launch operations must be built from validated adapter output. Never accept an arbitrary executable or working directory from browser input.
 
