@@ -24,10 +24,13 @@ const VIEW_CAPABILITY={console:'console',config:'fileManagement',mods:'mods',bac
 const CAPABILITY_LABELS=[['consoleCommands','console commands'],['playerList','the player list'],['mods','mods'],['backups','backups'],['deviceAuth','device login'],['gameUpdates','in-app game updates']];
 function listJoin(items){return items.length<2?items.join(''):items.slice(0,-1).join(', ')+' or '+items[items.length-1]}
 function gameLabel(id){return ({hytale:'Hytale','minecraft-java':'Minecraft Java','terraria':'Terraria','runescape-dragonwilds':'RuneScape: Dragonwilds'})[id]||'Unknown game'}
-function gameLogo(id){const files={'hytale':'hytale.svg','minecraft-java':'minecraft-java.svg','terraria':'terraria.svg','runescape-dragonwilds':'runescape-dragonwilds.svg'};const file=files[id]||files.hytale;return '<img src="/assets/games/'+file+'" alt="" loading="eager" decoding="async">'}
+// Square monogram for small icon slots; the game wordmarks are wide (about 3:1)
+// and only fit the wide tile on the Overview.
+function gameLogo(id){const marks={'hytale':'H','minecraft-java':'MC','terraria':'T','runescape-dragonwilds':'DW'};return '<span class="mono mono-'+esc(id||'unknown')+'">'+(marks[id]||'?')+'</span>'}
+function gameWordmark(id){const files={'hytale':'hytale.svg','minecraft-java':'minecraft-java.svg','terraria':'terraria.svg','runescape-dragonwilds':'runescape-dragonwilds.svg'};return files[id]?'<img src="/assets/games/'+files[id]+'" alt="" decoding="async">':gameLogo(id)}
 function statusDotClass(s){if(s?.state==='crashed')return'crashed';if(s?.state==='starting'||s?.state==='stopping'||s?.installBusy||s?.state==='installing')return'busy';if(s?.running)return'online';return''}
 async function boot(){const b=await api('/api/bootstrap',{serverId:null});state.configured=b.configured;if(!b.configured){showAuth(true);return}try{await api('/api/servers',{serverId:null});showApp()}catch{showAuth(false)}}
-function showAuth(setup){$('#app').classList.add('hidden');$('#auth').classList.remove('hidden');$('#auth-title').textContent=setup?'Create admin account':'Sign in';$('#auth-copy').textContent=setup?'Secure this server manager.':'Manage your Hytale servers.';$('#auth-submit').textContent=setup?'Create account':'Sign in';$('#auth-pass').autocomplete=setup?'new-password':'current-password';$('#auth-form').dataset.mode=setup?'setup':'login'}
+function showAuth(setup){$('#app').classList.add('hidden');$('#auth').classList.remove('hidden');$('#auth-title').textContent=setup?'Create admin account':'Sign in';$('#auth-copy').textContent=setup?'Secure this server manager.':'Manage your game servers on this host.';$('#auth-submit').textContent=setup?'Create account':'Sign in';$('#auth-pass').autocomplete=setup?'new-password':'current-password';$('#auth-form').dataset.mode=setup?'setup':'login'}
 async function showApp(){$('#auth').classList.add('hidden');$('#app').classList.remove('hidden');await loadServers(true);if(state.serverId)await loadSelected();startPolling();switchView(state.current);renderOnboarding()}
 function startPolling(){clearInterval(state.poll);state.poll=setInterval(pollTick,2000);clearInterval(state.playerPoll);state.playerPoll=setInterval(()=>{if(state.serverId&&serverCapabilities().playerList)refreshPlayers()},30000)}
 // One poll at a time: a slow response must not let ticks pile up and race.
@@ -48,11 +51,12 @@ function switchView(v){
   });
   $('#console-form')?.classList.toggle('hidden',!caps.consoleCommands);
   $('.players-panel')?.classList.toggle('hidden',!caps.playerList);
-  $('.stat-strip > div:nth-child(2)')?.classList.toggle('hidden',!caps.playerList);
+  $('#metric-players-row')?.classList.toggle('hidden',!caps.playerList);
+  $('#meta-players')?.classList.toggle('hidden',!caps.playerList);
   $$('[data-action="auth"]').forEach(el=>el.classList.toggle('hidden',!caps.deviceAuth));
   $('#setup-auth')?.classList.toggle('hidden',!caps.deviceAuth);
   $$('[data-action="backup"]').forEach(el=>el.classList.toggle('hidden',!caps.backups));
-  $$('[data-update]').forEach(el=>el.closest('.panel')?.classList.toggle('hidden',!caps.gameUpdates));
+  $$('[data-update]').forEach(el=>el.closest('.card')?.classList.toggle('hidden',!caps.gameUpdates));
   $('#config-editor-panel')?.classList.toggle('hidden',!caps.configFiles.length);
   syncConfigFileOptions(caps.configFiles);
   renderCapabilityNote(summary,caps,v);
@@ -71,15 +75,35 @@ function switchView(v){
   });
   const showTabs=!!state.serverId&&!['servers','app-settings'].includes(v);
   $('#server-tabs').classList.toggle('hidden',!showTabs);
-  const titles={servers:'Servers',dashboard:'Overview',console:'Console',config:'Files',mods:'Mods',backups:'Backups',setup:'Install',settings:'Server settings','app-settings':'Application settings'};
-  $('#view-title').textContent=titles[v]||'Servers';
   const global=v==='servers'||v==='app-settings';
-  $('#top-status').classList.toggle('hidden',global||!state.serverId);
-  $('#top-start').classList.toggle('hidden',global||!state.serverId);
-  $('#top-context').textContent=global?'':(summary?.serverName||'');
+  $('#global-head').classList.toggle('hidden',!global||(v==='servers'&&!state.servers.length));
+  $('#server-head').classList.toggle('hidden',global||!state.serverId);
+  $('#view-title').textContent=v==='app-settings'?'Panel Settings':'My Servers';
+  $('#view-subtitle').textContent=v==='app-settings'?'Application version, updates and security.':'Your game servers, status and controls in one place.';
+  $('#add-server-main').classList.toggle('hidden',v!=='servers');
+  $('#mobile-context').textContent=global?(v==='app-settings'?'Panel Settings':'My Servers'):(summary?.serverName||'Server');
+  setNavOpen(false);
   renderWorkspaceError();
   loadCurrent();
 }
+// Header identity comes from the server summary so it is correct immediately
+// after a switch, before the server's settings have loaded.
+function renderServerHead(){
+  const summary=selectedSummary();
+  if(!summary)return;
+  $('#server-name').textContent=summary.serverName;
+  for(const id of['server-game','hero-game'])$('#'+id).textContent=gameLabel(summary.gameType);
+  $('#server-game-icon').innerHTML=gameLogo(summary.gameType);$('#hero-game-icon').innerHTML=gameWordmark(summary.gameType);
+  $('#meta-port').textContent=`${serverProtocol(summary)} ${summary.port}`;
+  if(!state.players)$('#meta-players-value').textContent='Players unknown';
+  if(!['servers','app-settings'].includes(state.current))$('#mobile-context').textContent=summary.serverName;
+}
+// Mobile navigation drawer.
+function setNavOpen(open){$('#app').classList.toggle('nav-open',open);$('#sidebar-scrim').hidden=!open;$('#nav-toggle').setAttribute('aria-expanded',String(open))}
+$('#nav-toggle').addEventListener('click',()=>setNavOpen(!$('#app').classList.contains('nav-open')));
+$('#sidebar-scrim').addEventListener('click',()=>setNavOpen(false));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')setNavOpen(false)});
+$('#back-to-servers').addEventListener('click',()=>switchView('servers'));
 function renderCapabilityNote(summary,caps,v){
   const note=$('#game-capability-note');
   if(!note)return;
@@ -142,9 +166,14 @@ async function loadServers(initial=false){
     }
   }
   renderServerList();renderFleet();renderFleetStats();populateCloneSources();renderOnboarding();
-  if(initial)$('#top-context').textContent=selectedSummary()?.serverName||'';
+  renderServerHead();
 }
-function renderFleetStats(){const online=state.servers.filter(s=>s.running).length;$('#fleet-online').textContent=online;$('#fleet-total').textContent=state.servers.length;const installed=state.servers.filter(s=>s.installed).length;$('#fleet-summary').innerHTML=`<div><strong>${state.servers.length}</strong><span>Instances</span></div><div><strong>${online}</strong><span>Online</span></div><div><strong>${installed}</strong><span>Installed</span></div><div><strong>${state.servers.length-online}</strong><span>Stopped</span></div>`}
+function renderFleetStats(){
+  const online=state.servers.filter(s=>s.running).length,installed=state.servers.filter(s=>s.installed).length;
+  $('#fleet-online').textContent=online;$('#fleet-total').textContent=state.servers.length;
+  const stat=(icon,tone,value,label)=>`<div class="stat"><span class="stat-icon ${tone}"><svg class="icon"><use href="#i-${icon}"/></svg></span><div><strong>${value}</strong><span>${label}</span></div></div>`;
+  $('#fleet-summary').innerHTML=stat('servers','',state.servers.length,'Servers')+stat('play','green',online,'Online')+stat('check','muted',installed,'Installed')+stat('stop','amber',state.servers.length-online,'Stopped');
+}
 function renderServerList(){
   const el=$('#server-list');
   const groups=new Map();
@@ -211,8 +240,26 @@ async function waitForAppVersion(target){
   $('#app-update-apply').disabled=true;
 }
 
-function renderOnboarding(){const empty=state.servers.length===0;$('#app').classList.toggle('onboarding',empty);$('#first-run')?.classList.toggle('hidden',!empty);$('#fleet-content')?.classList.toggle('hidden',empty);$('#server-list')?.classList.toggle('hidden',empty);$('#add-server-side')?.classList.toggle('hidden',empty);if(empty){$('#view-title').textContent='Welcome';$('#top-context').textContent='';$('#top-status').classList.add('hidden');$('#top-start').classList.add('hidden')}else if(state.current==='servers')$('#view-title').textContent='Servers'}
-function renderFleet(){if(!$('#fleet-grid'))return;const grid=$('#fleet-grid');if(!state.servers.length){grid.innerHTML='<div class="empty-state" style="padding:16px">No servers configured.</div>';return}grid.innerHTML=state.servers.map(s=>{const transitioning=s.state==='starting'||s.state==='stopping';const action=s.running?'stop':s.installed?'start':'install';const actionLabel=s.state==='starting'?'Starting…':s.state==='stopping'?'Stopping…':s.installBusy?'Installing…':s.running?'Stop':s.installed?'Start':'Install';return `<article class="fleet-card ${s.id===state.serverId?'selected':''}"><button class="fleet-open" data-fleet-open="${esc(s.id)}"><div class="fleet-name"><span class="game-icon game-icon-${esc(s.gameType)}" aria-hidden="true">${gameLogo(s.gameType)}</span><strong>${esc(s.serverName)}${s.primary?'<span class="primary-tag">primary</span>':''}</strong><small>${esc(gameLabel(s.gameType))} · ${esc(serverProtocol(s))} ${s.port}</small></div><div class="fleet-cell fleet-status"><span class="dot ${statusDotClass(s)}"></span>${esc(statusLabel(s))}</div><div class="fleet-cell fleet-address">${esc(s.publicHost||location.hostname)}:${s.port}</div><div class="fleet-cell fleet-uptime">${s.running?fmtUptime(s.uptimeSeconds):'—'}</div><div class="fleet-cell fleet-files">${s.installed?'Ready':'Missing'}</div></button><div class="fleet-actions"><button class="btn small ${s.running?'':'success'}" data-fleet-action="${action}" data-id="${esc(s.id)}" ${transitioning||s.installBusy?'disabled':''}>${actionLabel}</button><button class="btn small" data-fleet-open="${esc(s.id)}">Open</button></div></article>`}).join('');$$('[data-fleet-open]').forEach(b=>b.addEventListener('click',()=>selectServer(b.dataset.fleetOpen)));$$('[data-fleet-action]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();fleetAction(b.dataset.id,b.dataset.fleetAction)}))}
+function renderOnboarding(){const empty=state.servers.length===0;$('#app').classList.toggle('onboarding',empty);$('#first-run')?.classList.toggle('hidden',!empty);$('#fleet-content')?.classList.toggle('hidden',empty);$('.side-servers')?.classList.toggle('hidden',empty);if(state.current==='servers')$('#global-head').classList.toggle('hidden',empty)}
+function renderFleet(){
+  const grid=$('#fleet-grid');if(!grid)return;
+  if(!state.servers.length){grid.innerHTML='<div class="empty-state">No servers configured.</div>';return}
+  grid.innerHTML=state.servers.map(s=>{
+    const transitioning=s.state==='starting'||s.state==='stopping';
+    const action=s.running?'stop':s.installed?'start':'install';
+    const actionLabel=s.state==='starting'?'Starting…':s.state==='stopping'?'Stopping…':s.installBusy?'Installing…':s.running?'Stop':s.installed?'Start':'Install';
+    const actionClass=s.running?'danger':s.installed?'success':'primary';
+    return `<article class="server-card ${s.id===state.serverId?'selected':''}">
+      <button type="button" class="server-card-open" data-fleet-open="${esc(s.id)}" aria-label="Open ${esc(s.serverName)}">
+        <span class="server-card-top"><span class="game-icon large" aria-hidden="true">${gameLogo(s.gameType)}</span><span class="server-card-title"><strong>${esc(s.serverName)}${s.primary?'<span class="primary-tag">primary</span>':''}</strong><small>${esc(gameLabel(s.gameType))}</small></span></span>
+        <span class="status-badge ${statusDotClass(s)}"><span class="dot ${statusDotClass(s)}"></span>${esc(statusLabel(s))}</span>
+        <span class="server-card-meta"><span><span>Address</span><b>${esc(s.publicHost||location.hostname)}:${s.port}</b></span><span><span>Protocol</span><b>${esc(serverProtocol(s))}</b></span><span><span>Uptime</span><b>${s.running?fmtUptime(s.uptimeSeconds):'—'}</b></span><span><span>Files</span><b>${s.installed?'Ready':'Not installed'}</b></span></span>
+      </button>
+      <div class="server-card-actions"><button type="button" class="btn small ${actionClass}" data-fleet-action="${action}" data-id="${esc(s.id)}" ${transitioning||s.installBusy?'disabled':''}>${actionLabel}</button><button type="button" class="btn small" data-fleet-open="${esc(s.id)}">Manage</button></div>
+    </article>`}).join('');
+  $$('[data-fleet-open]').forEach(b=>b.addEventListener('click',()=>selectServer(b.dataset.fleetOpen)));
+  $$('[data-fleet-action]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();fleetAction(b.dataset.id,b.dataset.fleetAction)}));
+}
 // The only place the selected server changes. Everything that belongs to the
 // previous server (requests, live stream, cached data and rendered values) is
 // dropped before anything for the next server is requested.
@@ -238,7 +285,8 @@ function setSelectedServer(id){
 function resetWorkspaceView(){
   const summary=selectedSummary();
   $('#server-name').textContent=summary?.serverName||'Loading server…';
-  $('#top-context').textContent=summary?.serverName||'';
+  renderServerHead();
+  $('#hero-badge').className='status-badge';
   $('#top-status').innerHTML='<span class="dot"></span><span>Loading…</span>';
   $('#console-output').innerHTML='';
   $('#mini-log').innerHTML='<span class="muted">Loading server output…</span>';
@@ -271,7 +319,7 @@ function resetWorkspaceView(){
   $('#hero-state').textContent='LOADING';
   $('#hero-detail').textContent='Loading details for '+(summary?.serverName||'the selected server')+'…';
   $('#hero-detail').classList.remove('hidden');
-  for(const id of['start-btn','stop-btn','restart-btn','top-start'])$('#'+id).disabled=true;
+  for(const id of['start-btn','stop-btn','restart-btn'])$('#'+id).disabled=true;
   renderWorkspaceError();
 }
 async function selectServer(id){
@@ -302,13 +350,83 @@ async function loadSelected(){
 }
 async function fleetAction(id,action){if(action==='install'){await selectServer(id);switchView('setup');return}const server=state.servers.find(s=>s.id===id);if(action==='stop'&&!confirm(`Stop ${server?.serverName||'this server'}? Players may be disconnected.`))return;try{await api(`/api/servers/${encodeURIComponent(id)}/${action}`,{method:'POST',serverId:id});toast(`${action==='start'?'Start':'Stop'} requested`);setTimeout(async()=>{await loadServers(false);if(id===state.serverId)await refreshStatus()},450)}catch(e){toast(e.message,true)}}
 async function refreshPlayers(ctx=selectionContext()){if(!ctx.id||!serverCapabilities().playerList)return;const button=$('#players-refresh');if(button)button.disabled=true;try{const players=await scopedApi(ctx,'/api/players');if(!ctx.current())return;state.players=players;renderPlayers()}catch(e){if(!ctx.current())return;state.players={known:false,players:[],message:e.message};renderPlayers()}finally{if(button&&ctx.current())button.disabled=false}}
-function renderPlayers(){const p=state.players;if(!p)return;$('#metric-players').textContent=p.known?(p.count+' / '+p.maxPlayers):'Unknown';$('#players-message').textContent=p.message||(p.known?'Live player list':'Player count could not be verified');$('#players-list').innerHTML=p.known?(p.players&&p.players.length?p.players.map(name=>'<span class="player-chip">'+esc(name)+'</span>').join(''):'<span class="muted">No players online.</span>'):'<span class="muted">The server response was not recognized. Check Console for the /who output.</span>'}
+function renderPlayers(){const p=state.players;if(!p)return;$('#metric-players').textContent=p.known?(p.count+' / '+p.maxPlayers):'Unknown';$('#meta-players-value').textContent=p.known?(p.count+' / '+p.maxPlayers+' players'):'Players unknown';$('#players-message').textContent=p.message||(p.known?'Live player list':'Player count could not be verified');$('#players-list').innerHTML=p.known?(p.players&&p.players.length?p.players.map(name=>'<span class="player-chip">'+esc(name)+'</span>').join(''):'<span class="muted">No players online.</span>'):'<span class="muted">The server response was not recognized. Check Console for the /who output.</span>'}
 $('#players-refresh').addEventListener('click',refreshPlayers);
 async function refreshStatus(ctx=selectionContext(),quiet=true){if(!ctx.id)return;try{const status=await scopedApi(ctx,'/api/status');if(!ctx.current())return;state.status=status;renderStatus()}catch(e){if(!quiet&&ctx.current())throw e}}
 async function refreshResources(ctx=selectionContext()){if(!ctx.id)return;try{const resources=await scopedApi(ctx,'/api/resources');if(!ctx.current())return;state.resources=resources;renderResources()}catch{}}
-function renderResources(){const r=state.resources;if(!r)return;const cpu=$('#resource-cpu-value'),cpuBar=$('#resource-cpu-bar'),mem=$('#resource-memory-value'),memBar=$('#resource-memory-bar'),disk=$('#resource-disk-value'),diskBar=$('#resource-disk-bar');cpu.textContent=r.cpuAvailable?r.cpuPercent.toFixed(1)+'%':'Unavailable';cpuBar.style.width=r.cpuAvailable?Math.min(100,Math.max(0,r.cpuPercent))+'%':'0%';cpuBar.classList.toggle('warning',r.cpuAvailable&&r.cpuPercent>=80);cpuBar.classList.toggle('critical',r.cpuAvailable&&r.cpuPercent>=95);mem.textContent=r.memoryAvailable?fmtBytes(r.containerMemoryBytes)+(r.containerMemoryLimitBytes>0?' / '+fmtBytes(r.containerMemoryLimitBytes):' used'):'Unavailable';const mp=r.memoryAvailable&&r.containerMemoryLimitBytes>0?Math.min(100,r.containerMemoryBytes/r.containerMemoryLimitBytes*100):0;memBar.style.width=mp+'%';memBar.classList.toggle('warning',mp>=80);memBar.classList.toggle('critical',mp>=95);disk.textContent=r.diskAvailable?fmtBytes(r.diskUsedBytes)+' / '+fmtBytes(r.diskTotalBytes)+' · '+fmtBytes(r.diskFreeBytes)+' free':'Unavailable';const dp=r.diskAvailable&&r.diskTotalBytes>0?Math.min(100,r.diskUsedBytes/r.diskTotalBytes*100):0;diskBar.style.width=dp+'%';diskBar.classList.toggle('warning',dp>=80);diskBar.classList.toggle('critical',dp>=95);$('#resource-sampled').textContent=r.sampledAt?'Updated '+fmtTime(r.sampledAt):'Waiting for metrics';}
-function renderStatus(){const s=state.status,on=s?.running,busy=s?.installBusy,transitioning=s?.state==='starting'||s?.state==='stopping',label=statusLabel(s);$('#top-status').innerHTML=`<span class="dot ${statusDotClass(s)}"></span><span>${esc(label)}</span>`;$('#hero-dot').className='dot large '+statusDotClass(s);$('#hero-state').textContent=label.toUpperCase();const detail=s?.state==='crashed'?`Process exited with code ${s.exitCode}${s.lastExitAt?' at '+fmtDate(s.lastExitAt):''}. Check Recent output for the error.`:s?.state==='starting'?'The server process has launched; waiting for it to finish initializing.':s?.state==='stopping'?'A graceful shutdown was requested. Waiting for the process to exit.':s?.state==='not-installed'?'Install server files to start this instance.':s?.lastExitAt?`Last exit: ${fmtDate(s.lastExitAt)}.`:'';$('#hero-detail').textContent=detail;$('#hero-detail').classList.toggle('hidden',!detail);$('#metric-uptime').textContent=fmtUptime(s?.uptimeSeconds);$('#metric-memory').textContent=fmtBytes(s?.memoryBytes);$('#metric-memory-limit').textContent=fmtBytes(s?.memoryLimitBytes);$('#metric-installed').textContent=s?.installed?'Ready':'Missing';$('#memory-warning').classList.toggle('hidden',s?.meetsMinimumMemory!==false);$('#start-btn').disabled=on||busy||!s?.installed;$('#top-start').disabled=on||busy||!s?.installed;$('#stop-btn').disabled=!on||s?.state==='stopping';$('#restart-btn').disabled=!on||transitioning||busy;$('#top-start').textContent=s?.state==='starting'?'Starting…':s?.state==='stopping'?'Stopping…':on?'Running':s?.installed?'Start':'Install';if(state.settings){$('#metric-port').textContent=state.settings.port;updateAddress()}if(state.current==='config')setConfigEditState(!on)}
-async function loadSettings(ctx=selectionContext()){if(!ctx.id)return;const settings=await scopedApi(ctx,'/api/settings');if(!ctx.current())return;state.settings=settings;const s=settings;const protocol=serverProtocol(selectedSummary());$('#server-name').textContent=s.serverName;$('#top-context').textContent=s.serverName;$('#set-name').value=s.serverName;$('#set-host').value=s.publicHost||'';$('#set-port').value=s.port;$('#set-port').min=s.portMin||1;$('#set-port').max=s.portMax||65535;$('#port-help').textContent='Published '+protocol+' range: '+(s.portMin||1)+'–'+(s.portMax||65535)+'. Each server must use a unique port.';const minecraft=s.gameType==='minecraft-java';$('#set-mode').querySelectorAll('option').forEach(o=>{const mcMode=o.value==='Survival'||o.value==='Spectator';o.disabled=mcMode&&!minecraft;o.hidden=mcMode&&!minecraft});$('#set-mode').value=s.gameMode||(minecraft?'Survival':'Adventure');$('#set-players').value=s.maxPlayers||20;$('#set-motd').value=s.motd||'';$('#set-password').value=s.password||'';$('#set-whitelist').checked=!!s.whitelistEnabled;$('#set-xms').value=s.memoryMin;$('#set-xmx').value=s.memoryMax;$('#set-args').value=s.extraArgs||'';$('#set-autostart').checked=s.autoStart;
+function renderResources(){
+  const r=state.resources;if(!r)return;
+  $('#resource-cpu-value').textContent=r.cpuAvailable?r.cpuPercent.toFixed(1)+'%':'Unavailable';
+  $('#resource-memory-value').textContent=r.memoryAvailable?fmtBytes(r.containerMemoryBytes)+(r.containerMemoryLimitBytes>0?' / '+fmtBytes(r.containerMemoryLimitBytes):' used'):'Unavailable';
+  $('#resource-disk-value').textContent=r.diskAvailable?fmtBytes(r.diskUsedBytes)+' / '+fmtBytes(r.diskTotalBytes):'Unavailable';
+  $('#resource-sampled').textContent=r.sampledAt?'Updated '+fmtTime(r.sampledAt):'Waiting for metrics';
+  // Container-wide samples, so the history is kept across server switches.
+  const key=r.sampledAt||Date.now();
+  if(usage.history[usage.history.length-1]?.key!==key){
+    usage.history.push({key,time:r.sampledAt||new Date().toISOString(),
+      cpu:r.cpuAvailable?Math.min(100,Math.max(0,r.cpuPercent)):null,
+      memory:r.memoryAvailable&&r.containerMemoryLimitBytes>0?Math.min(100,r.containerMemoryBytes/r.containerMemoryLimitBytes*100):null,
+      memoryBytes:r.containerMemoryBytes,disk:r.diskAvailable&&r.diskTotalBytes>0?r.diskUsedBytes/r.diskTotalBytes*100:null,diskBytes:r.diskUsedBytes});
+    if(usage.history.length>USAGE_POINTS)usage.history.shift();
+  }
+  renderUsageChart();
+}
+// Usage chart: an SVG area chart of real samples, percentage on the y axis.
+const USAGE_POINTS=90,usage={metric:'cpu',history:[],hover:null};
+const USAGE_W=600,USAGE_H=220,USAGE_LEFT=34,USAGE_BOTTOM=200;
+function usagePoints(){const pts=[];usage.history.forEach((h,i)=>{const v=h[usage.metric];if(v==null)return;pts.push({i,v,h,x:USAGE_LEFT+(USAGE_W-USAGE_LEFT)*(USAGE_POINTS<=1?0:(i+USAGE_POINTS-usage.history.length)/(USAGE_POINTS-1)),y:USAGE_BOTTOM-(USAGE_BOTTOM-10)*v/100})});return pts}
+function renderUsageChart(){
+  const svg=$('#usage-svg');if(!svg)return;
+  const grid=[0,25,50,75,100].map(v=>{const y=USAGE_BOTTOM-(USAGE_BOTTOM-10)*v/100;return `<line class="usage-grid" x1="${USAGE_LEFT}" x2="${USAGE_W}" y1="${y}" y2="${y}"/><text class="usage-label" x="0" y="${y+4}">${v}%</text>`}).join('');
+  const pts=usagePoints();
+  let body='';
+  if(pts.length<2){body=`<text class="usage-empty" x="${(USAGE_W+USAGE_LEFT)/2}" y="110" text-anchor="middle">${usage.metric==='memory'&&state.resources&&!(state.resources.containerMemoryLimitBytes>0)?'No container memory limit reported':'Collecting samples…'}</text>`}
+  else{
+    const line=pts.map((p,i)=>(i?'L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' ');
+    body=`<path class="usage-area" d="${line} L${pts[pts.length-1].x.toFixed(1)} ${USAGE_BOTTOM} L${pts[0].x.toFixed(1)} ${USAGE_BOTTOM} Z"/><path class="usage-line" d="${line}"/>`;
+    const hp=usage.hover!=null&&pts.find(p=>p.i===usage.hover);
+    if(hp)body+=`<line class="usage-cursor" x1="${hp.x}" x2="${hp.x}" y1="10" y2="${USAGE_BOTTOM}"/><circle cx="${hp.x}" cy="${hp.y}" r="5" fill="#fff" stroke="#4c8dff" stroke-width="3"/>`;
+  }
+  svg.innerHTML=`<defs><linearGradient id="usage-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4c8dff" stop-opacity=".35"/><stop offset="1" stop-color="#4c8dff" stop-opacity="0"/></linearGradient></defs>${grid}${body}`;
+}
+function updateUsageTooltip(clientX){
+  const chart=$('#usage-chart'),tip=$('#usage-tooltip'),pts=usagePoints();
+  if(!pts.length){tip.classList.add('hidden');return}
+  const rect=chart.getBoundingClientRect(),x=(clientX-rect.left)/rect.width*USAGE_W;
+  const p=pts.reduce((a,b)=>Math.abs(b.x-x)<Math.abs(a.x-x)?b:a);
+  usage.hover=p.i;renderUsageChart();
+  const names={cpu:'CPU usage',memory:'RAM usage',disk:'Storage used'};
+  const extra=usage.metric==='memory'?fmtBytes(p.h.memoryBytes):usage.metric==='disk'?fmtBytes(p.h.diskBytes):'';
+  tip.innerHTML=`<span class="muted">${names[usage.metric]} · ${esc(fmtTime(p.h.time))}</span><strong>${p.v.toFixed(1)}%</strong>${extra?`<span class="muted">${esc(extra)}</span>`:''}`;
+  tip.style.left=Math.min(Math.max(p.x/USAGE_W*rect.width,70),rect.width-70)+'px';
+  tip.classList.remove('hidden');
+}
+$('#usage-chart').addEventListener('pointermove',e=>updateUsageTooltip(e.clientX));
+$('#usage-chart').addEventListener('pointerleave',()=>{usage.hover=null;$('#usage-tooltip').classList.add('hidden');renderUsageChart()});
+$$('[data-usage]').forEach(b=>b.addEventListener('click',()=>{usage.metric=b.dataset.usage;usage.hover=null;$('#usage-tooltip').classList.add('hidden');$$('[data-usage]').forEach(x=>{const on=x===b;x.classList.toggle('active',on);x.setAttribute('aria-selected',String(on))});renderUsageChart()}));
+function renderStatus(){
+  const s=state.status,on=!!s?.running,busy=!!s?.installBusy,transitioning=s?.state==='starting'||s?.state==='stopping',label=statusLabel(s),tone=statusDotClass(s);
+  $('#top-status').innerHTML=`<span class="dot ${tone}"></span><span>${esc(label)}</span>`;
+  $('#hero-dot').className='dot '+tone;
+  $('#hero-badge').className='status-badge '+tone;
+  $('#hero-state').textContent=label;
+  const detail=s?.state==='crashed'?`Process exited with code ${s.exitCode}${s.lastExitAt?' at '+fmtDate(s.lastExitAt):''}. Check the console for the error.`:s?.state==='starting'?'The server process has launched; waiting for it to finish initializing.':s?.state==='stopping'?'A graceful shutdown was requested. Waiting for the process to exit.':s?.state==='not-installed'?'Install server files to start this server.':s?.lastExitAt?`Last exit: ${fmtDate(s.lastExitAt)}.`:'';
+  $('#hero-detail').textContent=detail;$('#hero-detail').classList.toggle('hidden',!detail);
+  $('#metric-uptime').textContent=fmtUptime(s?.uptimeSeconds);
+  $('#metric-memory').textContent=fmtBytes(s?.memoryBytes);
+  $('#metric-memory-limit').textContent=fmtBytes(s?.memoryLimitBytes);
+  $('#metric-installed').textContent=s?.installed?'Ready':'Not installed';
+  $('#memory-warning').classList.toggle('hidden',s?.meetsMinimumMemory!==false);
+  // One primary lifecycle button: Start while stopped, Stop while running.
+  const start=$('#start-btn'),stop=$('#stop-btn'),restart=$('#restart-btn');
+  start.classList.toggle('hidden',on);stop.classList.toggle('hidden',!on);restart.classList.toggle('hidden',!on);
+  start.disabled=on||busy||!s?.installed;stop.disabled=!on||s?.state==='stopping';restart.disabled=!on||transitioning||busy;
+  start.lastChild.textContent=s&&!s.installed?'Install first':'Start Server';
+  stop.lastChild.textContent=s?.state==='stopping'?'Stopping…':'Stop Server';
+  if(state.settings){$('#metric-port').textContent=state.settings.port;updateAddress()}
+  if(state.current==='config')setConfigEditState(!on);
+}
+async function loadSettings(ctx=selectionContext()){if(!ctx.id)return;const settings=await scopedApi(ctx,'/api/settings');if(!ctx.current())return;state.settings=settings;const s=settings;const protocol=serverProtocol(selectedSummary());$('#server-name').textContent=s.serverName;$('#set-name').value=s.serverName;$('#set-host').value=s.publicHost||'';$('#set-port').value=s.port;$('#set-port').min=s.portMin||1;$('#set-port').max=s.portMax||65535;$('#port-help').textContent='Published '+protocol+' range: '+(s.portMin||1)+'–'+(s.portMax||65535)+'. Each server must use a unique port.';const minecraft=s.gameType==='minecraft-java';$('#set-mode').querySelectorAll('option').forEach(o=>{const mcMode=o.value==='Survival'||o.value==='Spectator';o.disabled=mcMode&&!minecraft;o.hidden=mcMode&&!minecraft});$('#set-mode').value=s.gameMode||(minecraft?'Survival':'Adventure');$('#set-players').value=s.maxPlayers||20;$('#set-motd').value=s.motd||'';$('#set-password').value=s.password||'';$('#set-whitelist').checked=!!s.whitelistEnabled;$('#set-xms').value=s.memoryMin;$('#set-xmx').value=s.memoryMax;$('#set-args').value=s.extraArgs||'';$('#set-autostart').checked=s.autoStart;
 const dragon=s.gameType==='runescape-dragonwilds';
 $('#dragonwilds-settings').classList.toggle('hidden',!dragon);
 $('#hytale-settings-note').classList.toggle('hidden',dragon);
@@ -322,7 +440,7 @@ $('#set-dragonwilds-password').value=s.dragonwildsWorldPassword||'';
 ['set-dragonwilds-owner','set-dragonwilds-world','set-dragonwilds-admin','set-dragonwilds-password'].forEach(id=>{const input=$('#'+id);input.disabled=!dragon;input.required=dragon&&id!=='set-dragonwilds-password'});$('#metric-port').textContent=s.port;const sel=selectedSummary();$('#delete-server').disabled=!sel||!!sel.running;$('#delete-server').title=sel?.running?'Stop this server before deleting it.':'';updateAddress()}
 function updateAddress(){const s=state.settings;if(!s)return;$('#connect-address').textContent=`${s.publicHost||location.hostname}:${s.port}`}
 $('#copy-address').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('#connect-address').textContent);toast('Address copied')}catch{toast('Could not copy address',true)}});
-for(const id of['start-btn','top-start','setup-start'])$('#'+id).addEventListener('click',()=>serverAction('start'));$('#stop-btn').addEventListener('click',()=>serverAction('stop'));$('#restart-btn').addEventListener('click',()=>serverAction('restart'));
+for(const id of['start-btn','setup-start'])$('#'+id).addEventListener('click',()=>serverAction('start'));$('#stop-btn').addEventListener('click',()=>serverAction('stop'));$('#restart-btn').addEventListener('click',()=>serverAction('restart'));
 // Lifecycle actions name the server in the URL, captured before any confirmation.
 async function serverAction(action){const id=state.serverId;if(!id)return;if(action==='start'&&state.status&&!state.status.installed){switchView('setup');return}const name=selectedSummary()?.serverName||'this server';if(action==='stop'&&!confirm(`Stop ${name}? Players may be disconnected.`))return;if(action==='restart'&&!confirm(`Restart ${name}? Players will be disconnected briefly.`))return;try{await api(`/api/servers/${encodeURIComponent(id)}/${action}`,{method:'POST',serverId:id});toast(`${action[0].toUpperCase()+action.slice(1)} requested for ${name}`);setTimeout(async()=>{await loadServers(false);if(id===state.serverId)await refreshStatus()},450)}catch(e){toast(e.message,true)}}
 const logKey=x=>x.time+'\u0000'+x.source+'\u0000'+x.line;
@@ -330,7 +448,7 @@ const logKey=x=>x.time+'\u0000'+x.source+'\u0000'+x.line;
 // merged without duplicates, so reconnecting never drops or repeats output.
 async function loadLogs(ctx=selectionContext()){if(!ctx.id)return;const buffer=[];state.liveLogBuffers.add(buffer);try{const logs=await scopedApi(ctx,'/api/logs');if(!ctx.current())return;const seen=new Set(logs.slice(-500).map(logKey));state.logs=logs.concat(buffer.filter(x=>!seen.has(logKey(x)))).slice(-2500);renderLogs()}catch{}finally{state.liveLogBuffers.delete(buffer)}}
 function renderLogs(){const out=$('#console-output');out.removeAttribute('data-cleared');out.innerHTML=state.logs.map(logHTML).join('');if($('#auto-scroll').checked)out.scrollTop=out.scrollHeight;renderMiniLog()}
-function renderMiniLog(){const recent=state.logs.slice(-8);$('#mini-log').innerHTML=recent.map(x=>`<div class="mini-line ${esc(x.source)}"><span class="time">${fmtTime(x.time)}</span>${esc(x.line)}</div>`).join('')||'<span class="muted">No server output yet.</span>'}
+function renderMiniLog(){const recent=state.logs.slice(-40);$('#mini-log').innerHTML=recent.map(x=>`<div class="mini-line ${esc(x.source)}"><span class="time">${fmtTime(x.time)}</span>${esc(x.line)}</div>`).join('')||'<span class="muted">No server output yet.</span>';const mini=$('#mini-log');mini.scrollTop=mini.scrollHeight}
 function logHTML(x){return`<div class="log-line ${esc(x.source)}"><span class="stamp">${fmtTime(x.time)}</span><span class="source">${esc(x.source)}</span>${esc(x.line)}</div>`}
 function disconnectEvents(){state.events?.close();state.events=null;state.eventsOpen=false}
 function connectEvents(ctx=selectionContext()){
@@ -417,7 +535,7 @@ function syncGameSpecificFields(){
   $('#new-port-help').textContent='Leave blank to assign the next available port in the published range.';
  }
 }
-function renderGameChoices(){const el=$('#game-choice-list');if(!el||!state.games.length)return;el.innerHTML=state.games.map(g=>{const ready=!!g.available;const selected=state.selectedGame===g.id&&ready;const detail=ready?'Dedicated server · Ready to configure':'Planned · Not available yet';return '<button type="button" class="game-choice'+(selected?' selected':'')+'" data-game-choice="'+esc(g.id)+'" '+(ready?'':'disabled')+'><span class="game-icon">'+esc(g.name.slice(0,1))+'</span><span><strong>'+esc(g.name)+'</strong><small>'+esc(detail)+'</small></span><span class="choice-check">'+(selected?'✓':'')+'</span></button>'}).join('');$$('[data-game-choice]:not(:disabled)').forEach(b=>b.addEventListener('click',()=>{state.selectedGame=b.dataset.gameChoice;syncGameSpecificFields();populateCloneSources();renderGameChoices()}))}
+function renderGameChoices(){const el=$('#game-choice-list');if(!el||!state.games.length)return;el.innerHTML=state.games.map(g=>{const ready=!!g.available;const selected=state.selectedGame===g.id&&ready;const detail=ready?'Dedicated server · Ready to configure':'Planned · Not available yet';return '<button type="button" class="game-choice'+(selected?' selected':'')+'" data-game-choice="'+esc(g.id)+'" '+(ready?'':'disabled')+'><span class="game-icon">'+gameLogo(g.id)+'</span><span><strong>'+esc(g.name)+'</strong><small>'+esc(detail)+'</small></span><span class="choice-check">'+(selected?'✓':'')+'</span></button>'}).join('');$$('[data-game-choice]:not(:disabled)').forEach(b=>b.addEventListener('click',()=>{state.selectedGame=b.dataset.gameChoice;syncGameSpecificFields();populateCloneSources();renderGameChoices()}))}
 async function loadGameChoices(){try{const data=await api('/api/games');state.games=data.games||[];if(!state.games.some(g=>g.id===state.selectedGame&&g.available))state.selectedGame=state.games.find(g=>g.available)?.id||'hytale';renderGameChoices()}catch(e){toast('Could not load game catalog: '+e.message,true)}}
 function openServerDialog(){wizardStep=0;state.selectedGame='hytale';setWizardStep(0);loadGameChoices();$('#new-server-name').value=state.servers.length?'New Hytale Server':'My Hytale Server';$('#new-server-port').value='';$('#new-server-host').value='';$('#new-server-mode').value='Adventure';$('#new-server-players').value=20;$('#new-server-motd').value='Welcome to your Hytale server!';$('#new-server-password').value='';$('#new-server-whitelist').checked=false;$('#new-server-xms').value='2G';$('#new-server-xmx').value='4G';$('#new-server-backup').value=30;$('#new-server-autostart').checked=false;$('#new-minecraft-version').value='latest';$('#new-minecraft-eula').checked=false;$('#new-dragonwilds-owner').value='';$('#new-dragonwilds-world').value='Dragonwilds World';$('#new-dragonwilds-admin').value='';$('#new-dragonwilds-password').value='';syncGameSpecificFields();const ports=state.settings||{};$('#new-port-help').textContent=ports.portMin?'Leave blank for the next available port in '+ports.portMin+'–'+ports.portMax+'.':'Leave blank for the next available published port.';populateCloneSources();dialog.showModal()}
 function closeServerDialog(){dialog.close()}$('#add-server-side').addEventListener('click',openServerDialog);$('#add-server-main').addEventListener('click',openServerDialog);$('#first-create').addEventListener('click',openServerDialog);$('#cancel-server-dialog').addEventListener('click',closeServerDialog);$('#wizard-back').addEventListener('click',()=>setWizardStep(wizardStep-1));$('#wizard-next').addEventListener('click',()=>{if(wizardStep===1){const name=$('#new-server-name').value.trim();if(name.length<2||name.length>64){toast('Server name must be between 2 and 64 characters',true);return}const p=$('#new-server-port').value;if(p&&(+p<1||+p>65535)){toast('Enter a valid game port',true);return}}if(wizardStep===2){const players=+$('#new-server-players').value;if(players<1||players>(state.selectedGame==='runescape-dragonwilds'?6:1000)){toast(state.selectedGame==='runescape-dragonwilds'?'Dragonwilds supports up to 6 players':'Maximum players must be between 1 and 1000',true);return}if(state.selectedGame==='minecraft-java'){if(!$('#new-minecraft-eula').checked){toast('Accept the Minecraft EULA before continuing',true);return}const version=$('#new-minecraft-version').value.trim();if(version.length>32||/[\\r\\n\\x00]/.test(version)){toast('Enter a valid Minecraft version or latest',true);return}}if(state.selectedGame==='runescape-dragonwilds'){if(!$('#new-dragonwilds-owner').value.trim()){toast('Enter your Dragonwilds Owner ID',true);return}if(!$('#new-dragonwilds-admin').value){toast('Set a Dragonwilds admin password',true);return}}}setWizardStep(wizardStep+1)});

@@ -56,7 +56,7 @@ installers and lifecycles. All of these are backed by real endpoints and unit te
 - The CasaOS compose mounts `/var/run/docker.sock` for the updater, which is effectively host root. This is documented but significant.
 - Backups and snapshots are Hytale-path specific (`game/Server/...`). Minecraft has no backups yet.
 - The Go module path is `github.com/example/...`, which does not match the repository.
-- Sidebar nav icons overlap the "All servers" and "Application settings" labels (visual only).
+- ~~Sidebar nav icons overlap the navigation labels~~ (resolved by the panel redesign that followed this milestone).
 
 ## 5. Milestone 1 changes (this branch)
 
@@ -78,7 +78,6 @@ installers and lifecycles. All of these are backed by real endpoints and unit te
 | P2 | Redact passwords from `GET /api/settings` (write-only fields) | — | Settings round-trip preserves secrets without exposing them |
 | P3 | Minecraft: generic snapshot backups, structured `server.properties` editor, `list` player query | Adapter capabilities | Phase 4 exit criteria in the product manifest |
 | P3 | Terraria adapter (vanilla) | Adapter cleanup | Phase 5 exit criteria |
-| P4 | Sidebar nav icon overlap, other visual polish | — | Desktop/mobile screenshots clean |
 
 ## 7. Milestone 1 test plan and results
 
