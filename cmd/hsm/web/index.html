@@ -225,6 +225,10 @@
           <div class="setup-row"><div class="step-index">2</div><div><h4>Existing game.zip</h4><p>Import a server bundle already placed in this instance's imports directory.</p></div><div class="setup-buttons"><button class="btn" id="import-local">Import game.zip</button></div></div>
           <div class="setup-row"><div class="step-index">3</div><div><h4>First start</h4><p>Start the server, then authenticate from the Console using the device code.</p></div><div class="setup-buttons"><button class="btn success" id="setup-start">Start</button><button class="btn" id="setup-auth">Authenticate</button></div></div>
           </div>
+          <div id="minecraft-install-controls" class="hidden">
+            <div class="setup-row"><div class="step-index">1</div><div><h4>Download official server</h4><p>Fetches the Mojang-published vanilla Java server jar for the selected release. The first launch generates the remaining server files.</p></div><div class="setup-buttons"><button class="btn primary" id="minecraft-install">Download vanilla server</button></div></div>
+            <p class="help">Minecraft Java uses TCP, not UDP. This release maps TCP 5520–5525 in addition to the existing Hytale UDP ports. Forward the chosen TCP port in your router if players connect from outside your network.</p>
+          </div>
           <div id="dragonwilds-install-controls" class="hidden">
             <div class="setup-row"><div class="step-index">1</div><div><h4>Install or update Dragonwilds</h4><p>Downloads the official Linux dedicated-server files through Valve SteamCMD. Progress and any SteamCMD errors appear in Console.</p></div><div class="setup-buttons"><button class="btn primary" id="dragonwilds-install">Install dedicated server</button></div></div>
             <p class="help">The first download is several gigabytes. UDP ports 7777–7782 must be published and forwarded for players to join. If SteamCMD reports that anonymous access is unavailable, claim the free dedicated-server tool in Steam first.</p>
@@ -323,6 +327,11 @@
           <label class="span-two hytale-only">Server message<input id="new-server-motd" maxlength="160" value="Welcome to your Hytale server!"></label>
           <label class="toggle-row span-two hytale-only"><span><b>Require whitelist permission</b><small>Private server; players need join permission.</small></span><input id="new-server-whitelist" type="checkbox"></label>
           <label class="span-two hytale-only">Server password (optional)<input id="new-server-password" type="password" autocomplete="new-password" placeholder="Leave empty for an open server"></label>
+          <div id="minecraft-fields" class="hidden span-two">
+            <div class="wizard-heading"><p class="eyebrow">MINECRAFT JAVA</p><h3>Vanilla server</h3><p>Choose a release or leave it on latest. Mod loaders will be added separately after vanilla is validated.</p></div>
+            <label>Version<input id="new-minecraft-version" maxlength="32" value="latest" placeholder="latest or 1.21.11"></label>
+            <label class="toggle-row"><span><b>Accept Minecraft EULA</b><small>You must review and agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noreferrer">Minecraft EULA</a> to host this server.</small></span><input id="new-minecraft-eula" type="checkbox"></label>
+          </div>
           <div id="dragonwilds-fields" class="hidden span-two">
             <div class="wizard-heading"><p class="eyebrow">DRAGONWILDS SERVER</p><h3>Dedicated server settings</h3><p>Your Owner ID is required by the game. Find it at the bottom of the in-game Settings menu.</p></div>
             <div class="form-grid">
