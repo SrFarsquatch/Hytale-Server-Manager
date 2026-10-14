@@ -120,7 +120,8 @@ try {
     await select('bravo-minecraft');
     await waitForName('Bravo Minecraft');
     assert.equal(await text('#server-name'), 'Bravo Minecraft');
-    assert.equal(await text('#view-title'), 'Overview');
+    assert.ok(await page.isVisible('#view-dashboard'), 'Overview section is shown');
+    assert.ok(await page.isVisible('#server-head'), 'server header is shown');
     assert.notEqual(await text('#hero-state'), 'LOADING');
   });
 
@@ -182,7 +183,7 @@ try {
     await waitForName('Charlie Dragonwilds');
     await page.waitForTimeout(800);
     assert.equal(await value('#set-name'), 'Charlie Dragonwilds');
-    assert.equal(await text('#top-context'), 'Charlie Dragonwilds');
+    assert.equal(await text('#server-name'), 'Charlie Dragonwilds');
   });
 
   await check('an essential API failure shows an error with a working retry', async () => {
@@ -272,7 +273,13 @@ try {
 
   await check('mobile overview has no horizontal page overflow', async () => {
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(400); // drawer hides after its slide-out transition
+    assert.ok(!(await visible('[data-select-server="alpha-hytale"]')), 'server list is in the closed drawer');
+    await page.click('#nav-toggle');
+    await page.waitForTimeout(300);
     await select('alpha-hytale');
+    await page.waitForTimeout(300);
+    assert.ok(!(await page.evaluate(() => document.querySelector('#app').classList.contains('nav-open'))), 'drawer closes after choosing a server');
     await page.waitForTimeout(500);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     assert.ok(overflow <= 0, `page overflows by ${overflow}px`);
