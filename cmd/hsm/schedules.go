@@ -46,7 +46,7 @@ var (
 // {message} as the placeholder. Games without one get no warnings.
 func broadcastTemplate(gameType string) string {
 	switch normalizeGameType(gameType) {
-	case "minecraft-java":
+	case "minecraft-java", "terraria":
 		return "say {message}"
 	case "hytale":
 		return "/say {message}"

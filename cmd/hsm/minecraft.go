@@ -25,7 +25,7 @@ type MinecraftAdapter struct{}
 func (MinecraftAdapter) GameType() string { return "minecraft-java" }
 
 func (MinecraftAdapter) Rules() GameRules {
-	return GameRules{GameModes: []string{"Survival", "Adventure", "Creative", "Spectator"}, DefaultMOTD: "A Minecraft Server", DefaultMaxPlayers: 20, PlayerLimit: 1000}
+	return GameRules{GameModes: []string{"Survival", "Adventure", "Creative", "Spectator"}, ModeLabel: "Game mode", DefaultMOTD: "A Minecraft Server", DefaultMaxPlayers: 20, PlayerLimit: 1000, JVMMemory: true, Whitelist: true}
 }
 
 func (MinecraftAdapter) ValidateNew(req *newServerRequest) error {
@@ -52,6 +52,7 @@ func (MinecraftAdapter) ValidateNew(req *newServerRequest) error {
 func (MinecraftAdapter) MergeSettings(in *ServerSettings, current ServerSettings) error {
 	keepMinecraftFields(in, current)
 	keepDragonwildsFields(in, current)
+	keepTerrariaFields(in, current)
 	return nil
 }
 

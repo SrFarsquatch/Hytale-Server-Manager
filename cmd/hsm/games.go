@@ -46,6 +46,8 @@ type GameCatalogEntry struct {
 	Protocol     string         `json:"protocol"`
 	Capabilities GameCapability `json:"capabilities"`
 	Art          GameArt        `json:"art"`
+	// Rules are present for available games.
+	Rules *GameRules `json:"rules,omitempty"`
 }
 
 // GameArt holds URLs for optional official artwork bundled under
@@ -104,8 +106,13 @@ func supportedGameCatalog() []GameCatalogEntry {
 			},
 		},
 		{
-			ID: "terraria", Name: "Terraria", Available: false, Protocol: "tcp",
-			Capabilities: GameCapability{ConfigFiles: []string{}, Variants: []string{"vanilla", "tmodloader"}},
+			// Snapshots are taken while stopped: vanilla Terraria has no way to
+			// pause world saving during a copy.
+			ID: "terraria", Name: "Terraria", Available: true, Protocol: "tcp",
+			Capabilities: GameCapability{
+				Console: true, ConsoleCommands: true, FileManagement: true, Configuration: true,
+				Backups: true, PlayerList: true, ConfigFiles: []string{}, Variants: []string{"vanilla"},
+			},
 		},
 		{
 			// Dragonwilds is stopped with SIGINT and does not read commands from stdin.
@@ -171,6 +178,10 @@ func catalogWithArt() []GameCatalogEntry {
 	games := supportedGameCatalog()
 	for i := range games {
 		games[i].Art = embeddedGameArt(games[i].ID)
+		if adapter, err := gameAdapterFor(games[i].ID); err == nil && games[i].Available {
+			rules := adapter.Rules().resolved()
+			games[i].Rules = &rules
+		}
 	}
 	return games
 }

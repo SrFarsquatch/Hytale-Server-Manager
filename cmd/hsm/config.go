@@ -21,6 +21,9 @@ type ServerSettings struct {
 	MinecraftVersion         string `json:"minecraftVersion,omitempty"`
 	MinecraftVariant         string `json:"minecraftVariant,omitempty"`
 	MinecraftEulaAccepted    bool   `json:"minecraftEulaAccepted,omitempty"`
+	TerrariaVersion          string `json:"terrariaVersion,omitempty"`
+	TerrariaWorldName        string `json:"terrariaWorldName,omitempty"`
+	TerrariaWorldSize        string `json:"terrariaWorldSize,omitempty"`
 	ServerName               string `json:"serverName"`
 	Port                     int    `json:"port"`
 	GameMode                 string `json:"gameMode"`

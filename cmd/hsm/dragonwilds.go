@@ -48,7 +48,7 @@ type DragonwildsAdapter struct{}
 func (DragonwildsAdapter) GameType() string { return "runescape-dragonwilds" }
 
 func (DragonwildsAdapter) Rules() GameRules {
-	return GameRules{GameModes: hytaleGameModes, DefaultMOTD: "Welcome to your Hytale server!", DefaultMaxPlayers: 6, PlayerLimit: 6, PortMin: 7777, PortMax: 7782}
+	return GameRules{GameModes: hytaleGameModes, ModeLabel: "Game mode", DefaultMOTD: "Welcome to your Hytale server!", DefaultMaxPlayers: 6, PlayerLimit: 6, PortMin: 7777, PortMax: 7782}
 }
 
 func (DragonwildsAdapter) ValidateNew(req *newServerRequest) error {
@@ -77,6 +77,7 @@ func (DragonwildsAdapter) ValidateNew(req *newServerRequest) error {
 // the game does not use (players, MOTD, memory, backups) unchanged.
 func (DragonwildsAdapter) MergeSettings(in *ServerSettings, current ServerSettings) error {
 	keepMinecraftFields(in, current)
+	keepTerrariaFields(in, current)
 	in.DragonwildsOwnerID = strings.TrimSpace(in.DragonwildsOwnerID)
 	in.DragonwildsWorldName = strings.TrimSpace(in.DragonwildsWorldName)
 	if in.DragonwildsOwnerID == "" || len(in.DragonwildsOwnerID) > 128 || strings.ContainsAny(in.DragonwildsOwnerID, "\r\n\x00") {

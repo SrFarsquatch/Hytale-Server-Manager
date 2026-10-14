@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#151a24">
   <title>HSM · Game Server Control Panel</title>
-  <link rel="stylesheet" href="/app.css?v=20261015-ports1">
+  <link rel="stylesheet" href="/app.css?v=20261015-terraria1">
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -313,6 +313,10 @@
               <div class="step"><span class="step-index">1</span><div><h4>Download official server</h4><p class="muted small">Fetches the Mojang-published vanilla Java server jar for the selected release. The first launch generates the remaining files.</p></div><div class="toolbar"><button type="button" class="btn small primary" id="minecraft-install">Download vanilla server</button></div></div>
               <p class="muted small">Minecraft Java uses TCP. This release maps TCP 5520–5525 alongside the Hytale UDP ports. Forward the chosen TCP port in your router for players outside your network.</p>
             </div>
+            <div id="terraria-install-controls" class="steps hidden">
+              <div class="step"><span class="step-index">1</span><div><h4>Download official server</h4><p class="muted small">Fetches the official Terraria dedicated server from terraria.org and installs its Linux build. The world is generated on the first start, which can take a few minutes.</p></div><div class="toolbar"><button type="button" class="btn small primary" id="terraria-install">Download vanilla server</button></div></div>
+              <p class="muted small">Terraria uses TCP. The official Linux server runs only on x86-64 (amd64) hosts. World files live in <code>game/Worlds</code>.</p>
+            </div>
             <div id="dragonwilds-install-controls" class="steps hidden">
               <div class="step"><span class="step-index">1</span><div><h4>Install or update Dragonwilds</h4><p class="muted small">Downloads the official Linux dedicated-server files through Valve SteamCMD. Progress and errors appear in Console.</p></div><div class="toolbar"><button type="button" class="btn small primary" id="dragonwilds-install">Install dedicated server</button></div></div>
               <p class="muted small">The first download is several gigabytes. UDP ports 7777–7782 must be published and forwarded for players to join. If SteamCMD reports that anonymous access is unavailable, claim the free dedicated-server tool in Steam first.</p>
@@ -337,13 +341,13 @@
               <label>Server name<input id="set-name" required></label>
               <label>Public address<input id="set-host" placeholder="play.example.com or public IP"></label>
               <label>Game port<input id="set-port" type="number" min="1" max="65535" required><small id="port-help">Each server needs a unique game port.</small></label>
-              <label class="hytale-settings-only">Game mode<select id="set-mode"><option value="Survival">Survival</option><option value="Adventure">Adventure</option><option value="Creative">Creative</option><option value="Spectator">Spectator</option></select><small>Default mode for newly created worlds.</small></label>
+              <label class="hytale-settings-only"><span id="set-mode-label">Game mode</span><select id="set-mode"><option value="Survival">Survival</option><option value="Adventure">Adventure</option><option value="Creative">Creative</option><option value="Spectator">Spectator</option></select><small id="set-mode-help">Default mode for newly created worlds.</small></label>
               <label id="set-players-label" class="hytale-settings-only">Maximum players<input id="set-players" type="number" min="1" max="1000" required></label>
               <label class="hytale-settings-only">Server message<input id="set-motd" maxlength="160" placeholder="Welcome to your server"></label>
               <label class="hytale-settings-only">Server password (optional)<input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label><label id="set-password-clear-row" class="check hidden"><input id="set-password-clear" type="checkbox"> Remove the current server password</label>
-              <label class="toggle-row hytale-settings-only"><span><b>Require whitelist permission</b><small>Restrict joining to players granted join access.</small></span><input id="set-whitelist" type="checkbox"></label>
-              <label class="hytale-settings-only">Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
-              <label class="hytale-settings-only">Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
+              <label id="set-whitelist-row" class="toggle-row hytale-settings-only"><span><b>Require whitelist permission</b><small>Restrict joining to players granted join access.</small></span><input id="set-whitelist" type="checkbox"></label>
+              <label id="set-xms-row" class="hytale-settings-only">Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
+              <label id="set-xmx-row" class="hytale-settings-only">Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
               <label class="hytale-settings-only span-two">Additional server arguments<input id="set-args" placeholder="Only change if you know which flags your server supports"></label>
               <label class="toggle-row span-two"><span><b>Auto-start</b><small>Start this server when the manager starts.</small></span><input id="set-autostart" type="checkbox"></label>
               <label class="toggle-row span-two"><span><b>Auto-restart on crash</b><small>If the server stops unexpectedly, start it again after 5, 15 and 45 seconds. Gives up after 3 crashes in 10 minutes.</small></span><input id="set-autorestart" type="checkbox"></label>
@@ -359,6 +363,7 @@
               <p class="muted small">Find your Owner ID at the bottom of the in-game Settings menu. Players find the server under Worlds → Public by searching for the exact world name, including capitalization. World saves are stored under <code>RSDragonwilds/Saved/Savegames</code>.</p>
               <p class="muted small">Network: forward the server's UDP port (7777 by default). The official RAM baseline is 2 GB plus about 1 GB per player (up to 6 players).</p>
             </div>
+            <div id="terraria-settings-note" class="notice hidden"><span id="terraria-settings-text"></span></div>
             <div id="hytale-settings-note" class="notice"><span><b>Networking.</b> The container publishes a port range. Each server needs a different port in that range.</span></div>
             <p id="dragonwilds-player-limit" class="muted small hidden">RuneScape: Dragonwilds currently supports up to 6 players. The game-managed player limit is not changed by this panel.</p>
           </form>
@@ -413,10 +418,10 @@
       <div class="wizard-step hidden" data-wizard-step="2">
         <div class="wizard-heading"><h2>Game settings</h2><p class="muted">These become the defaults for the new server.</p></div>
         <div class="form-grid">
-          <label class="hytale-only">Game mode<select id="new-server-mode"><option value="Survival">Survival</option><option value="Adventure">Adventure</option><option value="Creative">Creative</option><option value="Spectator">Spectator</option></select></label>
+          <label class="hytale-only"><span id="new-mode-label">Game mode</span><select id="new-server-mode"><option value="Survival">Survival</option><option value="Adventure">Adventure</option><option value="Creative">Creative</option><option value="Spectator">Spectator</option></select><small id="new-mode-help" class="hidden">Applied when the world is generated; it cannot be changed later.</small></label>
           <label class="hytale-only">Maximum players<input id="new-server-players" type="number" min="1" max="1000" value="20" required></label>
           <label class="span-two hytale-only">Server message<input id="new-server-motd" maxlength="160" value="Welcome to your Hytale server!"></label>
-          <label class="toggle-row span-two hytale-only"><span><b>Require whitelist permission</b><small>Private server; players need join permission.</small></span><input id="new-server-whitelist" type="checkbox"></label>
+          <label id="new-whitelist-row" class="toggle-row span-two hytale-only"><span><b>Require whitelist permission</b><small>Private server; players need join permission.</small></span><input id="new-server-whitelist" type="checkbox"></label>
           <label class="span-two hytale-only">Server password (optional)<input id="new-server-password" type="password" autocomplete="new-password" placeholder="Leave empty for an open server"></label>
           <div id="minecraft-fields" class="hidden span-two">
             <h3>Minecraft Java · Vanilla</h3>
@@ -424,6 +429,15 @@
             <div class="form-grid one">
               <label>Version<input id="new-minecraft-version" maxlength="32" value="latest" placeholder="latest or 1.21.11"></label>
               <label class="toggle-row"><span><b>Accept Minecraft EULA</b><small>You must review and agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noreferrer">Minecraft EULA</a> to host this server.</small></span><input id="new-minecraft-eula" type="checkbox"></label>
+            </div>
+          </div>
+          <div id="terraria-fields" class="hidden span-two">
+            <h3>Terraria · Vanilla</h3>
+            <p class="muted small">The world is generated on the first start. Its name, size and difficulty cannot be changed afterwards.</p>
+            <div class="form-grid">
+              <label>World name<input id="new-terraria-world" maxlength="32" placeholder="Defaults to the server name"></label>
+              <label>World size<select id="new-terraria-size"><option value="small">Small</option><option value="medium" selected>Medium</option><option value="large">Large</option></select></label>
+              <label class="span-two">Version<input id="new-terraria-version" maxlength="16" value="latest" placeholder="latest or 1.4.4.9"></label>
             </div>
           </div>
           <div id="dragonwilds-fields" class="hidden span-two">
@@ -443,9 +457,9 @@
       <div class="wizard-step hidden" data-wizard-step="3">
         <div class="wizard-heading"><h2>Ready to create?</h2><p class="muted">You can change these settings later.</p></div>
         <div class="form-grid">
-          <label class="hytale-only">Minimum memory<input id="new-server-xms" value="2G" required></label>
-          <label class="hytale-only">Maximum memory<input id="new-server-xmx" value="4G" required></label>
-          <label class="hytale-only">Backup frequency (minutes)<input id="new-server-backup" type="number" min="5" max="10080" value="30" required></label>
+          <label id="new-xms-row" class="hytale-only">Minimum memory<input id="new-server-xms" value="2G" required></label>
+          <label id="new-xmx-row" class="hytale-only">Maximum memory<input id="new-server-xmx" value="4G" required></label>
+          <label id="new-backup-row" class="hytale-only">Backup frequency (minutes)<input id="new-server-backup" type="number" min="5" max="10080" value="30" required></label>
           <label class="toggle-row"><span><b>Auto-start</b><small>Start when the manager starts.</small></span><input id="new-server-autostart" type="checkbox"></label>
         </div>
         <div id="wizard-review" class="wizard-review"></div>
@@ -455,6 +469,6 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/app.js?v=20261015-ports1"></script>
+  <script src="/app.js?v=20261015-terraria1"></script>
 </body>
 </html>

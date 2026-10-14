@@ -45,16 +45,31 @@ type GameAdapter interface {
 }
 
 // GameRules are the per-game limits the generic settings validation applies.
+// They are also served to the browser, so the forms follow the same rules.
 type GameRules struct {
 	// GameModes lists the accepted modes; the first is the default.
-	GameModes         []string
-	DefaultMOTD       string
-	DefaultMaxPlayers int
+	GameModes []string `json:"gameModes"`
+	// ModeLabel names the mode setting in forms ("Game mode", "Difficulty").
+	ModeLabel string `json:"modeLabel"`
+	// ModeFixed means the mode applies only when the world is created.
+	ModeFixed         bool   `json:"modeFixed"`
+	DefaultMOTD       string `json:"defaultMotd"`
+	DefaultMaxPlayers int    `json:"defaultMaxPlayers"`
 	// PlayerLimit is the most players the game supports.
-	PlayerLimit int
+	PlayerLimit int `json:"playerLimit"`
+	// JVMMemory and Whitelist say whether those settings apply.
+	JVMMemory bool `json:"jvmMemory"`
+	Whitelist bool `json:"whitelist"`
 	// PortMin and PortMax pin a fixed port range. Zero means the deployment's
-	// published game port range.
-	PortMin, PortMax int
+	// published game port range; served copies always hold the resolved range.
+	PortMin int `json:"portMin"`
+	PortMax int `json:"portMax"`
+}
+
+// resolved returns the rules with the actual port range filled in.
+func (r GameRules) resolved() GameRules {
+	r.PortMin, r.PortMax = r.portRange()
+	return r
 }
 
 var hytaleGameModes = []string{"Adventure", "Creative"}
@@ -100,7 +115,7 @@ func portRangeForGame(gameType string) (int, int) {
 	return adapter.Rules().portRange()
 }
 
-// keepMinecraftFields and keepDragonwildsFields stop a settings update from
+// keepMinecraftFields, keepDragonwildsFields and keepTerrariaFields stop a settings update from
 // changing another game's fields, or Minecraft's fixed install identity.
 func keepMinecraftFields(in *ServerSettings, current ServerSettings) {
 	in.MinecraftEulaAccepted = current.MinecraftEulaAccepted
@@ -121,7 +136,7 @@ type HytaleAdapter struct{}
 func (HytaleAdapter) GameType() string { return "hytale" }
 
 func (HytaleAdapter) Rules() GameRules {
-	return GameRules{GameModes: hytaleGameModes, DefaultMOTD: "Welcome to your Hytale server!", DefaultMaxPlayers: 20, PlayerLimit: 1000}
+	return GameRules{GameModes: hytaleGameModes, ModeLabel: "Game mode", DefaultMOTD: "Welcome to your Hytale server!", DefaultMaxPlayers: 20, PlayerLimit: 1000, JVMMemory: true, Whitelist: true}
 }
 
 func (HytaleAdapter) ValidateNew(*newServerRequest) error { return nil }
@@ -129,6 +144,7 @@ func (HytaleAdapter) ValidateNew(*newServerRequest) error { return nil }
 func (HytaleAdapter) MergeSettings(in *ServerSettings, current ServerSettings) error {
 	keepMinecraftFields(in, current)
 	keepDragonwildsFields(in, current)
+	keepTerrariaFields(in, current)
 	return nil
 }
 
@@ -214,7 +230,7 @@ func gameAdapterFor(gameType string) (GameAdapter, error) {
 	case "minecraft-java":
 		return MinecraftAdapter{}, nil
 	case "terraria":
-		return nil, fmt.Errorf("%s server support is not implemented yet", gameType)
+		return TerrariaAdapter{}, nil
 	default:
 		return nil, fmt.Errorf("unknown game type %q", gameType)
 	}

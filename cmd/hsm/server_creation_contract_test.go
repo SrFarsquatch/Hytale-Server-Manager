@@ -9,7 +9,7 @@ import (
 )
 
 func TestHandleServersCreateRejectsUnsupportedGamesWithoutSideEffects(t *testing.T) {
-	for _, game := range []string{"terraria", "not-a-game"} {
+	for _, game := range []string{"terraria-tmodloader", "not-a-game"} {
 		t.Run(game, func(t *testing.T) {
 			root := t.TempDir()
 			app := &App{dataDir: root, managers: map[string]*ServerManager{}}

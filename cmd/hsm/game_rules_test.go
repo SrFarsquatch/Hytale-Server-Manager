@@ -287,3 +287,25 @@ func TestEveryAvailableGameDeclaresUsableRules(t *testing.T) {
 		}
 	}
 }
+
+func TestCatalogServesResolvedRulesForAvailableGames(t *testing.T) {
+	min, max, _ := deploymentPortRange()
+	for _, g := range catalogWithArt() {
+		if !g.Available {
+			if g.Rules != nil {
+				t.Errorf("%s: unavailable game has rules", g.ID)
+			}
+			continue
+		}
+		if g.Rules == nil || len(g.Rules.GameModes) == 0 || g.Rules.ModeLabel == "" || g.Rules.PortMin == 0 {
+			t.Fatalf("%s: rules = %+v", g.ID, g.Rules)
+		}
+		wantMin, wantMax := min, max
+		if g.ID == "runescape-dragonwilds" {
+			wantMin, wantMax = 7777, 7782
+		}
+		if g.Rules.PortMin != wantMin || g.Rules.PortMax != wantMax {
+			t.Errorf("%s: ports %d-%d, want %d-%d", g.ID, g.Rules.PortMin, g.Rules.PortMax, wantMin, wantMax)
+		}
+	}
+}
