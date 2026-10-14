@@ -47,12 +47,13 @@ type GameCatalogEntry struct {
 // falls back to a generated monogram, so a missing image is never requested.
 type GameArt struct {
 	Icon   string `json:"icon,omitempty"`
+	Logo   string `json:"logo,omitempty"`
 	Banner string `json:"banner,omitempty"`
 }
 
 var gameArtExtensions = []string{"png", "webp", "jpg", "jpeg", "svg"}
 
-// gameArtFrom looks for <id>-icon.<ext> and <id>-banner.<ext> in fsys, which is
+// gameArtFrom looks for <id>-icon, <id>-logo and <id>-banner images in fsys, which is
 // rooted at the embedded web directory.
 func gameArtFrom(fsys fs.FS, id string) GameArt {
 	find := func(kind string) string {
@@ -64,7 +65,7 @@ func gameArtFrom(fsys fs.FS, id string) GameArt {
 		}
 		return ""
 	}
-	return GameArt{Icon: find("icon"), Banner: find("banner")}
+	return GameArt{Icon: find("icon"), Logo: find("logo"), Banner: find("banner")}
 }
 
 func embeddedGameArt(id string) GameArt {

@@ -31,7 +31,7 @@ function gameLabel(id){return ({hytale:'Hytale','minecraft-java':'Minecraft Java
 const gameArt={};
 function rememberGameArt(id,art){if(id&&art)gameArt[id]=art}
 function gameLogo(id){const icon=gameArt[id]?.icon;if(icon)return '<img src="'+esc(icon)+'" alt="" decoding="async">';const marks={'hytale':'H','minecraft-java':'MC','terraria':'T','runescape-dragonwilds':'DW'};return '<span class="mono mono-'+esc(id||'unknown')+'">'+(marks[id]||'?')+'</span>'}
-function gameWordmark(id){if(gameArt[id]?.icon)return gameLogo(id);const files={'hytale':'hytale.svg','minecraft-java':'minecraft-java.svg','terraria':'terraria.svg','runescape-dragonwilds':'runescape-dragonwilds.svg'};return files[id]?'<img src="/assets/games/'+files[id]+'" alt="" decoding="async">':gameLogo(id)}
+function gameWordmark(id){const art=gameArt[id];if(art?.logo)return '<img src="'+esc(art.logo)+'" alt="" decoding="async">';if(art?.icon)return gameLogo(id);const files={'hytale':'hytale.svg','minecraft-java':'minecraft-java.svg','terraria':'terraria.svg','runescape-dragonwilds':'runescape-dragonwilds.svg'};return files[id]?'<img src="/assets/games/'+files[id]+'" alt="" decoding="async">':gameLogo(id)}
 function statusDotClass(s){if(s?.state==='crashed')return'crashed';if(s?.state==='starting'||s?.state==='stopping'||s?.installBusy||s?.state==='installing')return'busy';if(s?.running)return'online';return''}
 async function boot(){const b=await api('/api/bootstrap',{serverId:null});state.configured=b.configured;if(!b.configured){showAuth(true);return}try{await api('/api/servers',{serverId:null});showApp()}catch{showAuth(false)}}
 function showAuth(setup){$('#app').classList.add('hidden');$('#auth').classList.remove('hidden');$('#auth-title').textContent=setup?'Create admin account':'Sign in';$('#auth-copy').textContent=setup?'Secure this server manager.':'Manage your game servers on this host.';$('#auth-submit').textContent=setup?'Create account':'Sign in';$('#auth-pass').autocomplete=setup?'new-password':'current-password';$('#auth-form').dataset.mode=setup?'setup':'login'}
@@ -97,7 +97,7 @@ function renderServerHead(){
   if(!summary)return;
   $('#server-name').textContent=summary.serverName;
   for(const id of['server-game','hero-game'])$('#'+id).textContent=gameLabel(summary.gameType);
-  $('#server-game-icon').innerHTML=gameLogo(summary.gameType);$('#hero-game-icon').innerHTML=gameWordmark(summary.gameType);$('#hero-game-icon').classList.toggle('is-icon',!!gameArt[summary.gameType]?.icon);const banner=gameArt[summary.gameType]?.banner,tile=$('.game-tile');tile.classList.toggle('has-banner',!!banner);tile.style.setProperty('--banner',banner?'url("'+banner.replace(/["\\]/g,'')+'")':'none');
+  $('#server-game-icon').innerHTML=gameLogo(summary.gameType);$('#hero-game-icon').innerHTML=gameWordmark(summary.gameType);$('#hero-game-icon').classList.toggle('is-icon',!gameArt[summary.gameType]?.logo&&!!gameArt[summary.gameType]?.icon);const banner=gameArt[summary.gameType]?.banner,tile=$('.game-tile');tile.classList.toggle('has-banner',!!banner);tile.style.setProperty('--banner',banner?'url("'+banner.replace(/["\\]/g,'')+'")':'none');
   $('#meta-port').textContent=`${serverProtocol(summary)} ${summary.port}`;
   if(!state.players)$('#meta-players-value').textContent='Players unknown';
   if(!['servers','app-settings'].includes(state.current))$('#mobile-context').textContent=summary.serverName;

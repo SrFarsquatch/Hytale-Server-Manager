@@ -203,13 +203,14 @@ func TestGameArtOnlyReportsFilesThatExist(t *testing.T) {
 		"assets/games/art/hytale-icon.png":                {Data: []byte("png")},
 		"assets/games/art/hytale-banner.webp":             {Data: []byte("webp")},
 		"assets/games/art/minecraft-java-icon.svg":        {Data: []byte("<svg/>")},
+		"assets/games/art/minecraft-java-logo.webp":       {Data: []byte("webp")},
 		"assets/games/art/runescape-dragonwilds-icon.gif": {Data: []byte("unsupported")},
 	}
 	if got := gameArtFrom(fsys, "hytale"); got.Icon != "/assets/games/art/hytale-icon.png" || got.Banner != "/assets/games/art/hytale-banner.webp" {
 		t.Errorf("hytale art = %#v", got)
 	}
-	if got := gameArtFrom(fsys, "minecraft-java"); got.Icon == "" || got.Banner != "" {
-		t.Errorf("minecraft art = %#v, want icon only", got)
+	if got := gameArtFrom(fsys, "minecraft-java"); got.Icon == "" || got.Logo != "/assets/games/art/minecraft-java-logo.webp" || got.Banner != "" {
+		t.Errorf("minecraft art = %#v, want icon and logo only", got)
 	}
 	if got := gameArtFrom(fsys, "runescape-dragonwilds"); got != (GameArt{}) {
 		t.Errorf("unsupported extension produced art %#v", got)
