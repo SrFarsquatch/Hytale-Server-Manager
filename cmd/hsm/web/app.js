@@ -153,7 +153,7 @@ $('#file-upload').addEventListener('change',e=>{if(e.target.files&&e.target.file
 $('#file-editor-save').addEventListener('click',saveManagedFile);
 $('#file-editor-close').addEventListener('click',()=>{if(managedDirty&&!confirm('Discard unsaved file changes?'))return;managedDirty=false;managedOpenPath='';$('#file-editor').classList.add('hidden')});
 
-function loadCurrent(){if(state.current==='servers')renderFleet();if(state.current==='app-settings')loadAppUpdate();if(!state.serverId)return;const caps=serverCapabilities();if(state.current==='mods')loadMods();if(state.current==='backups')loadBackups();if(state.current==='config'){loadFiles();if(caps.configFiles.length)loadServerConfig()}if(state.current==='setup')loadInstallStatus();if(state.current==='settings'&&caps.serverProperties)loadMinecraftProperties()}
+function loadCurrent(){if(state.current==='servers')renderFleet();if(state.current==='app-settings')loadAppUpdate();if(!state.serverId)return;const caps=serverCapabilities();if(state.current==='mods')loadMods();if(state.current==='backups')loadBackups();if(state.current==='config'){loadFiles();if(caps.configFiles.length)loadServerConfig()}if(state.current==='setup')loadInstallStatus();if(state.current==='settings'&&caps.serverProperties)loadMinecraftProperties();if(state.current==='schedules')loadSchedules()}
 async function loadServers(initial=false){
   let servers;
   try{servers=await api('/api/servers',{serverId:null})}catch(e){if(initial)toast(e.message,true);return}
@@ -310,6 +310,9 @@ function resetWorkspaceView(){
   $('#config-note').textContent='';
   $('#mods-list').innerHTML='';
   $('#mc-properties-fields').innerHTML='';
+  state.schedules=null;
+  $('#schedule-list').innerHTML='<div class="empty-state">Loading schedules…</div>';
+  $('#schedule-editor').classList.add('hidden');
   $('#native-backups').innerHTML='';
   $('#snapshots').innerHTML='';
   $('#install-state').textContent='Checking installation…';
@@ -439,7 +442,7 @@ function renderStatus(){
   if(state.settings){$('#metric-port').textContent=state.settings.port;updateAddress()}
   if(state.current==='config')setConfigEditState(!on);
 }
-async function loadSettings(ctx=selectionContext()){if(!ctx.id)return;const settings=await scopedApi(ctx,'/api/settings');if(!ctx.current())return;state.settings=settings;const s=settings;const protocol=serverProtocol(selectedSummary());$('#server-name').textContent=s.serverName;$('#set-name').value=s.serverName;$('#set-host').value=s.publicHost||'';$('#set-port').value=s.port;$('#set-port').min=s.portMin||1;$('#set-port').max=s.portMax||65535;$('#port-help').textContent='Published '+protocol+' range: '+(s.portMin||1)+'–'+(s.portMax||65535)+'. Each server must use a unique port.';const minecraft=s.gameType==='minecraft-java';$('#set-mode').querySelectorAll('option').forEach(o=>{const mcMode=o.value==='Survival'||o.value==='Spectator';o.disabled=mcMode&&!minecraft;o.hidden=mcMode&&!minecraft});$('#set-mode').value=s.gameMode||(minecraft?'Survival':'Adventure');$('#set-players').value=s.maxPlayers||20;$('#set-motd').value=s.motd||'';$('#set-password').value='';$('#set-password').placeholder=s.passwordSet?'Password set · leave blank to keep it':'Leave blank for no password';$('#set-password-clear').checked=false;$('#set-password-clear-row').classList.toggle('hidden',!s.passwordSet||s.gameType==='runescape-dragonwilds');$('#set-whitelist').checked=!!s.whitelistEnabled;$('#set-xms').value=s.memoryMin;$('#set-xmx').value=s.memoryMax;$('#set-args').value=s.extraArgs||'';$('#set-autostart').checked=s.autoStart;
+async function loadSettings(ctx=selectionContext()){if(!ctx.id)return;const settings=await scopedApi(ctx,'/api/settings');if(!ctx.current())return;state.settings=settings;const s=settings;const protocol=serverProtocol(selectedSummary());$('#server-name').textContent=s.serverName;$('#set-name').value=s.serverName;$('#set-host').value=s.publicHost||'';$('#set-port').value=s.port;$('#set-port').min=s.portMin||1;$('#set-port').max=s.portMax||65535;$('#port-help').textContent='Published '+protocol+' range: '+(s.portMin||1)+'–'+(s.portMax||65535)+'. Each server must use a unique port.';const minecraft=s.gameType==='minecraft-java';$('#set-mode').querySelectorAll('option').forEach(o=>{const mcMode=o.value==='Survival'||o.value==='Spectator';o.disabled=mcMode&&!minecraft;o.hidden=mcMode&&!minecraft});$('#set-mode').value=s.gameMode||(minecraft?'Survival':'Adventure');$('#set-players').value=s.maxPlayers||20;$('#set-motd').value=s.motd||'';$('#set-password').value='';$('#set-password').placeholder=s.passwordSet?'Password set · leave blank to keep it':'Leave blank for no password';$('#set-password-clear').checked=false;$('#set-password-clear-row').classList.toggle('hidden',!s.passwordSet||s.gameType==='runescape-dragonwilds');$('#set-whitelist').checked=!!s.whitelistEnabled;$('#set-xms').value=s.memoryMin;$('#set-xmx').value=s.memoryMax;$('#set-args').value=s.extraArgs||'';$('#set-autostart').checked=s.autoStart;$('#set-autorestart').checked=!!s.autoRestart;
 const dragon=s.gameType==='runescape-dragonwilds';
 $('#dragonwilds-settings').classList.toggle('hidden',!dragon);
 $('#hytale-settings-note').classList.toggle('hidden',dragon);
@@ -517,7 +520,7 @@ $('#dragonwilds-install').addEventListener('click',()=>startInstall('/api/instal
 $('#downloader-file').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append('file',f);try{await api('/api/install/downloader',{method:'POST',body:fd});toast('Shared Hytale downloader ready');loadInstallStatus()}catch(err){toast(err.message,true)}finally{e.target.value=''}});$('#run-downloader').addEventListener('click',()=>startInstall('/api/install/run-downloader','Downloader started'));$('#import-local').addEventListener('click',()=>startInstall('/api/install/import-local','Import started'));
 // Settings are only saved when the form holds the selected server's loaded
 // values; a form cleared by a server switch can never overwrite another server.
-$('#settings-form').addEventListener('submit',async e=>{e.preventDefault();const id=state.serverId,loaded=state.settings;if(!id||loaded?.id!==id){toast('Server settings are still loading. Try again in a moment.',true);return}const s={id,serverName:$('#set-name').value.trim(),publicHost:$('#set-host').value.trim(),port:+$('#set-port').value,gameMode:$('#set-mode').value,maxPlayers:+$('#set-players').value,motd:$('#set-motd').value.trim(),password:$('#set-password').value,whitelistEnabled:$('#set-whitelist').checked,backupFrequency:loaded.backupFrequency,backupRetention:loaded.backupRetention,snapshotRetention:loaded.snapshotRetention,memoryMin:$('#set-xms').value.trim(),memoryMax:$('#set-xmx').value.trim(),extraArgs:$('#set-args').value.trim(),autoStart:$('#set-autostart').checked,storageDir:loaded.storageDir||'',dragonwildsOwnerId:$('#set-dragonwilds-owner').value.trim(),dragonwildsWorldName:$('#set-dragonwilds-world').value.trim(),dragonwildsAdminPassword:$('#set-dragonwilds-admin').value,dragonwildsWorldPassword:$('#set-dragonwilds-password').value,clearPassword:$('#set-password-clear').checked,clearDragonwildsWorldPassword:$('#set-dragonwilds-password-clear').checked};if(loaded.gameType==='runescape-dragonwilds'){if(!s.dragonwildsOwnerId||!s.dragonwildsWorldName||(!s.dragonwildsAdminPassword&&!loaded.dragonwildsAdminPasswordSet)){toast('Owner ID, default world name, and admin password are required',true);return}if(s.dragonwildsWorldName.length>32){toast('Dragonwilds world name must be 32 characters or fewer',true);return}}try{const saved=await api('/api/settings',{method:'PUT',serverId:id,body:JSON.stringify(s)});toast(saved.gameType==='runescape-dragonwilds'?'Dragonwilds settings saved. Restart the server to apply changes.':state.status?.running?'Settings saved. Restart the server to apply launch-option changes.':'Server settings saved');await loadServers(false);if(id!==state.serverId)return;state.settings=saved;await loadSettings();renderStatus()}catch(e){toast(e.message,true)}});
+$('#settings-form').addEventListener('submit',async e=>{e.preventDefault();const id=state.serverId,loaded=state.settings;if(!id||loaded?.id!==id){toast('Server settings are still loading. Try again in a moment.',true);return}const s={id,serverName:$('#set-name').value.trim(),publicHost:$('#set-host').value.trim(),port:+$('#set-port').value,gameMode:$('#set-mode').value,maxPlayers:+$('#set-players').value,motd:$('#set-motd').value.trim(),password:$('#set-password').value,whitelistEnabled:$('#set-whitelist').checked,backupFrequency:loaded.backupFrequency,backupRetention:loaded.backupRetention,snapshotRetention:loaded.snapshotRetention,memoryMin:$('#set-xms').value.trim(),memoryMax:$('#set-xmx').value.trim(),extraArgs:$('#set-args').value.trim(),autoStart:$('#set-autostart').checked,autoRestart:$('#set-autorestart').checked,storageDir:loaded.storageDir||'',dragonwildsOwnerId:$('#set-dragonwilds-owner').value.trim(),dragonwildsWorldName:$('#set-dragonwilds-world').value.trim(),dragonwildsAdminPassword:$('#set-dragonwilds-admin').value,dragonwildsWorldPassword:$('#set-dragonwilds-password').value,clearPassword:$('#set-password-clear').checked,clearDragonwildsWorldPassword:$('#set-dragonwilds-password-clear').checked};if(loaded.gameType==='runescape-dragonwilds'){if(!s.dragonwildsOwnerId||!s.dragonwildsWorldName||(!s.dragonwildsAdminPassword&&!loaded.dragonwildsAdminPasswordSet)){toast('Owner ID, default world name, and admin password are required',true);return}if(s.dragonwildsWorldName.length>32){toast('Dragonwilds world name must be 32 characters or fewer',true);return}}try{const saved=await api('/api/settings',{method:'PUT',serverId:id,body:JSON.stringify(s)});toast(saved.gameType==='runescape-dragonwilds'?'Dragonwilds settings saved. Restart the server to apply changes.':state.status?.running?'Settings saved. Restart the server to apply launch-option changes.':'Server settings saved');await loadServers(false);if(id!==state.serverId)return;state.settings=saved;await loadSettings();renderStatus()}catch(e){toast(e.message,true)}});
 $('#delete-server').addEventListener('click',async()=>{const s=selectedSummary();if(!s||s.running)return;const detail=s.storageDir===''||s.storageDir==='.'?' Its server-owned folders will be removed while manager configuration, shared tools, and other servers are preserved.':' Its server files, world, mods and snapshots will be permanently removed.';if(!confirm(`Delete ${s.serverName}?${detail}`))return;try{await api(`/api/servers/${encodeURIComponent(s.id)}`,{method:'DELETE',serverId:s.id});toast('Server deleted');setSelectedServer(null);await loadServers(true);if(state.serverId)await loadSelected();switchView('servers')}catch(e){toast(e.message,true)}});
 
 const dialog=$('#server-dialog');let wizardStep=0;const wizardTitles=['Choose your game','The basics','Game settings','Resources & review'];function setWizardStep(step){wizardStep=Math.max(0,Math.min(3,step));$$('[data-wizard-step]').forEach(el=>el.classList.toggle('hidden',Number(el.dataset.wizardStep)!==wizardStep));$('#wizard-step-label').textContent='STEP '+(wizardStep+1)+' OF 4';$('#wizard-step-title').textContent=wizardTitles[wizardStep];$('#wizard-progress-fill').style.width=((wizardStep+1)*25)+'%';$('#wizard-back').classList.toggle('hidden',wizardStep===0);$('#wizard-next').classList.toggle('hidden',wizardStep===3);$('#wizard-create').classList.toggle('hidden',wizardStep!==3);if(wizardStep===3)renderWizardReview()}
@@ -569,4 +572,88 @@ function renderMinecraftProperties(d){
   $('#mc-properties-note').textContent=d.running?'Saved to server.properties. The server is running, so changes apply after a restart.':'Saved to server.properties. Changes apply the next time the server starts.';
 }
 $('#mc-properties-save').addEventListener('click',async()=>{const id=state.serverId;if(!id)return;const values={};$$('[data-mc-prop]').forEach(el=>{values[el.dataset.mcProp]=el.dataset.kind==='bool'?String(el.checked):el.value});const btn=$('#mc-properties-save');btn.disabled=true;try{const d=await api('/api/minecraft/properties',{method:'PUT',serverId:id,body:JSON.stringify({values})});toast(d.running?'Game rules saved. Restart the server to apply them.':'Game rules saved');if(id===state.serverId)renderMinecraftProperties(d)}catch(e){toast(e.message,true)}finally{btn.disabled=false}});
+// Schedules: the whole list is edited client-side and saved with one PUT.
+const SCHEDULE_ACTIONS={restart:'Restart server',start:'Start server',stop:'Stop server',backup:'Back up',command:'Run console command'};
+const DAY_NAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+let editingSchedule=null;
+async function loadSchedules(){const ctx=selectionContext();if(!ctx.id)return;try{const d=await scopedApi(ctx,'/api/schedules');if(!ctx.current())return;state.schedules=d;renderSchedules()}catch(e){if(ctx.current())$('#schedule-list').innerHTML='<div class="empty-state">'+esc(e.message)+'</div>'}}
+function describeSchedule(x){
+  if(x.kind==='interval'){const m=x.everyMinutes;return 'Every '+(m%60===0?(m/60===1?'hour':m/60+' hours'):m+' minutes')}
+  const days=(x.days&&x.days.length)?x.days.map(d=>DAY_NAMES[d]).join(', '):'Every day';
+  return days+' at '+x.time;
+}
+function renderSchedules(){
+  const d=state.schedules;if(!d)return;
+  $('#schedules-note').textContent='Automatic restarts, backups and commands. Times use the server time zone: '+d.timezone+'.';
+  const list=$('#schedule-list');
+  if(!d.schedules.length){list.innerHTML='<div class="empty-state">No schedules yet. Add one to restart, back up or run commands automatically.</div>';return}
+  list.innerHTML=d.schedules.map(x=>{
+    const failed=x.lastResult&&x.lastResult!=='Done'&&!x.lastResult.startsWith('Skipped');
+    const action=SCHEDULE_ACTIONS[x.action]||x.action;
+    const extra=x.action==='command'?' · <code>'+esc(x.command)+'</code>':(x.warnMinutes?' · warns '+x.warnMinutes+' min before':'');
+    const next=!x.enabled?'Disabled':x.running?'Running now…':(x.nextRun?'Next: '+esc(fmtDate(x.nextRun)):'Not scheduled');
+    const last=x.lastRun?'<div class="result'+(failed?' failed':'')+'">Last: '+esc(fmtDate(x.lastRun))+' · '+esc(x.lastResult)+'</div>':'';
+    return '<div class="schedule-row'+(x.enabled?'':' disabled')+'" data-schedule="'+esc(x.id)+'"><span class="schedule-icon" aria-hidden="true"><svg class="icon"><use href="#i-clock"/></svg></span><div><strong>'+esc(x.name)+'</strong><div class="when">'+esc(action)+' · '+esc(describeSchedule(x))+extra+'</div></div><div class="next"><div class="when">'+next+'</div>'+last+'</div><div class="actions"><label class="check" title="Enabled"><input type="checkbox" data-schedule-toggle '+(x.enabled?'checked':'')+' aria-label="Enabled"></label><button type="button" class="btn small ghost" data-schedule-edit>Edit</button><button type="button" class="btn small danger-ghost" data-schedule-delete>Delete</button></div></div>';
+  }).join('');
+}
+function scheduleListForSave(){return(state.schedules?.schedules||[]).map(({nextRun,lastRun,lastResult,running,...rest})=>rest)}
+async function saveSchedules(list,message){const id=state.serverId;if(!id)return false;try{const d=await api('/api/schedules',{method:'PUT',serverId:id,body:JSON.stringify({schedules:list})});if(id===state.serverId){state.schedules=d;renderSchedules()}toast(message);return true}catch(e){toast(e.message,true);return false}}
+function syncScheduleForm(){
+  const action=$('#sch-action').value,kind=$('#sch-kind').value,warn=!!state.schedules?.warnings&&(action==='restart'||action==='stop');
+  $('#sch-command-row').classList.toggle('hidden',action!=='command');
+  $('#sch-time-row').classList.toggle('hidden',kind!=='daily');
+  $('#sch-days-row').classList.toggle('hidden',kind!=='daily');
+  $('#sch-every-row').classList.toggle('hidden',kind!=='interval');
+  $('#sch-warn-row').classList.toggle('hidden',!warn);
+}
+function openScheduleEditor(x){
+  const d=state.schedules;if(!d)return;
+  editingSchedule=x?.id||null;
+  $('#schedule-editor-title').textContent=x?'Edit schedule':'New schedule';
+  $('#sch-action').innerHTML=d.actions.map(a=>'<option value="'+esc(a)+'">'+esc(SCHEDULE_ACTIONS[a]||a)+'</option>').join('');
+  $('#sch-days-row').innerHTML='<legend>On these days <small class="muted">(none selected = every day)</small></legend>'+DAY_NAMES.map((n,i)=>'<label><input type="checkbox" value="'+i+'" '+((x?.days||[]).includes(i)?'checked':'')+'> '+n+'</label>').join('');
+  $('#sch-name').value=x?.name||'';
+  $('#sch-action').value=x?.action||'restart';
+  $('#sch-command').value=x?.command||'';
+  $('#sch-kind').value=x?.kind||'daily';
+  $('#sch-time').value=x?.time||'04:00';
+  const every=x?.everyMinutes||360;
+  if(every%60===0){$('#sch-every').value=every/60;$('#sch-every-unit').value='60'}else{$('#sch-every').value=every;$('#sch-every-unit').value='1'}
+  $('#sch-warn').value=x?.warnMinutes??5;
+  $('#sch-enabled').checked=x?x.enabled:true;
+  syncScheduleForm();
+  $('#schedule-editor').classList.remove('hidden');
+  $('#schedule-editor').scrollIntoView({behavior:'smooth',block:'nearest'});
+  $('#sch-name').focus();
+}
+$('#schedule-add').addEventListener('click',()=>openScheduleEditor(null));
+$('#sch-cancel').addEventListener('click',()=>{editingSchedule=null;$('#schedule-editor').classList.add('hidden')});
+$('#sch-action').addEventListener('change',syncScheduleForm);
+$('#sch-kind').addEventListener('change',syncScheduleForm);
+$('#schedule-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const kind=$('#sch-kind').value,action=$('#sch-action').value;
+  const item={id:editingSchedule||'',name:$('#sch-name').value.trim(),enabled:$('#sch-enabled').checked,action,kind,
+    command:action==='command'?$('#sch-command').value.trim():'',
+    time:kind==='daily'?$('#sch-time').value:'',
+    days:kind==='daily'?$$('#sch-days-row input:checked').map(i=>+i.value):[],
+    everyMinutes:kind==='interval'?Math.round(+$('#sch-every').value*+$('#sch-every-unit').value):0,
+    warnMinutes:$('#sch-warn-row').classList.contains('hidden')?0:+$('#sch-warn').value};
+  const list=scheduleListForSave();
+  const i=list.findIndex(x=>x.id===editingSchedule);
+  if(i>=0)list[i]=item;else list.push(item);
+  if(await saveSchedules(list,editingSchedule?'Schedule updated':'Schedule added')){editingSchedule=null;$('#schedule-editor').classList.add('hidden')}
+});
+$('#schedule-list').addEventListener('click',async e=>{
+  const row=e.target.closest('[data-schedule]');if(!row)return;
+  const id=row.dataset.schedule,current=(state.schedules?.schedules||[]).find(x=>x.id===id);if(!current)return;
+  if(e.target.closest('[data-schedule-edit]'))openScheduleEditor(current);
+  if(e.target.closest('[data-schedule-delete]')){if(!confirm('Delete the schedule "'+current.name+'"?'))return;await saveSchedules(scheduleListForSave().filter(x=>x.id!==id),'Schedule deleted')}
+});
+$('#schedule-list').addEventListener('change',async e=>{
+  const toggle=e.target.closest('[data-schedule-toggle]');if(!toggle)return;
+  const id=toggle.closest('[data-schedule]').dataset.schedule;
+  const list=scheduleListForSave().map(x=>x.id===id?{...x,enabled:toggle.checked}:x);
+  if(!await saveSchedules(list,toggle.checked?'Schedule enabled':'Schedule disabled'))toggle.checked=!toggle.checked;
+});
 boot().catch(e=>{document.body.innerHTML=`<pre style="padding:30px;color:#e29a96">${esc(e.stack||e.message)}</pre>`});
