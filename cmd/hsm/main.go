@@ -1820,10 +1820,11 @@ func NewServerManager(rootDir, toolsDir string, gameTypes ...string) *ServerMana
 	return &ServerManager{rootDir: rootDir, toolsDir: toolsDir, gameType: gameType, logs: &LogRing{max: 2500}, hub: &LogHub{clients: map[chan LogLine]struct{}{}}}
 }
 func (m *ServerManager) Installed() bool {
-	if m.gameType == "runescape-dragonwilds" {
-		return fileExists(filepath.Join(m.rootDir, "game", "RSDragonwildsServer.sh")) || fileExists(filepath.Join(m.rootDir, "game", "RSDragonwilds", "Binaries", "Linux", "RSDragonwildsServer-Linux-Shipping"))
+	adapter, err := gameAdapterFor(m.gameType)
+	if err != nil {
+		return false
 	}
-	return fileExists(filepath.Join(m.rootDir, "game", "Server", "HytaleServer.jar")) && fileExists(filepath.Join(m.rootDir, "game", "Assets.zip"))
+	return adapter.Installed(m.rootDir)
 }
 func (m *ServerManager) IsRunning() bool   { m.mu.Lock(); defer m.mu.Unlock(); return m.running }
 func (m *ServerManager) InstallBusy() bool { m.mu.Lock(); defer m.mu.Unlock(); return m.installBusy }
@@ -1892,27 +1893,16 @@ func (m *ServerManager) Start(args []string) error {
 	if !m.Installed() {
 		return errors.New("server files are not installed yet")
 	}
-	gameDir := filepath.Join(m.rootDir, "game")
-	var cmd *exec.Cmd
-	if m.gameType == "runescape-dragonwilds" {
-		launcher := filepath.Join(gameDir, "RSDragonwildsServer.sh")
-		if fileExists(launcher) {
-			_ = os.Chmod(launcher, 0755)
-			cmd = exec.Command(launcher, args...)
-		} else {
-			binary := filepath.Join(gameDir, "RSDragonwilds", "Binaries", "Linux", "RSDragonwildsServer-Linux-Shipping")
-			if !fileExists(binary) { return errors.New("Dragonwilds launcher or Linux server binary is missing") }
-			_ = os.Chmod(binary, 0755)
-			cmd = exec.Command(binary, args...)
-		}
-	} else {
-		startSh := filepath.Join(gameDir, "start.sh")
-		if !fileExists(startSh) { return errors.New("game/start.sh is missing; import an official server bundle or run /update setup first") }
-		_ = os.Chmod(startSh, 0755)
-		cmdArgs := append([]string{startSh}, args...)
-		cmd = exec.Command("bash", cmdArgs...)
+	adapter, err := gameAdapterFor(m.gameType)
+	if err != nil {
+		return err
 	}
-	cmd.Dir = gameDir
+	spec, err := adapter.BuildProcess(m.rootDir, args)
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(spec.Path, spec.Args...)
+	cmd.Dir = spec.Dir
 	cmd.Env = append(os.Environ(), "HOME="+filepath.Join(m.rootDir, "home"))
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	stdout, err := cmd.StdoutPipe()
@@ -2004,15 +1994,15 @@ func (m *ServerManager) Stop() error {
 	}
 	pid := m.cmd.Process.Pid
 	stdin := m.stdin
-	var err error
-	if m.gameType == "runescape-dragonwilds" {
-		m.appendLogLocked("controller", "Requesting Dragonwilds shutdown with SIGINT")
+	adapter, adapterErr := gameAdapterFor(m.gameType)
+	if adapterErr != nil {
+		m.mu.Unlock()
+		return adapterErr
+	}
+	m.appendLogLocked("controller", "Requesting graceful shutdown")
+	err := adapter.RequestStop(pid, stdin)
+	if err == nil {
 		m.phase = "stopping"
-		err = syscall.Kill(-pid, syscall.SIGINT)
-	} else {
-		m.appendLogLocked("controller", "Requesting graceful shutdown with /stop")
-		_, err = io.WriteString(stdin, "/stop\n")
-		if err == nil { m.phase = "stopping" }
 	}
 	m.mu.Unlock()
 	if err != nil {
