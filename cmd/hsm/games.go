@@ -36,8 +36,8 @@ func supportedGameCatalog() []GameCatalogEntry {
 			},
 		},
 		{
-			ID: "minecraft-java", Name: "Minecraft Java Edition", Available: false,
-			Capabilities: GameCapability{Variants: []string{"vanilla", "fabric", "forge", "neoforge"}},
+			ID: "minecraft-java", Name: "Minecraft Java Edition", Available: true,
+			Capabilities: GameCapability{Console: true, FileManagement: true, Configuration: true, Variants: []string{"vanilla"}},
 		},
 		{
 			ID: "terraria", Name: "Terraria", Available: false,

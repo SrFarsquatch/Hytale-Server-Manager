@@ -90,7 +90,9 @@ func gameAdapterFor(gameType string) (GameAdapter, error) {
 		return HytaleAdapter{}, nil
 	case "runescape-dragonwilds":
 		return DragonwildsAdapter{}, nil
-	case "minecraft-java", "terraria":
+	case "minecraft-java":
+		return MinecraftAdapter{}, nil
+	case "terraria":
 		return nil, fmt.Errorf("%s server support is not implemented yet", gameType)
 	default:
 		return nil, fmt.Errorf("unknown game type %q", gameType)

@@ -51,6 +51,9 @@ type ServerSettings struct {
 	DragonwildsAdminPassword string `json:"dragonwildsAdminPassword,omitempty"`
 	DragonwildsWorldPassword string `json:"dragonwildsWorldPassword,omitempty"`
 	DragonwildsPublic bool `json:"dragonwildsPublic,omitempty"`
+	MinecraftVersion string `json:"minecraftVersion,omitempty"`
+	MinecraftVariant string `json:"minecraftVariant,omitempty"`
+	MinecraftEulaAccepted bool `json:"minecraftEulaAccepted,omitempty"`
 	ServerName      string `json:"serverName"`
 	Port            int    `json:"port"`
 	GameMode        string `json:"gameMode"`
@@ -272,6 +275,7 @@ func (a *App) routes(mux *http.ServeMux) {
 	mux.Handle("POST /api/install/downloader", a.auth(http.HandlerFunc(a.handleDownloaderUpload)))
 	mux.Handle("POST /api/install/run-downloader", a.auth(http.HandlerFunc(a.handleDownloaderRun)))
 	mux.Handle("POST /api/install/dragonwilds", a.auth(http.HandlerFunc(a.handleDragonwildsInstall)))
+	mux.Handle("POST /api/install/minecraft", a.auth(http.HandlerFunc(a.handleMinecraftInstall)))
 	mux.Handle("POST /api/install/import-local", a.auth(http.HandlerFunc(a.handleImportLocal)))
 
 	for _, x := range []struct{ path, cmd string }{
@@ -517,6 +521,9 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		BackupFrequency int    `json:"backupFrequency"`
 		AutoStart       bool   `json:"autoStart"`
 		SourceServerID  string `json:"sourceServerId"`
+		MinecraftVersion string `json:"minecraftVersion"`
+		MinecraftVariant string `json:"minecraftVariant"`
+		MinecraftEulaAccepted bool `json:"minecraftEulaAccepted"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		jsonError(w, 400, err.Error())
@@ -524,9 +531,16 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	game := strings.ToLower(strings.TrimSpace(body.Game))
 	if game == "" { game = "hytale" }
-	if game != "hytale" && game != "runescape-dragonwilds" {
-		jsonError(w, 400, "this release supports Hytale and RuneScape: Dragonwilds only; see GET /api/games for supported games")
+	if game != "hytale" && game != "runescape-dragonwilds" && game != "minecraft-java" {
+		jsonError(w, 400, "this release supports Hytale, Minecraft Java vanilla, and RuneScape: Dragonwilds; see GET /api/games for supported games")
 		return
+	}
+	if game == "minecraft-java" {
+		if body.MinecraftVariant == "" { body.MinecraftVariant = "vanilla" }
+		if body.MinecraftVariant != "vanilla" { jsonError(w, 400, "only vanilla Minecraft Java servers are currently supported"); return }
+		if !body.MinecraftEulaAccepted { jsonError(w, 400, "you must accept the Minecraft EULA before creating this server"); return }
+		if body.MinecraftVersion == "" { body.MinecraftVersion = "latest" }
+		if len(body.MinecraftVersion) > 32 || strings.ContainsAny(body.MinecraftVersion, "\r\n\x00") { jsonError(w, 400, "invalid Minecraft version"); return }
 	}
 	if game == "runescape-dragonwilds" {
 		if strings.TrimSpace(body.DragonwildsOwnerID) == "" {
@@ -556,8 +570,15 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "server name must be between 2 and 64 characters")
 		return
 	}
-	if body.GameMode == "" { body.GameMode = "Adventure" }
-	if body.GameMode != "Adventure" && body.GameMode != "Creative" {
+	if body.GameMode == "" {
+		if game == "minecraft-java" { body.GameMode = "Survival" } else { body.GameMode = "Adventure" }
+	}
+	if game == "minecraft-java" {
+		if body.GameMode != "Survival" && body.GameMode != "Adventure" && body.GameMode != "Creative" && body.GameMode != "Spectator" {
+			jsonError(w, 400, "Minecraft game mode must be Survival, Adventure, Creative, or Spectator")
+			return
+		}
+	} else if body.GameMode != "Adventure" && body.GameMode != "Creative" {
 		jsonError(w, 400, "game mode must be Adventure or Creative")
 		return
 	}
@@ -567,7 +588,9 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "maximum players must be between 1 and 1000")
 		return
 	}
-	if body.MOTD == "" { body.MOTD = "Welcome to your Hytale server!" }
+	if body.MOTD == "" {
+		if game == "minecraft-java" { body.MOTD = "A Minecraft Server" } else { body.MOTD = "Welcome to your Hytale server!" }
+	}
 	if body.MemoryMin == "" { body.MemoryMin = "2G" }
 	if body.MemoryMax == "" { body.MemoryMax = "4G" }
 	if !validMemory(body.MemoryMin) || !validMemory(body.MemoryMax) {
@@ -591,15 +614,20 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	min, max, _ := deploymentPortRange()
 	if game == "runescape-dragonwilds" { min, max = 7777, 7782 }
 	if port < min || port > max {
-		jsonError(w, 400, fmt.Sprintf("port must be within the published UDP range %d-%d", min, max))
+		protocol := "UDP"
+		if game == "minecraft-java" { protocol = "TCP" }
+		jsonError(w, 400, fmt.Sprintf("port must be within the published %s range %d-%d", protocol, min, max))
 		return
 	}
 	if a.portInUse(port, "") {
-		jsonError(w, 409, "that UDP port is already assigned to another server")
+		jsonError(w, 409, "that game port is already assigned to another server")
 		return
 	}
 	s := defaultServerSettings(id, name, port, filepath.Join("servers", id))
 	s.GameType = game
+	s.MinecraftVersion = body.MinecraftVersion
+	s.MinecraftVariant = body.MinecraftVariant
+	s.MinecraftEulaAccepted = body.MinecraftEulaAccepted
 	s.DragonwildsOwnerID = strings.TrimSpace(body.DragonwildsOwnerID)
 	s.DragonwildsWorldName = strings.TrimSpace(body.DragonwildsWorldName)
 	s.DragonwildsAdminPassword = body.DragonwildsAdminPassword
@@ -922,6 +950,11 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	in.ID = current.ID
 	in.GameType = current.GameType // game identity is immutable through generic settings updates
 	in.StorageDir = current.StorageDir
+	if current.GameType == "minecraft-java" {
+		in.MinecraftEulaAccepted = current.MinecraftEulaAccepted
+		in.MinecraftVersion = current.MinecraftVersion
+		in.MinecraftVariant = current.MinecraftVariant
+	}
 	if current.GameType == "runescape-dragonwilds" {
 		in.DragonwildsOwnerID = strings.TrimSpace(in.DragonwildsOwnerID)
 		in.DragonwildsWorldName = strings.TrimSpace(in.DragonwildsWorldName)
@@ -964,11 +997,11 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.Port < min || in.Port > max {
-		jsonError(w, 400, fmt.Sprintf("port must be within the Docker/CasaOS UDP range %d-%d", min, max))
+		jsonError(w, 400, fmt.Sprintf("port must be within the Docker/CasaOS %s range %d-%d", map[bool]string{true:"TCP", false:"UDP"}[current.GameType == "minecraft-java"], min, max))
 		return
 	}
 	if a.portInUse(in.Port, current.ID) {
-		jsonError(w, 409, "that UDP port is already assigned to another server")
+		jsonError(w, 409, "that game port is already assigned to another server")
 		return
 	}
 	if !validMemory(in.MemoryMin) || !validMemory(in.MemoryMax) {
@@ -976,7 +1009,12 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.GameMode == "" { in.GameMode = current.GameMode }
-	if in.GameMode != "Adventure" && in.GameMode != "Creative" {
+	if current.GameType == "minecraft-java" {
+		if in.GameMode != "Survival" && in.GameMode != "Adventure" && in.GameMode != "Creative" && in.GameMode != "Spectator" {
+			jsonError(w, 400, "Minecraft game mode must be Survival, Adventure, Creative, or Spectator")
+			return
+		}
+	} else if in.GameMode != "Adventure" && in.GameMode != "Creative" {
 		jsonError(w, 400, "game mode must be Adventure or Creative")
 		return
 	}
@@ -1504,6 +1542,10 @@ func (a *App) handleInstallStatus(w http.ResponseWriter, r *http.Request) {
 	root := a.serverRoot(s)
 	if s.GameType == "runescape-dragonwilds" {
 		jsonOut(w, 200, map[string]any{"installed": m.Installed(), "busy": m.InstallBusy(), "game": s.GameType, "paths": map[string]string{"game": filepath.Join(root, "game"), "steamcmd": filepath.Join(a.dataDir, "tools", "steamcmd", "steamcmd.sh")}})
+		return
+	}
+	if s.GameType == "minecraft-java" {
+		jsonOut(w, 200, map[string]any{"installed": m.Installed(), "busy": m.InstallBusy(), "game": s.GameType, "version": s.MinecraftVersion, "variant": s.MinecraftVariant, "eulaAccepted": s.MinecraftEulaAccepted, "paths": map[string]string{"game": filepath.Join(root, "game")}})
 		return
 	}
 	downloader := filepath.Join(a.dataDir, "tools", "hytale-downloader")

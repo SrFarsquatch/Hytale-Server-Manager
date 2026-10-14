@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0a0d12">
   <title>HSM · Game Server Control Panel</title>
-  <link rel="stylesheet" href="/app.css?v=20261014-game-capabilities1">
-  <link rel="stylesheet" href="/panel-redesign.css?v=20261014-game-capabilities1">
+  <link rel="stylesheet" href="/app.css?v=20261014-minecraft-vanilla1">
+  <link rel="stylesheet" href="/panel-redesign.css?v=20261014-minecraft-vanilla1">
 </head>
 <body>
   <div id="auth" class="auth-shell hidden">
@@ -115,7 +115,7 @@
           <div><span>Players online</span><strong id="metric-players">Unknown</strong></div>
           <div><span>Memory</span><strong id="metric-memory">—</strong></div>
           <div><span>Limit</span><strong id="metric-memory-limit">—</strong></div>
-          <div><span>UDP port</span><strong id="metric-port">—</strong></div>
+          <div><span>Game port</span><strong id="metric-port">—</strong></div>
           <div><span>Files</span><strong id="metric-installed">—</strong></div>
         </div>
 
@@ -225,6 +225,10 @@
           <div class="setup-row"><div class="step-index">2</div><div><h4>Existing game.zip</h4><p>Import a server bundle already placed in this instance's imports directory.</p></div><div class="setup-buttons"><button class="btn" id="import-local">Import game.zip</button></div></div>
           <div class="setup-row"><div class="step-index">3</div><div><h4>First start</h4><p>Start the server, then authenticate from the Console using the device code.</p></div><div class="setup-buttons"><button class="btn success" id="setup-start">Start</button><button class="btn" id="setup-auth">Authenticate</button></div></div>
           </div>
+          <div id="minecraft-install-controls" class="hidden">
+            <div class="setup-row"><div class="step-index">1</div><div><h4>Download official server</h4><p>Fetches the Mojang-published vanilla Java server jar for the selected release. The first launch generates the remaining server files.</p></div><div class="setup-buttons"><button class="btn primary" id="minecraft-install">Download vanilla server</button></div></div>
+            <p class="help">Minecraft Java uses TCP, not UDP. This release maps TCP 5520–5525 in addition to the existing Hytale UDP ports. Forward the chosen TCP port in your router if players connect from outside your network.</p>
+          </div>
           <div id="dragonwilds-install-controls" class="hidden">
             <div class="setup-row"><div class="step-index">1</div><div><h4>Install or update Dragonwilds</h4><p>Downloads the official Linux dedicated-server files through Valve SteamCMD. Progress and any SteamCMD errors appear in Console.</p></div><div class="setup-buttons"><button class="btn primary" id="dragonwilds-install">Install dedicated server</button></div></div>
             <p class="help">The first download is several gigabytes. UDP ports 7777–7782 must be published and forwarded for players to join. If SteamCMD reports that anonymous access is unavailable, claim the free dedicated-server tool in Steam first.</p>
@@ -248,8 +252,8 @@
           <div class="form-grid">
             <label>Server name<input id="set-name" required></label>
             <label>Public address<input id="set-host" placeholder="play.example.com or public IP"></label>
-            <label>UDP game port<input id="set-port" type="number" min="1" max="65535" required><small id="port-help">Each running server needs a unique UDP port.</small></label>
-            <label class="hytale-settings-only">Game mode<select id="set-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select><small>Default mode for newly created worlds.</small></label>
+            <label>Game port<input id="set-port" type="number" min="1" max="65535" required><small id="port-help">Each server needs a unique game port. Minecraft Java uses TCP; Hytale and Dragonwilds use UDP.</small></label>
+            <label class="hytale-settings-only">Game mode<select id="set-mode"><option value="Survival">Survival</option><option value="Adventure">Adventure</option><option value="Creative">Creative</option><option value="Spectator">Spectator</option></select><small>Default mode for newly created worlds.</small></label>
             <label id="set-players-label" class="hytale-settings-only">Maximum players<input id="set-players" type="number" min="1" max="1000" required></label>
             <label class="hytale-settings-only">Server message<input id="set-motd" maxlength="160" placeholder="Welcome to your server"></label>
             <label class="toggle-row hytale-settings-only"><span><b>Require whitelist permission</b><small>Restrict joining to players granted server join access.</small></span><input id="set-whitelist" type="checkbox"></label>
@@ -311,18 +315,23 @@
       <div class="wizard-step hidden" data-wizard-step="1">
         <div class="wizard-heading"><p class="eyebrow">THE BASICS</p><h2>Name your world.</h2><p>Give this server a name and choose how players connect.</p></div>
         <label>Server name<input id="new-server-name" value="My Hytale Server" minlength="2" maxlength="64" required></label>
-        <label>Game port (UDP)<input id="new-server-port" type="number" min="0" max="65535" placeholder="Automatic"><small id="new-port-help">Leave blank to assign the next available port in the published range.</small></label>
+        <label>Game port<input id="new-server-port" type="number" min="0" max="65535" placeholder="Automatic"><small id="new-port-help">Leave blank to assign the next available port in the published range.</small></label>
         <label>Public address (optional)<input id="new-server-host" placeholder="play.example.com or your public IP"></label>
         <label>Start from<select id="new-server-source"><option value="">Fresh install — set up game files next</option></select><small>Clone an installed server if you'd like to reuse its mods and configuration.</small></label>
       </div>
       <div class="wizard-step hidden" data-wizard-step="2">
         <div class="wizard-heading"><p class="eyebrow">YOUR GAME, YOUR WAY</p><h2>Set up the experience.</h2><p>These become the default settings for the new server.</p></div>
         <div class="form-grid">
-          <label class="hytale-only">Game mode<select id="new-server-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select></label>
+          <label class="hytale-only">Game mode<select id="new-server-mode"><option value="Survival">Survival</option><option value="Adventure">Adventure</option><option value="Creative">Creative</option><option value="Spectator">Spectator</option></select></label>
           <label class="hytale-only">Maximum players<input id="new-server-players" type="number" min="1" max="1000" value="20" required></label>
           <label class="span-two hytale-only">Server message<input id="new-server-motd" maxlength="160" value="Welcome to your Hytale server!"></label>
           <label class="toggle-row span-two hytale-only"><span><b>Require whitelist permission</b><small>Private server; players need join permission.</small></span><input id="new-server-whitelist" type="checkbox"></label>
           <label class="span-two hytale-only">Server password (optional)<input id="new-server-password" type="password" autocomplete="new-password" placeholder="Leave empty for an open server"></label>
+          <div id="minecraft-fields" class="hidden span-two">
+            <div class="wizard-heading"><p class="eyebrow">MINECRAFT JAVA</p><h3>Vanilla server</h3><p>Choose a release or leave it on latest. Mod loaders will be added separately after vanilla is validated.</p></div>
+            <label>Version<input id="new-minecraft-version" maxlength="32" value="latest" placeholder="latest or 1.21.11"></label>
+            <label class="toggle-row"><span><b>Accept Minecraft EULA</b><small>You must review and agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noreferrer">Minecraft EULA</a> to host this server.</small></span><input id="new-minecraft-eula" type="checkbox"></label>
+          </div>
           <div id="dragonwilds-fields" class="hidden span-two">
             <div class="wizard-heading"><p class="eyebrow">DRAGONWILDS SERVER</p><h3>Dedicated server settings</h3><p>Your Owner ID is required by the game. Find it at the bottom of the in-game Settings menu.</p></div>
             <div class="form-grid">
@@ -351,6 +360,6 @@
   </dialog>
 
   <div id="toast" class="toast"></div>
-  <script src="/app.js?v=20261014-game-capabilities1"></script>
+  <script src="/app.js?v=20261014-minecraft-vanilla1"></script>
 </body>
 </html>
