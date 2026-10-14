@@ -138,8 +138,20 @@ func (m *ServerManager) installMinecraft(version string) error {
 	if copyErr != nil { _ = os.Remove(tmpPath); return copyErr }
 	if closeErr != nil { _ = os.Remove(tmpPath); return closeErr }
 	if err := os.Rename(tmpPath, finalPath); err != nil { _ = os.Remove(tmpPath); return err }
+	if err := os.WriteFile(filepath.Join(gameDir, "eula.txt"), []byte("# Accepted by the server owner in HSM. See https://aka.ms/MinecraftEULA.\\neula=true\\n"), 0600); err != nil { return err }
 	m.appendLog("installer", "Downloaded Minecraft "+resolvedVersion+" server jar")
 	return nil
+}
+
+func (a *App) handleMinecraftInstall(w http.ResponseWriter, r *http.Request) {
+	m, s, err := a.requestServer(r)
+	if err != nil { jsonError(w, 404, err.Error()); return }
+	if s.GameType != "minecraft-java" { jsonError(w, 400, "select a Minecraft Java server before installing Minecraft files"); return }
+	if s.MinecraftVariant != "" && s.MinecraftVariant != "vanilla" { jsonError(w, 400, "only vanilla Minecraft Java servers are currently supported"); return }
+	if !s.MinecraftEulaAccepted { jsonError(w, 400, "accept the Minecraft EULA in the creation wizard before installing server files"); return }
+	if m.IsRunning() { jsonError(w, 409, "stop the server before installing or updating files"); return }
+	if err := m.RunMinecraftInstaller(s.MinecraftVersion); err != nil { jsonError(w, 409, err.Error()); return }
+	jsonOut(w, 202, map[string]any{"ok": true, "message": "Minecraft Java server download started; follow progress in Console"})
 }
 
 func writeMinecraftProperties(root string, s ServerSettings) error {
