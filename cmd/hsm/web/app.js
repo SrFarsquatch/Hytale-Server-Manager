@@ -38,6 +38,7 @@ function switchView(v){
   });
   $('#console-form')?.classList.toggle('hidden',!caps.console);
   $('.players-panel')?.classList.toggle('hidden',!caps.players);
+  $('.stat-strip > div:nth-child(2)')?.classList.toggle('hidden',!caps.players);
   $$('[data-action="auth"]').forEach(el=>el.classList.toggle('hidden',!caps.auth));
   $$('[data-action="backup"]').forEach(el=>el.classList.toggle('hidden',!caps.backups));
   $$('[data-update]').forEach(el=>el.closest('.panel')?.classList.toggle('hidden',!caps.update));
@@ -47,7 +48,9 @@ function switchView(v){
     note.classList.toggle('hidden',!state.serverId||!hasLimitedControls||['servers','app-settings'].includes(v));
     note.textContent=game==='runescape-dragonwilds'
       ?'Dragonwilds has its own server controls. Console commands, player queries, mods, and Hytale-specific backups are not available for this game.'
-      :'Some workspace tools are hidden until this game has a supported server adapter.';
+      :game==='minecraft-java'
+        ?'Vanilla Minecraft Java is supported. Mod loaders, player-list integration, and backup tools are not enabled yet.'
+        :'Some workspace tools are hidden until this game has a supported server adapter.';
   }
   $$('.view').forEach(x=>x.classList.remove('active'));
   const target=document.getElementById('view-'+v);
