@@ -616,10 +616,10 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	s.MemoryMax = body.MemoryMax
 	s.BackupFrequency = body.BackupFrequency
 	s.AutoStart = body.AutoStart
-	if err := ensureServerDirs(a.serverRoot(s)); err != nil {
-		jsonError(w, 500, err.Error())
-		return
-	}
+	// Validate a clone source before creating the destination directory. Otherwise
+	// a stale, running, or incompatible source can leave an orphan server folder.
+	var cloneSource *ServerManager
+	var cloneSettings ServerSettings
 	if body.SourceServerID != "" {
 		srcM, srcS, err := a.serverByID(body.SourceServerID)
 		if err != nil {
@@ -638,16 +638,34 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, 409, "source server is not installed")
 			return
 		}
-		if err := cloneGameInstall(a.serverRoot(srcS), a.serverRoot(s)); err != nil {
+		cloneSource = srcM
+		cloneSettings = srcS
+	}
+
+	destinationRoot := a.serverRoot(s)
+	if err := ensureServerDirs(destinationRoot); err != nil {
+		_ = removeServerData(destinationRoot, false)
+		jsonError(w, 500, err.Error())
+		return
+	}
+	if cloneSource != nil {
+		if err := cloneGameInstall(a.serverRoot(cloneSettings), destinationRoot); err != nil {
+			_ = removeServerData(destinationRoot, false)
 			jsonError(w, 500, "clone failed: "+err.Error())
 			return
 		}
 	}
+
 	a.cfgMu.Lock()
 	a.cfg.Servers = append(a.cfg.Servers, s)
 	err := a.saveConfigLocked()
+	if err != nil {
+		// Roll back the in-memory entry as well as the on-disk destination.
+		a.cfg.Servers = a.cfg.Servers[:len(a.cfg.Servers)-1]
+	}
 	a.cfgMu.Unlock()
 	if err != nil {
+		_ = removeServerData(destinationRoot, false)
 		jsonError(w, 500, err.Error())
 		return
 	}
