@@ -30,7 +30,9 @@ func playerQueryFor(gameType string) (playerQuery, bool) {
 }
 
 // Hytale answers /who with one line per world:
-//   GrandMine (1): : Clarkonalark (Clarkonalark)
+//
+//	GrandMine (1): : Clarkonalark (Clarkonalark)
+//
 // that is "<world> (<count>):", a separator, then "Name (username)" entries.
 var hytaleWhoWorld = regexp.MustCompile(`^(?:\[[^\]]*\]\s*)*(\S.*?) \((\d+)\):(.*)$`)
 var hytaleWhoEntry = regexp.MustCompile(`^(.*?)\s*\(([^()]*)\)$`)
