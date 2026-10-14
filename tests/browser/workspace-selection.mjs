@@ -429,6 +429,17 @@ try {
     }
   });
 
+  await check('every sidebar server can be clicked on a short window', async () => {
+    await page.setViewportSize({ width: 1280, height: 520 });
+    try {
+      for (const id of await page.$$eval('[data-select-server]', els => els.map(e => e.dataset.selectServer))) {
+        await page.click(`[data-select-server="${id}"]`, { timeout: 3000 });
+      }
+    } finally {
+      await page.setViewportSize({ width: 1280, height: 720 });
+    }
+  });
+
   await check('mobile overview has no horizontal page overflow', async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(400); // drawer hides after its slide-out transition
