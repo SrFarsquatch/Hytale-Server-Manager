@@ -21,10 +21,10 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
-	"regexp"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,36 +44,36 @@ type AdminConfig struct {
 }
 
 type ServerSettings struct {
-	ID              string `json:"id"`
-	GameType        string `json:"gameType,omitempty"`
-	DragonwildsOwnerID string `json:"dragonwildsOwnerId,omitempty"`
-	DragonwildsWorldName string `json:"dragonwildsWorldName,omitempty"`
+	ID                       string `json:"id"`
+	GameType                 string `json:"gameType,omitempty"`
+	DragonwildsOwnerID       string `json:"dragonwildsOwnerId,omitempty"`
+	DragonwildsWorldName     string `json:"dragonwildsWorldName,omitempty"`
 	DragonwildsAdminPassword string `json:"dragonwildsAdminPassword,omitempty"`
 	DragonwildsWorldPassword string `json:"dragonwildsWorldPassword,omitempty"`
-	DragonwildsPublic bool `json:"dragonwildsPublic,omitempty"`
-	MinecraftVersion string `json:"minecraftVersion,omitempty"`
-	MinecraftVariant string `json:"minecraftVariant,omitempty"`
-	MinecraftEulaAccepted bool `json:"minecraftEulaAccepted,omitempty"`
-	ServerName      string `json:"serverName"`
-	Port            int    `json:"port"`
-	GameMode        string `json:"gameMode"`
-	MaxPlayers      int    `json:"maxPlayers"`
-	MOTD            string `json:"motd"`
-	Password        string `json:"password"`
-	WhitelistEnabled bool   `json:"whitelistEnabled"`
-	MemoryMin       string `json:"memoryMin"`
-	MemoryMax       string `json:"memoryMax"`
-	AutoStart       bool   `json:"autoStart"`
+	DragonwildsPublic        bool   `json:"dragonwildsPublic,omitempty"`
+	MinecraftVersion         string `json:"minecraftVersion,omitempty"`
+	MinecraftVariant         string `json:"minecraftVariant,omitempty"`
+	MinecraftEulaAccepted    bool   `json:"minecraftEulaAccepted,omitempty"`
+	ServerName               string `json:"serverName"`
+	Port                     int    `json:"port"`
+	GameMode                 string `json:"gameMode"`
+	MaxPlayers               int    `json:"maxPlayers"`
+	MOTD                     string `json:"motd"`
+	Password                 string `json:"password"`
+	WhitelistEnabled         bool   `json:"whitelistEnabled"`
+	MemoryMin                string `json:"memoryMin"`
+	MemoryMax                string `json:"memoryMax"`
+	AutoStart                bool   `json:"autoStart"`
 	// AutoRestart restarts the server after it crashes (see crash.go).
-	AutoRestart     bool   `json:"autoRestart"`
-	ExtraArgs       string `json:"extraArgs"`
-	PublicHost      string `json:"publicHost"`
-	BackupFrequency int    `json:"backupFrequency"`
-	BackupRetention int    `json:"backupRetention"`
-	SnapshotRetention int  `json:"snapshotRetention"`
-	StorageDir      string `json:"storageDir,omitempty"`
-	PortMin         int    `json:"portMin,omitempty"`
-	PortMax         int    `json:"portMax,omitempty"`
+	AutoRestart       bool   `json:"autoRestart"`
+	ExtraArgs         string `json:"extraArgs"`
+	PublicHost        string `json:"publicHost"`
+	BackupFrequency   int    `json:"backupFrequency"`
+	BackupRetention   int    `json:"backupRetention"`
+	SnapshotRetention int    `json:"snapshotRetention"`
+	StorageDir        string `json:"storageDir,omitempty"`
+	PortMin           int    `json:"portMin,omitempty"`
+	PortMax           int    `json:"portMax,omitempty"`
 }
 
 type legacySettings struct {
@@ -88,11 +88,11 @@ type legacySettings struct {
 }
 
 type ControllerConfig struct {
-	Admin    *AdminConfig     `json:"admin,omitempty"`
-	Servers  []ServerSettings `json:"servers"`
+	Admin   *AdminConfig     `json:"admin,omitempty"`
+	Servers []ServerSettings `json:"servers"`
 	// Schedules holds each server's automated tasks, keyed by server ID.
 	Schedules map[string][]Schedule `json:"schedules,omitempty"`
-	Settings *legacySettings  `json:"settings,omitempty"`
+	Settings  *legacySettings       `json:"settings,omitempty"`
 }
 
 type Session struct {
@@ -101,23 +101,23 @@ type Session struct {
 }
 
 type App struct {
-	dataDir    string
-	cfgMu      sync.RWMutex
-	cfg        ControllerConfig
-	sessionsMu sync.Mutex
-	sessions   map[string]Session
-	loginMu sync.Mutex
-	loginAttempts map[string]loginAttempt
-	managersMu sync.RWMutex
-	managers   map[string]*ServerManager
-	resourceMu sync.Mutex
-	lastCPUUsageNS uint64
+	dataDir         string
+	cfgMu           sync.RWMutex
+	cfg             ControllerConfig
+	sessionsMu      sync.Mutex
+	sessions        map[string]Session
+	loginMu         sync.Mutex
+	loginAttempts   map[string]loginAttempt
+	managersMu      sync.RWMutex
+	managers        map[string]*ServerManager
+	resourceMu      sync.Mutex
+	lastCPUUsageNS  uint64
 	lastCPUSampleAt time.Time
-	lastCPUPercent float64
-	hasCPUPercent bool
-	sched        scheduler
-	crashMu      sync.Mutex
-	crashHistory map[string][]time.Time
+	lastCPUPercent  float64
+	hasCPUPercent   bool
+	sched           scheduler
+	crashMu         sync.Mutex
+	crashHistory    map[string][]time.Time
 	// crashBackoff overrides the auto-restart delays in tests.
 	crashBackoff []time.Duration
 }
@@ -317,7 +317,7 @@ func (a *App) routes(mux *http.ServeMux) {
 	deviceAuth := func(c GameCapability) bool { return c.DeviceAuth }
 	for _, x := range []struct {
 		path, cmd, feature string
-		supported func(GameCapability) bool
+		supported          func(GameCapability) bool
 	}{
 		{"/api/update/check", "/update check", "Game updates", gameUpdates}, {"/api/update/download", "/update download", "Game updates", gameUpdates},
 		{"/api/update/apply", "/update apply --confirm", "Game updates", gameUpdates}, {"/api/update/status", "/update status", "Game updates", gameUpdates},
@@ -429,25 +429,35 @@ const loginWindow = 15 * time.Minute
 const loginBlockDuration = 15 * time.Minute
 
 type loginAttempt struct {
-	Count int
-	WindowStart time.Time
+	Count        int
+	WindowStart  time.Time
 	BlockedUntil time.Time
 }
 
 func clientAddress(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err == nil && host != "" { return host }
-	if r.RemoteAddr != "" { return r.RemoteAddr }
+	if err == nil && host != "" {
+		return host
+	}
+	if r.RemoteAddr != "" {
+		return r.RemoteAddr
+	}
 	return "unknown"
 }
 
 func (a *App) loginBlocked(key string, now time.Time) (bool, time.Duration) {
 	a.loginMu.Lock()
 	defer a.loginMu.Unlock()
-	if a.loginAttempts == nil { a.loginAttempts = make(map[string]loginAttempt) }
+	if a.loginAttempts == nil {
+		a.loginAttempts = make(map[string]loginAttempt)
+	}
 	attempt, ok := a.loginAttempts[key]
-	if !ok { return false, 0 }
-	if now.Before(attempt.BlockedUntil) { return true, attempt.BlockedUntil.Sub(now) }
+	if !ok {
+		return false, 0
+	}
+	if now.Before(attempt.BlockedUntil) {
+		return true, attempt.BlockedUntil.Sub(now)
+	}
 	if !attempt.WindowStart.IsZero() && now.Sub(attempt.WindowStart) >= loginWindow {
 		delete(a.loginAttempts, key)
 		return false, 0
@@ -463,13 +473,17 @@ func (a *App) loginBlocked(key string, now time.Time) (bool, time.Duration) {
 func (a *App) recordLoginFailure(key string, now time.Time) {
 	a.loginMu.Lock()
 	defer a.loginMu.Unlock()
-	if a.loginAttempts == nil { a.loginAttempts = make(map[string]loginAttempt) }
+	if a.loginAttempts == nil {
+		a.loginAttempts = make(map[string]loginAttempt)
+	}
 	attempt := a.loginAttempts[key]
 	if attempt.WindowStart.IsZero() || now.Sub(attempt.WindowStart) >= loginWindow {
 		attempt = loginAttempt{WindowStart: now}
 	}
 	attempt.Count++
-	if attempt.Count >= loginAttemptLimit { attempt.BlockedUntil = now.Add(loginBlockDuration) }
+	if attempt.Count >= loginAttemptLimit {
+		attempt.BlockedUntil = now.Add(loginBlockDuration)
+	}
 	a.loginAttempts[key] = attempt
 	// Bound memory if many unique addresses hit the login endpoint.
 	if len(a.loginAttempts) > 4096 {
@@ -547,45 +561,60 @@ func (a *App) handleServersList(w http.ResponseWriter, r *http.Request) {
 }
 func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Game            string `json:"game"`
-		DragonwildsOwnerID string `json:"dragonwildsOwnerId"`
-		DragonwildsWorldName string `json:"dragonwildsWorldName"`
+		Game                     string `json:"game"`
+		DragonwildsOwnerID       string `json:"dragonwildsOwnerId"`
+		DragonwildsWorldName     string `json:"dragonwildsWorldName"`
 		DragonwildsAdminPassword string `json:"dragonwildsAdminPassword"`
 		DragonwildsWorldPassword string `json:"dragonwildsWorldPassword"`
-		DragonwildsPublic bool `json:"dragonwildsPublic"`
-		Name            string `json:"name"`
-		Port            int    `json:"port"`
-		GameMode        string `json:"gameMode"`
-		MaxPlayers      int    `json:"maxPlayers"`
-		MOTD            string `json:"motd"`
-		Password        string `json:"password"`
-		WhitelistEnabled bool `json:"whitelistEnabled"`
-		PublicHost      string `json:"publicHost"`
-		MemoryMin       string `json:"memoryMin"`
-		MemoryMax       string `json:"memoryMax"`
-		BackupFrequency int    `json:"backupFrequency"`
-		AutoStart       bool   `json:"autoStart"`
-		SourceServerID  string `json:"sourceServerId"`
-		MinecraftVersion string `json:"minecraftVersion"`
-		MinecraftVariant string `json:"minecraftVariant"`
-		MinecraftEulaAccepted bool `json:"minecraftEulaAccepted"`
+		DragonwildsPublic        bool   `json:"dragonwildsPublic"`
+		Name                     string `json:"name"`
+		Port                     int    `json:"port"`
+		GameMode                 string `json:"gameMode"`
+		MaxPlayers               int    `json:"maxPlayers"`
+		MOTD                     string `json:"motd"`
+		Password                 string `json:"password"`
+		WhitelistEnabled         bool   `json:"whitelistEnabled"`
+		PublicHost               string `json:"publicHost"`
+		MemoryMin                string `json:"memoryMin"`
+		MemoryMax                string `json:"memoryMax"`
+		BackupFrequency          int    `json:"backupFrequency"`
+		AutoStart                bool   `json:"autoStart"`
+		SourceServerID           string `json:"sourceServerId"`
+		MinecraftVersion         string `json:"minecraftVersion"`
+		MinecraftVariant         string `json:"minecraftVariant"`
+		MinecraftEulaAccepted    bool   `json:"minecraftEulaAccepted"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		jsonError(w, 400, err.Error())
 		return
 	}
 	game := strings.ToLower(strings.TrimSpace(body.Game))
-	if game == "" { game = "hytale" }
+	if game == "" {
+		game = "hytale"
+	}
 	if game != "hytale" && game != "runescape-dragonwilds" && game != "minecraft-java" {
 		jsonError(w, 400, "this release supports Hytale, Minecraft Java vanilla, and RuneScape: Dragonwilds; see GET /api/games for supported games")
 		return
 	}
 	if game == "minecraft-java" {
-		if body.MinecraftVariant == "" { body.MinecraftVariant = "vanilla" }
-		if body.MinecraftVariant != "vanilla" { jsonError(w, 400, "only vanilla Minecraft Java servers are currently supported"); return }
-		if !body.MinecraftEulaAccepted { jsonError(w, 400, "you must accept the Minecraft EULA before creating this server"); return }
-		if body.MinecraftVersion == "" { body.MinecraftVersion = "latest" }
-		if len(body.MinecraftVersion) > 32 || strings.ContainsAny(body.MinecraftVersion, "\r\n\x00") { jsonError(w, 400, "invalid Minecraft version"); return }
+		if body.MinecraftVariant == "" {
+			body.MinecraftVariant = "vanilla"
+		}
+		if body.MinecraftVariant != "vanilla" {
+			jsonError(w, 400, "only vanilla Minecraft Java servers are currently supported")
+			return
+		}
+		if !body.MinecraftEulaAccepted {
+			jsonError(w, 400, "you must accept the Minecraft EULA before creating this server")
+			return
+		}
+		if body.MinecraftVersion == "" {
+			body.MinecraftVersion = "latest"
+		}
+		if len(body.MinecraftVersion) > 32 || strings.ContainsAny(body.MinecraftVersion, "\r\n\x00") {
+			jsonError(w, 400, "invalid Minecraft version")
+			return
+		}
 	}
 	if game == "runescape-dragonwilds" {
 		if strings.TrimSpace(body.DragonwildsOwnerID) == "" {
@@ -596,7 +625,9 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, 400, "invalid Dragonwilds Owner ID")
 			return
 		}
-		if strings.TrimSpace(body.DragonwildsWorldName) == "" { body.DragonwildsWorldName = nameSafeDefault(body.Name) }
+		if strings.TrimSpace(body.DragonwildsWorldName) == "" {
+			body.DragonwildsWorldName = nameSafeDefault(body.Name)
+		}
 		if len(body.DragonwildsWorldName) > 32 || strings.ContainsAny(body.DragonwildsWorldName, "\r\n\x00") {
 			jsonError(w, 400, "Dragonwilds world name must be 1–32 characters")
 			return
@@ -616,7 +647,11 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.GameMode == "" {
-		if game == "minecraft-java" { body.GameMode = "Survival" } else { body.GameMode = "Adventure" }
+		if game == "minecraft-java" {
+			body.GameMode = "Survival"
+		} else {
+			body.GameMode = "Adventure"
+		}
 	}
 	if game == "minecraft-java" {
 		if body.GameMode != "Survival" && body.GameMode != "Adventure" && body.GameMode != "Creative" && body.GameMode != "Spectator" {
@@ -627,22 +662,41 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "game mode must be Adventure or Creative")
 		return
 	}
-	if body.MaxPlayers == 0 { if game == "runescape-dragonwilds" { body.MaxPlayers = 6 } else { body.MaxPlayers = 20 } }
-	if game == "runescape-dragonwilds" && body.MaxPlayers > 6 { jsonError(w, 400, "RuneScape: Dragonwilds supports up to 6 players"); return }
+	if body.MaxPlayers == 0 {
+		if game == "runescape-dragonwilds" {
+			body.MaxPlayers = 6
+		} else {
+			body.MaxPlayers = 20
+		}
+	}
+	if game == "runescape-dragonwilds" && body.MaxPlayers > 6 {
+		jsonError(w, 400, "RuneScape: Dragonwilds supports up to 6 players")
+		return
+	}
 	if body.MaxPlayers < 1 || body.MaxPlayers > 1000 {
 		jsonError(w, 400, "maximum players must be between 1 and 1000")
 		return
 	}
 	if body.MOTD == "" {
-		if game == "minecraft-java" { body.MOTD = "A Minecraft Server" } else { body.MOTD = "Welcome to your Hytale server!" }
+		if game == "minecraft-java" {
+			body.MOTD = "A Minecraft Server"
+		} else {
+			body.MOTD = "Welcome to your Hytale server!"
+		}
 	}
-	if body.MemoryMin == "" { body.MemoryMin = "2G" }
-	if body.MemoryMax == "" { body.MemoryMax = "4G" }
+	if body.MemoryMin == "" {
+		body.MemoryMin = "2G"
+	}
+	if body.MemoryMax == "" {
+		body.MemoryMax = "4G"
+	}
 	if !validMemory(body.MemoryMin) || !validMemory(body.MemoryMax) {
 		jsonError(w, 400, "memory values must look like 2G, 4096M, or 1024K")
 		return
 	}
-	if body.BackupFrequency == 0 { body.BackupFrequency = 30 }
+	if body.BackupFrequency == 0 {
+		body.BackupFrequency = 30
+	}
 	if body.BackupFrequency < 5 || body.BackupFrequency > 10080 {
 		jsonError(w, 400, "backup frequency must be between 5 and 10080 minutes")
 		return
@@ -654,13 +708,21 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	port := body.Port
 	if port == 0 {
-		if game == "runescape-dragonwilds" { port = a.nextAvailablePortForRange(7777, 7782) } else { port = a.nextAvailablePort() }
+		if game == "runescape-dragonwilds" {
+			port = a.nextAvailablePortForRange(7777, 7782)
+		} else {
+			port = a.nextAvailablePort()
+		}
 	}
 	min, max, _ := deploymentPortRange()
-	if game == "runescape-dragonwilds" { min, max = 7777, 7782 }
+	if game == "runescape-dragonwilds" {
+		min, max = 7777, 7782
+	}
 	if port < min || port > max {
 		protocol := "UDP"
-		if game == "minecraft-java" { protocol = "TCP" }
+		if game == "minecraft-java" {
+			protocol = "TCP"
+		}
 		jsonError(w, 400, fmt.Sprintf("port must be within the published %s range %d-%d", protocol, min, max))
 		return
 	}
@@ -678,7 +740,9 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	s.DragonwildsAdminPassword = body.DragonwildsAdminPassword
 	s.DragonwildsWorldPassword = body.DragonwildsWorldPassword
 	s.DragonwildsPublic = body.DragonwildsPublic
-	if game == "runescape-dragonwilds" { s.MaxPlayers = 6 }
+	if game == "runescape-dragonwilds" {
+		s.MaxPlayers = 6
+	}
 	s.GameMode = body.GameMode
 	s.MaxPlayers = body.MaxPlayers
 	s.MOTD = body.MOTD
@@ -745,7 +809,9 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	a.managersMu.Lock()
 	a.managers[id] = a.newServerManager(s)
 	a.managersMu.Unlock()
-	if s.GameType == "hytale" { _ = a.writeJVMOptionsFor(s) }
+	if s.GameType == "hytale" {
+		_ = a.writeJVMOptionsFor(s)
+	}
 	jsonOut(w, 201, settingsView(s))
 }
 func (a *App) handleServersDelete(w http.ResponseWriter, r *http.Request) {
@@ -907,9 +973,14 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) handlePlayers(w http.ResponseWriter, r *http.Request) {
 	m, settings, err := a.requestServer(r)
-	if err != nil { jsonError(w, 404, err.Error()); return }
+	if err != nil {
+		jsonError(w, 404, err.Error())
+		return
+	}
 	maxPlayers := settings.MaxPlayers
-	if maxPlayers < 1 { maxPlayers = 100 }
+	if maxPlayers < 1 {
+		maxPlayers = 100
+	}
 	if settings.GameType == "runescape-dragonwilds" {
 		jsonOut(w, 200, map[string]any{"known": false, "count": 0, "maxPlayers": 6, "players": []string{}, "message": "Player list integration is not available for Dragonwilds yet"})
 		return
@@ -932,38 +1003,56 @@ func (a *App) handlePlayers(w http.ResponseWriter, r *http.Request) {
 		jsonOut(w, 200, map[string]any{"known": false, "maxPlayers": maxPlayers, "players": []string{}, "message": "Could not query the server"})
 		return
 	}
-	if reportedMax > 0 { maxPlayers = reportedMax }
+	if reportedMax > 0 {
+		maxPlayers = reportedMax
+	}
 	message := "Waiting for a recognizable response to " + query.command
-	if known { message = "Player list updated" }
-	if players == nil { players = []string{} }
+	if known {
+		message = "Player list updated"
+	}
+	if players == nil {
+		players = []string{}
+	}
 	jsonOut(w, 200, map[string]any{"known": known, "count": len(players), "maxPlayers": maxPlayers, "players": players, "message": message})
 }
 
 var (
 	whoCountLine = regexp.MustCompile("(?i)(?:online players|players online|players)\\s*[(:]\\s*(\\d+)(?:\\s*/\\s*(\\d+))?\\s*\\)?\\s*:?\\s*(.*)")
-	whoSentence = regexp.MustCompile("(?i)(?:there are|total of)\\s+(\\d+)\\s+players?\\s+online\\s*[:\\-]?\\s*(.*)")
+	whoSentence  = regexp.MustCompile("(?i)(?:there are|total of)\\s+(\\d+)\\s+players?\\s+online\\s*[:\\-]?\\s*(.*)")
 	whoNamesLine = regexp.MustCompile("(?i)(?:online players|players online|connected players)\\s*:\\s*(.+)")
 )
 
 func parseWhoOutput(lines []LogLine) ([]string, bool) {
-	for i := len(lines)-1; i >= 0; i-- {
+	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimSpace(stripANSI(lines[i].Line))
 		lower := strings.ToLower(line)
-		if strings.Contains(lower, "no players online") || strings.Contains(lower, "0 players online") { return []string{}, true }
+		if strings.Contains(lower, "no players online") || strings.Contains(lower, "0 players online") {
+			return []string{}, true
+		}
 		match := whoCountLine.FindStringSubmatch(line)
-		if match == nil { match = whoSentence.FindStringSubmatch(line) }
+		if match == nil {
+			match = whoSentence.FindStringSubmatch(line)
+		}
 		if match == nil {
 			if names := whoNamesLine.FindStringSubmatch(line); names != nil {
 				players := parsePlayerNames(names[1])
-				if len(players) > 0 && !(len(players) == 1 && strings.TrimSpace(players[0]) == "0") { return players, true }
+				if len(players) > 0 && !(len(players) == 1 && strings.TrimSpace(players[0]) == "0") {
+					return players, true
+				}
 			}
 			continue
 		}
 		count, err := strconv.Atoi(match[1])
-		if err != nil || count < 0 || count > 1000 { continue }
+		if err != nil || count < 0 || count > 1000 {
+			continue
+		}
 		players := parsePlayerNames(strings.TrimSpace(match[len(match)-1]))
-		if count == 0 { return []string{}, true }
-		if len(players) > 0 { return players, true }
+		if count == 0 {
+			return []string{}, true
+		}
+		if len(players) > 0 {
+			return players, true
+		}
 		return nil, false
 	}
 	return nil, false
@@ -971,12 +1060,16 @@ func parseWhoOutput(lines []LogLine) ([]string, bool) {
 
 func parsePlayerNames(s string) []string {
 	s = strings.TrimSpace(strings.Trim(s, "[]{}"))
-	if s == "" { return nil }
+	if s == "" {
+		return nil
+	}
 	parts := strings.Split(s, ",")
 	players := make([]string, 0, len(parts))
 	for _, part := range parts {
 		name := strings.TrimSpace(strings.Trim(part, "[]{}•*- "))
-		if name != "" { players = append(players, name) }
+		if name != "" {
+			players = append(players, name)
+		}
 	}
 	return players
 }
@@ -984,6 +1077,7 @@ func parsePlayerNames(s string) []string {
 func (a *App) handleResources(w http.ResponseWriter, r *http.Request) {
 	jsonOut(w, 200, a.resourceMetrics())
 }
+
 // SettingsView is ServerSettings as sent to the browser. Passwords are never
 // returned; the *Set fields say whether each one is configured.
 type SettingsView struct {
@@ -1106,7 +1200,7 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.Port < min || in.Port > max {
-		jsonError(w, 400, fmt.Sprintf("port must be within the Docker/CasaOS %s range %d-%d", map[bool]string{true:"TCP", false:"UDP"}[current.GameType == "minecraft-java"], min, max))
+		jsonError(w, 400, fmt.Sprintf("port must be within the Docker/CasaOS %s range %d-%d", map[bool]string{true: "TCP", false: "UDP"}[current.GameType == "minecraft-java"], min, max))
 		return
 	}
 	if a.portInUse(in.Port, current.ID) {
@@ -1117,7 +1211,9 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "memory values must look like 2G, 4096M, or 1024K")
 		return
 	}
-	if in.GameMode == "" { in.GameMode = current.GameMode }
+	if in.GameMode == "" {
+		in.GameMode = current.GameMode
+	}
 	if current.GameType == "minecraft-java" {
 		if in.GameMode != "Survival" && in.GameMode != "Adventure" && in.GameMode != "Creative" && in.GameMode != "Spectator" {
 			jsonError(w, 400, "Minecraft game mode must be Survival, Adventure, Creative, or Spectator")
@@ -1127,7 +1223,9 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "game mode must be Adventure or Creative")
 		return
 	}
-	if in.MaxPlayers == 0 { in.MaxPlayers = current.MaxPlayers }
+	if in.MaxPlayers == 0 {
+		in.MaxPlayers = current.MaxPlayers
+	}
 	if in.MaxPlayers < 1 || in.MaxPlayers > 1000 {
 		jsonError(w, 400, "maximum players must be between 1 and 1000")
 		return
@@ -1136,18 +1234,26 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "RuneScape: Dragonwilds currently supports up to 6 players")
 		return
 	}
-	if in.MOTD == "" { in.MOTD = current.MOTD }
-	if in.BackupFrequency == 0 { in.BackupFrequency = current.BackupFrequency }
+	if in.MOTD == "" {
+		in.MOTD = current.MOTD
+	}
+	if in.BackupFrequency == 0 {
+		in.BackupFrequency = current.BackupFrequency
+	}
 	if in.BackupFrequency < 5 || in.BackupFrequency > 10080 {
 		jsonError(w, 400, "backup frequency must be between 5 and 10080 minutes")
 		return
 	}
-	if in.BackupRetention == 0 { in.BackupRetention = current.BackupRetention }
+	if in.BackupRetention == 0 {
+		in.BackupRetention = current.BackupRetention
+	}
 	if in.BackupRetention < 1 || in.BackupRetention > 100 {
 		jsonError(w, 400, "automatic backup retention must be between 1 and 100")
 		return
 	}
-	if in.SnapshotRetention == 0 { in.SnapshotRetention = current.SnapshotRetention }
+	if in.SnapshotRetention == 0 {
+		in.SnapshotRetention = current.SnapshotRetention
+	}
 	if in.SnapshotRetention < 1 || in.SnapshotRetention > 100 {
 		jsonError(w, 400, "snapshot retention must be between 1 and 100")
 		return
@@ -1559,35 +1665,57 @@ func (a *App) backupMaintenanceLoop() {
 		a.cfgMu.RLock()
 		servers := append([]ServerSettings(nil), a.cfg.Servers...)
 		a.cfgMu.RUnlock()
-		for _, s := range servers { a.pruneBackupRetention(s) }
+		for _, s := range servers {
+			a.pruneBackupRetention(s)
+		}
 	}
 }
 
 func (a *App) pruneBackupRetention(s ServerSettings) {
 	root := a.serverRoot(s)
 	pruneBackupFiles(filepath.Join(root, "game", "Server", "backups"), s.BackupRetention, func(name string) bool { return true })
-	pruneBackupFiles(filepath.Join(root, "snapshots"), s.SnapshotRetention, func(name string) bool { return strings.HasPrefix(name, "snapshot-") && strings.HasSuffix(name, ".tar.gz") })
+	pruneBackupFiles(filepath.Join(root, "snapshots"), s.SnapshotRetention, func(name string) bool {
+		return strings.HasPrefix(name, "snapshot-") && strings.HasSuffix(name, ".tar.gz")
+	})
 }
 
 func pruneBackupFiles(dir string, keep int, include func(string) bool) {
-	if keep < 1 { return }
+	if keep < 1 {
+		return
+	}
 	entries, err := os.ReadDir(dir)
-	if err != nil { return }
-	type backupEntry struct { path string; mod time.Time }
+	if err != nil {
+		return
+	}
+	type backupEntry struct {
+		path string
+		mod  time.Time
+	}
 	var files []backupEntry
 	for _, entry := range entries {
-		if entry.IsDir() || !include(entry.Name()) { continue }
+		if entry.IsDir() || !include(entry.Name()) {
+			continue
+		}
 		info, err := entry.Info()
-		if err != nil || !info.Mode().IsRegular() { continue }
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
 		files = append(files, backupEntry{path: filepath.Join(dir, entry.Name()), mod: info.ModTime()})
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].mod.After(files[j].mod) })
 	for _, old := range files[minInt(keep, len(files)):] {
-		if err := os.Remove(old.path); err != nil { log.Printf("backup retention: could not remove %s: %v", old.path, err) }
+		if err := os.Remove(old.path); err != nil {
+			log.Printf("backup retention: could not remove %s: %v", old.path, err)
+		}
 	}
 }
 
-func minInt(a, b int) int { if a < b { return a }; return b }
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
 func (a *App) handleNativeBackup(w http.ResponseWriter, r *http.Request) {
 	m, s, err := a.requestServer(r)
 	if err != nil {
@@ -1903,7 +2031,9 @@ func (a *App) loadConfig() error {
 			}
 		}
 		var rawFields map[string]json.RawMessage
-		if i < len(rawCfg.Servers) { rawFields = rawCfg.Servers[i] }
+		if i < len(rawCfg.Servers) {
+			rawFields = rawCfg.Servers[i]
+		}
 		a.migrateMissingHytaleSettings(&cfg.Servers[i], rawFields)
 		if cfg.Servers[i].Port == 0 {
 			cfg.Servers[i].Port = min + i
@@ -1945,22 +2075,34 @@ func (a *App) migrateMissingHytaleSettings(s *ServerSettings, raw map[string]jso
 	}
 	path := filepath.Join(a.serverRoot(*s), "game", "Server", "config.json")
 	b, err := os.ReadFile(path)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	var gameCfg map[string]any
-	if json.Unmarshal(b, &gameCfg) != nil { return }
+	if json.Unmarshal(b, &gameCfg) != nil {
+		return
+	}
 	if missing("gameMode") {
 		if defaults, ok := gameCfg["Defaults"].(map[string]any); ok {
-			if mode, ok := defaults["GameMode"].(string); ok && (mode == "Adventure" || mode == "Creative") { s.GameMode = mode }
+			if mode, ok := defaults["GameMode"].(string); ok && (mode == "Adventure" || mode == "Creative") {
+				s.GameMode = mode
+			}
 		}
 	}
 	if missing("maxPlayers") {
-		if players, ok := gameCfg["MaxPlayers"].(float64); ok && players >= 1 && players <= 1000 { s.MaxPlayers = int(players) }
+		if players, ok := gameCfg["MaxPlayers"].(float64); ok && players >= 1 && players <= 1000 {
+			s.MaxPlayers = int(players)
+		}
 	}
 	if missing("motd") {
-		if motd, ok := gameCfg["MOTD"].(string); ok { s.MOTD = motd }
+		if motd, ok := gameCfg["MOTD"].(string); ok {
+			s.MOTD = motd
+		}
 	}
 	if missing("password") {
-		if password, ok := gameCfg["Password"].(string); ok { s.Password = password }
+		if password, ok := gameCfg["Password"].(string); ok {
+			s.Password = password
+		}
 	}
 	if missing("whitelistEnabled") {
 		if required, ok := gameCfg["RequireJoinPermission"].(bool); ok {
@@ -1988,31 +2130,37 @@ func (a *App) applyHytaleConfig(s ServerSettings) error {
 		}
 		// Create a minimal current-schema config so first startup honors the wizard choices.
 		cfg := map[string]any{
-			"Version": 4,
-			"ServerName": s.ServerName,
-			"MOTD": s.MOTD,
-			"Password": s.Password,
-			"Port": s.Port,
-			"MaxPlayers": s.MaxPlayers,
-			"MaxViewRadius": 12,
-			"RequireJoinPermission": s.WhitelistEnabled,
-			"Defaults": map[string]any{"World": "default", "GameMode": s.GameMode},
-			"ConnectionTimeouts": map[string]any{"JoinTimeouts": map[string]any{}},
-			"RateLimit": map[string]any{},
-			"Modules": map[string]any{},
-			"LogLevels": map[string]any{},
-			"Mods": map[string]any{},
+			"Version":                 4,
+			"ServerName":              s.ServerName,
+			"MOTD":                    s.MOTD,
+			"Password":                s.Password,
+			"Port":                    s.Port,
+			"MaxPlayers":              s.MaxPlayers,
+			"MaxViewRadius":           12,
+			"RequireJoinPermission":   s.WhitelistEnabled,
+			"Defaults":                map[string]any{"World": "default", "GameMode": s.GameMode},
+			"ConnectionTimeouts":      map[string]any{"JoinTimeouts": map[string]any{}},
+			"RateLimit":               map[string]any{},
+			"Modules":                 map[string]any{},
+			"LogLevels":               map[string]any{},
+			"Mods":                    map[string]any{},
 			"DisplayTmpTagsInStrings": false,
-			"PlayerStorage": map[string]any{"Type": "Hytale"},
-			"AuthCredentialStore": map[string]any{"Type": "Encrypted", "Path": "auth.enc"},
+			"PlayerStorage":           map[string]any{"Type": "Hytale"},
+			"AuthCredentialStore":     map[string]any{"Type": "Encrypted", "Path": "auth.enc"},
 		}
 		out, err := json.MarshalIndent(cfg, "", "  ")
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		return atomicWrite(path, out, 0644)
 	}
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	var cfg map[string]any
-	if err := json.Unmarshal(b, &cfg); err != nil { return fmt.Errorf("invalid config.json: %w", err) }
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		return fmt.Errorf("invalid config.json: %w", err)
+	}
 	cfg["ServerName"] = s.ServerName
 	cfg["Port"] = s.Port
 	cfg["MOTD"] = s.MOTD
@@ -2020,10 +2168,15 @@ func (a *App) applyHytaleConfig(s ServerSettings) error {
 	cfg["MaxPlayers"] = s.MaxPlayers
 	cfg["RequireJoinPermission"] = s.WhitelistEnabled
 	defaults, ok := cfg["Defaults"].(map[string]any)
-	if !ok { defaults = map[string]any{}; cfg["Defaults"] = defaults }
+	if !ok {
+		defaults = map[string]any{}
+		cfg["Defaults"] = defaults
+	}
 	defaults["GameMode"] = s.GameMode
 	out, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	return atomicWrite(path, out, 0644)
 }
 
@@ -2079,7 +2232,9 @@ func (a *App) portInUse(port int, except string) bool {
 
 func NewServerManager(rootDir, toolsDir string, gameTypes ...string) *ServerManager {
 	gameType := "hytale"
-	if len(gameTypes) > 0 && strings.TrimSpace(gameTypes[0]) != "" { gameType = strings.ToLower(strings.TrimSpace(gameTypes[0])) }
+	if len(gameTypes) > 0 && strings.TrimSpace(gameTypes[0]) != "" {
+		gameType = strings.ToLower(strings.TrimSpace(gameTypes[0]))
+	}
 	return &ServerManager{rootDir: rootDir, toolsDir: toolsDir, gameType: gameType, logs: &LogRing{max: 2500}, hub: &LogHub{clients: map[chan LogLine]struct{}{}}}
 }
 func (m *ServerManager) Installed() bool {
@@ -2662,6 +2817,7 @@ func jsonOut(w http.ResponseWriter, code int, v any) {
 func jsonError(w http.ResponseWriter, code int, msg string) {
 	jsonOut(w, code, map[string]any{"error": msg})
 }
+
 // decodeJSONAllowUnknown is decodeJSON without rejecting unknown fields.
 func decodeJSONAllowUnknown(r *http.Request, v any) error {
 	return json.NewDecoder(io.LimitReader(r.Body, 4<<20)).Decode(v)

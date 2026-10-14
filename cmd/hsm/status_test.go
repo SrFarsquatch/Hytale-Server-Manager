@@ -35,7 +35,6 @@ func TestServerDisplayState(t *testing.T) {
 	}
 }
 
-
 func TestServerDisplayStateWithPhase(t *testing.T) {
 	for _, phase := range []string{"starting", "stopping"} {
 		t.Run(phase, func(t *testing.T) {
