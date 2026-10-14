@@ -18,18 +18,24 @@ A self-hosted web panel for running multiple Hytale dedicated servers from one L
 
 ### Other games
 
-- **Minecraft Java (vanilla):**
-  - official server download from Mojang, with EULA acceptance
+- **Minecraft Java (vanilla, Paper or Fabric):**
+  - choose the server type when creating the server:
+    - **Vanilla:** Mojang's official server.
+    - **Paper:** the newest stable PaperMC build, checked against its published SHA-256. Plugins (`.jar`) go in `plugins/`, managed from the Plugins tab.
+    - **Fabric:** the Fabric server launcher with the newest stable loader. Mods (`.jar`) go in `mods/`, managed from the Mods tab. Most mods also need Fabric API.
+  - EULA acceptance required
   - console and player list (`list`)
-  - full snapshots, including while the server is running (autosave is paused for the copy)
+  - full snapshots, including while the server is running (autosave is paused for the copy); snapshots also include `plugins/`, `mods/` and `config/`
   - a game rules form for common `server.properties` settings
   - a Java version check before start
-- **Terraria (vanilla):**
-  - official server download from terraria.org (`latest` or a chosen release); the Linux server runs only on x86-64 (amd64) hosts
+- **Terraria (vanilla or tModLoader):**
+  - choose the server type when creating the server:
+    - **Vanilla:** the official server from terraria.org (`latest` or a chosen release such as `1.4.4.9`). The Linux server runs only on x86-64 (amd64) hosts.
+    - **tModLoader:** the latest (or a chosen) release from GitHub. The first start downloads the .NET runtime into the server folder, so it also runs on ARM hosts. Upload `.tmod` files from the Mods tab; HSM keeps `Mods/enabled.json` in sync. Workshop mods can be copied from a game client's `steamapps/workshop/content/1281930` folder.
   - world name, size and difficulty chosen at creation; the world is generated on first start
   - `serverconfig.txt` written before each start, keeping any extra lines you add
   - console, player list (`playing`), graceful stop (`exit` saves the world)
-  - snapshots of `Worlds`, `serverconfig.txt` and `banlist.txt` while the server is stopped
+  - snapshots of `Worlds`, `serverconfig.txt` and `banlist.txt` (plus `Mods` and `ModConfigs` for tModLoader) while the server is stopped
   - uses TCP in the published `5520`–`5525` range
 - **RuneScape: Dragonwilds:** SteamCMD install, dedicated-server settings and console output.
 

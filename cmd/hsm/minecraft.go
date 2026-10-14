@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-const minecraftVersionManifestURL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
+var minecraftVersionManifestURL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 
 type MinecraftAdapter struct{}
 
@@ -32,8 +32,8 @@ func (MinecraftAdapter) ValidateNew(req *newServerRequest) error {
 	if req.MinecraftVariant == "" {
 		req.MinecraftVariant = "vanilla"
 	}
-	if req.MinecraftVariant != "vanilla" {
-		return errors.New("only vanilla Minecraft Java servers are currently supported")
+	if !validMinecraftVariant(req.MinecraftVariant) {
+		return errors.New("Minecraft server type must be vanilla, paper or fabric")
 	}
 	if !req.MinecraftEulaAccepted {
 		return errors.New("you must accept the Minecraft EULA before creating this server")
@@ -66,7 +66,7 @@ func (MinecraftAdapter) InstallStatus(app *App, s ServerSettings) map[string]any
 
 func (MinecraftAdapter) Installed(rootDir string) bool {
 	b, err := os.ReadFile(filepath.Join(rootDir, "game", "eula.txt"))
-	if err != nil || !fileExists(filepath.Join(rootDir, "game", "server.jar")) {
+	if err != nil || !fileExists(filepath.Join(rootDir, "game", "server.jar")) && !fileExists(filepath.Join(rootDir, "game", fabricLauncherJar)) {
 		return false
 	}
 	for _, line := range strings.Split(string(b), "\n") {
@@ -90,13 +90,19 @@ func (MinecraftAdapter) PrepareLaunch(app *App, settings ServerSettings) ([]stri
 	if err := writeMinecraftProperties(app.serverRoot(settings), settings); err != nil {
 		return nil, err
 	}
-	return []string{"-Xms" + settings.MemoryMin, "-Xmx" + settings.MemoryMax, "-jar", "server.jar", "nogui"}, nil
+	return []string{"-Xms" + settings.MemoryMin, "-Xmx" + settings.MemoryMax, "-jar", minecraftLaunchJar(settings.MinecraftVariant), "nogui"}, nil
 }
 
 func (MinecraftAdapter) BuildProcess(rootDir string, args []string) (ProcessLaunch, error) {
 	gameDir := filepath.Join(rootDir, "game")
-	if !fileExists(filepath.Join(gameDir, "server.jar")) {
-		return ProcessLaunch{}, errors.New("Minecraft server.jar is missing; install the server files first")
+	jar := "server.jar"
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == "-jar" {
+			jar = args[i+1]
+		}
+	}
+	if !fileExists(filepath.Join(gameDir, jar)) {
+		return ProcessLaunch{}, errors.New("Minecraft " + jar + " is missing; install the server files first")
 	}
 	return ProcessLaunch{Path: "java", Args: append([]string(nil), args...), Dir: gameDir}, nil
 }
@@ -200,7 +206,13 @@ func resolveMinecraftServerURL(ctx context.Context, client *http.Client, version
 	return version, meta.Downloads.Server.URL, meta.JavaVersion.MajorVersion, nil
 }
 
-func (m *ServerManager) RunMinecraftInstaller(version string) error {
+func (m *ServerManager) RunMinecraftInstaller(version, variant string) error {
+	if variant == "" {
+		variant = "vanilla"
+	}
+	if !validMinecraftVariant(variant) {
+		return fmt.Errorf("unknown Minecraft server variant %q", variant)
+	}
 	m.mu.Lock()
 	if m.running {
 		m.mu.Unlock()
@@ -222,7 +234,7 @@ func (m *ServerManager) RunMinecraftInstaller(version string) error {
 	m.mu.Unlock()
 	go func() {
 		defer func() { m.mu.Lock(); m.installBusy = false; m.mu.Unlock() }()
-		if err := m.installMinecraft(version); err != nil {
+		if err := m.installMinecraft(version, variant); err != nil {
 			m.appendLog("installer", "Minecraft installation failed: "+err.Error())
 		} else {
 			m.appendLog("installer", "Minecraft Java server files installed successfully")
@@ -231,51 +243,45 @@ func (m *ServerManager) RunMinecraftInstaller(version string) error {
 	return nil
 }
 
-func (m *ServerManager) installMinecraft(version string) error {
+var minecraftVariantNames = map[string]string{"vanilla": "vanilla", "paper": "Paper", "fabric": "Fabric"}
+
+func (m *ServerManager) installMinecraft(version, variant string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	client := &http.Client{Timeout: 8 * time.Minute}
-	resolvedVersion, downloadURL, javaMajor, err := resolveMinecraftServerURL(ctx, client, version)
+	var resolvedVersion, downloadURL, sha string
+	var javaMajor int
+	var err error
+	switch variant {
+	case "paper":
+		resolvedVersion, downloadURL, sha, err = resolvePaper(ctx, client, version)
+	case "fabric":
+		resolvedVersion, downloadURL, err = resolveFabric(ctx, client, version)
+	default:
+		resolvedVersion, downloadURL, javaMajor, err = resolveMinecraftServerURL(ctx, client, version)
+	}
 	if err != nil {
 		return err
+	}
+	if variant != "vanilla" {
+		// Paper and Fabric run Mojang's server code, so Mojang's published Java
+		// requirement applies. If it cannot be read, the check is skipped.
+		if _, _, major, err := resolveMinecraftServerURL(ctx, client, resolvedVersion); err == nil {
+			javaMajor = major
+		} else {
+			m.appendLog("installer", "Could not read the Java requirement for Minecraft "+resolvedVersion+": "+err.Error())
+		}
 	}
 	gameDir := filepath.Join(m.rootDir, "game")
 	if err := os.MkdirAll(gameDir, 0755); err != nil {
 		return err
 	}
-	finalPath := filepath.Join(gameDir, "server.jar")
-	tmpPath := filepath.Join(gameDir, ".server.jar.download")
+	finalPath := filepath.Join(gameDir, minecraftLaunchJar(variant))
+	tmpPath := finalPath + ".download"
 	_ = os.Remove(tmpPath)
-	m.appendLog("installer", "Downloading official Minecraft Java server "+resolvedVersion+"…")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
-	if err != nil {
-		return err
-	}
-	resp, err := client.Do(req)
-	if err != nil {
+	m.appendLog("installer", "Downloading the "+minecraftVariantNames[variant]+" server for Minecraft "+resolvedVersion+"…")
+	if err := downloadVerified(ctx, client, downloadURL, tmpPath, 512<<20, sha); err != nil {
 		return fmt.Errorf("download server jar: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Minecraft server download returned HTTP %d", resp.StatusCode)
-	}
-	out, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	written, copyErr := io.Copy(out, io.LimitReader(resp.Body, (512<<20)+1))
-	closeErr := out.Close()
-	if copyErr != nil {
-		_ = os.Remove(tmpPath)
-		return copyErr
-	}
-	if written > 512<<20 {
-		_ = os.Remove(tmpPath)
-		return errors.New("Minecraft server download exceeded the 512 MiB safety limit")
-	}
-	if closeErr != nil {
-		_ = os.Remove(tmpPath)
-		return closeErr
 	}
 	if err := validateMinecraftJar(tmpPath); err != nil {
 		_ = os.Remove(tmpPath)
@@ -288,10 +294,14 @@ func (m *ServerManager) installMinecraft(version string) error {
 	if err := os.WriteFile(filepath.Join(gameDir, "eula.txt"), []byte("# Accepted by the server owner in HSM. See https://aka.ms/MinecraftEULA.\neula=true\n"), 0600); err != nil {
 		return err
 	}
-	if err := writeMinecraftInstallInfo(gameDir, minecraftInstallInfo{Version: resolvedVersion, JavaMajor: javaMajor}); err != nil {
+	if err := writeMinecraftInstallInfo(gameDir, minecraftInstallInfo{Version: resolvedVersion, JavaMajor: javaMajor, Variant: variant}); err != nil {
 		return err
 	}
-	m.appendLog("installer", "Downloaded Minecraft "+resolvedVersion+" server jar")
+	if variant == "fabric" {
+		m.appendLog("installer", "Installed the Fabric launcher for Minecraft "+resolvedVersion+"; it downloads Mojang's server on first start")
+	} else {
+		m.appendLog("installer", "Downloaded the "+minecraftVariantNames[variant]+" server for Minecraft "+resolvedVersion)
+	}
 	return nil
 }
 
@@ -305,10 +315,6 @@ func (a *App) handleMinecraftInstall(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "select a Minecraft Java server before installing Minecraft files")
 		return
 	}
-	if s.MinecraftVariant != "" && s.MinecraftVariant != "vanilla" {
-		jsonError(w, 400, "only vanilla Minecraft Java servers are currently supported")
-		return
-	}
 	if !s.MinecraftEulaAccepted {
 		jsonError(w, 400, "accept the Minecraft EULA in the creation wizard before installing server files")
 		return
@@ -317,11 +323,11 @@ func (a *App) handleMinecraftInstall(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 409, "stop the server before installing or updating files")
 		return
 	}
-	if err := m.RunMinecraftInstaller(s.MinecraftVersion); err != nil {
+	if err := m.RunMinecraftInstaller(s.MinecraftVersion, s.MinecraftVariant); err != nil {
 		jsonError(w, 409, err.Error())
 		return
 	}
-	jsonOut(w, 202, map[string]any{"ok": true, "message": "Minecraft Java server download started; follow progress in Console"})
+	jsonOut(w, 202, map[string]any{"ok": true, "message": "Minecraft server download started; follow progress in Console"})
 }
 
 func validateMinecraftJar(path string) error {
@@ -418,6 +424,7 @@ func mergeMinecraftProperties(path string, values []struct{ key, value string })
 type minecraftInstallInfo struct {
 	Version   string `json:"version"`
 	JavaMajor int    `json:"javaMajor"`
+	Variant   string `json:"variant,omitempty"`
 }
 
 const minecraftInstallInfoFile = ".hsm-minecraft.json"

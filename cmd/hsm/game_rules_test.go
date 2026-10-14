@@ -76,7 +76,7 @@ func TestCreateRejectsValuesOutsideEachGamesRules(t *testing.T) {
 		{"hytale mode", `{"name":"Alpha","gameMode":"Survival"}`, "Adventure or Creative"},
 		{"hytale port", `{"name":"Alpha","port":7777}`, "UDP range"},
 		{"minecraft mode", `{"game":"minecraft-java","name":"Blocks","minecraftEulaAccepted":true,"gameMode":"Hardcore"}`, "Survival, Adventure, Creative, or Spectator"},
-		{"minecraft variant", `{"game":"minecraft-java","name":"Blocks","minecraftEulaAccepted":true,"minecraftVariant":"paper"}`, "only vanilla"},
+		{"minecraft variant", `{"game":"minecraft-java","name":"Blocks","minecraftEulaAccepted":true,"minecraftVariant":"forge"}`, "vanilla, paper or fabric"},
 		{"minecraft version", `{"game":"minecraft-java","name":"Blocks","minecraftEulaAccepted":true,"minecraftVersion":"1.21\n"}`, "invalid Minecraft version"},
 		{"minecraft port", `{"game":"minecraft-java","name":"Blocks","minecraftEulaAccepted":true,"port":7777}`, "TCP range"},
 		{"dragonwilds players", `{"game":"runescape-dragonwilds","name":"Vale","dragonwildsOwnerId":"o","dragonwildsAdminPassword":"a","maxPlayers":7}`, "up to 6 players"},

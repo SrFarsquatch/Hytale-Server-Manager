@@ -163,7 +163,7 @@ func TestMojangURLValidationRejectsNonOfficialOrInsecureURLs(t *testing.T) {
 
 func TestMinecraftInstallerRejectsOtherGameManager(t *testing.T) {
 	m := NewServerManager(t.TempDir(), t.TempDir(), "hytale")
-	if err := m.RunMinecraftInstaller("latest"); err == nil || !strings.Contains(err.Error(), "Minecraft Java") {
+	if err := m.RunMinecraftInstaller("latest", "vanilla"); err == nil || !strings.Contains(err.Error(), "Minecraft Java") {
 		t.Fatalf("RunMinecraftInstaller error = %v, want wrong-game rejection", err)
 	}
 }

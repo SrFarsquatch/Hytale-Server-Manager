@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#151a24">
   <title>HSM · Game Server Control Panel</title>
-  <link rel="stylesheet" href="/app.css?v=20261015-terraria2">
+  <link rel="stylesheet" href="/app.css?v=20261016-variants2">
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -115,7 +115,7 @@
             <button type="button" data-view-tab="dashboard" class="active"><svg class="icon"><use href="#i-overview"/></svg>Overview</button>
             <button type="button" data-view-tab="console"><svg class="icon"><use href="#i-terminal"/></svg>Console</button>
             <button type="button" data-view-tab="config"><svg class="icon"><use href="#i-folder"/></svg>Files</button>
-            <button type="button" data-view-tab="mods"><svg class="icon"><use href="#i-puzzle"/></svg>Mods</button>
+            <button type="button" data-view-tab="mods"><svg class="icon"><use href="#i-puzzle"/></svg><span id="mods-tab-label">Mods</span></button>
             <button type="button" data-view-tab="backups"><svg class="icon"><use href="#i-archive"/></svg>Backups</button>
             <button type="button" data-view-tab="schedules"><svg class="icon"><use href="#i-clock"/></svg>Schedules</button>
             <button type="button" data-view-tab="setup"><svg class="icon"><use href="#i-download"/></svg>Install</button>
@@ -260,7 +260,7 @@
         </section>
 
         <section id="view-mods" class="view">
-          <section class="card"><div class="card-head"><div><h3>Mods</h3><p class="muted small">Installed for the selected server only.</p></div><label class="btn primary small file-btn"><svg class="icon"><use href="#i-plus"/></svg>Add mod<input type="file" id="mod-file" accept=".jar,.zip"></label></div><div id="mods-list" class="file-list empty-state">No mods installed.</div></section>
+          <section class="card"><div class="card-head"><div><h3 id="mods-title">Mods</h3><p class="muted small" id="mods-help">Installed for the selected server only.</p></div><label class="btn primary small file-btn"><svg class="icon"><use href="#i-plus"/></svg><span id="mods-add-label">Add mod</span><input type="file" id="mod-file" accept=".jar,.zip"></label></div><div id="mods-list" class="file-list empty-state">No mods installed.</div></section>
         </section>
 
         <section id="view-backups" class="view">
@@ -310,12 +310,12 @@
               <div class="step"><span class="step-index">3</span><div><h4>First start</h4><p class="muted small">Start the server, then authenticate from the Console using the device code.</p></div><div class="toolbar"><button type="button" class="btn small success" id="setup-start">Start</button><button type="button" class="btn small" id="setup-auth">Authenticate</button></div></div>
             </div>
             <div id="minecraft-install-controls" class="steps hidden">
-              <div class="step"><span class="step-index">1</span><div><h4>Download official server</h4><p class="muted small">Fetches the Mojang-published vanilla Java server jar for the selected release. The first launch generates the remaining files.</p></div><div class="toolbar"><button type="button" class="btn small primary" id="minecraft-install">Download vanilla server</button></div></div>
+              <div class="step"><span class="step-index">1</span><div><h4>Download official server</h4><p class="muted small" id="minecraft-install-help">Fetches the official server for this server type. The first launch generates the remaining files.</p></div><div class="toolbar"><button type="button" class="btn small primary" id="minecraft-install">Download vanilla server</button></div></div>
               <p class="muted small">Minecraft Java uses TCP. This release maps TCP 5520–5525 alongside the Hytale UDP ports. Forward the chosen TCP port in your router for players outside your network.</p>
             </div>
             <div id="terraria-install-controls" class="steps hidden">
-              <div class="step"><span class="step-index">1</span><div><h4>Download official server</h4><p class="muted small">Fetches the official Terraria dedicated server from terraria.org and installs its Linux build. The world is generated on the first start, which can take a few minutes.</p></div><div class="toolbar"><button type="button" class="btn small primary" id="terraria-install">Download vanilla server</button></div></div>
-              <p class="muted small">Terraria uses TCP. The official Linux server runs only on x86-64 (amd64) hosts. World files live in <code>game/Worlds</code>.</p>
+              <div class="step"><span class="step-index">1</span><div><h4>Download server</h4><p class="muted small" id="terraria-install-help">Fetches the official Terraria dedicated server from terraria.org and installs its Linux build. The world is generated on the first start, which can take a few minutes.</p></div><div class="toolbar"><button type="button" class="btn small primary" id="terraria-install">Download vanilla server</button></div></div>
+              <p class="muted small" id="terraria-install-note">Terraria uses TCP. The official Linux server runs only on x86-64 (amd64) hosts. World files live in <code>game/Worlds</code>.</p>
             </div>
             <div id="dragonwilds-install-controls" class="steps hidden">
               <div class="step"><span class="step-index">1</span><div><h4>Install or update Dragonwilds</h4><p class="muted small">Downloads the official Linux dedicated-server files through Valve SteamCMD. Progress and errors appear in Console.</p></div><div class="toolbar"><button type="button" class="btn small primary" id="dragonwilds-install">Install dedicated server</button></div></div>
@@ -424,17 +424,19 @@
           <label id="new-whitelist-row" class="toggle-row span-two hytale-only"><span><b>Require whitelist permission</b><small>Private server; players need join permission.</small></span><input id="new-server-whitelist" type="checkbox"></label>
           <label class="span-two hytale-only">Server password (optional)<input id="new-server-password" type="password" autocomplete="new-password" placeholder="Leave empty for an open server"></label>
           <div id="minecraft-fields" class="hidden span-two">
-            <h3>Minecraft Java · Vanilla</h3>
-            <p class="muted small">Choose a release or leave it on latest. Mod loaders will be added separately after vanilla is validated.</p>
+            <h3>Minecraft Java</h3>
+            <p class="muted small">Choose the server type and a release, or leave it on latest. The type cannot be changed after the server is created.</p>
             <div class="form-grid one">
+              <label>Server type<select id="new-minecraft-variant"><option value="vanilla">Vanilla (Mojang)</option><option value="paper">Paper (plugins)</option><option value="fabric">Fabric (mods)</option></select><small id="new-minecraft-variant-help">Mojang's official server, without plugins or mods.</small></label>
               <label>Version<input id="new-minecraft-version" maxlength="32" value="latest" placeholder="latest or 1.21.11"></label>
               <label class="toggle-row"><span><b>Accept Minecraft EULA</b><small>You must review and agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noreferrer">Minecraft EULA</a> to host this server.</small></span><input id="new-minecraft-eula" type="checkbox"></label>
             </div>
           </div>
           <div id="terraria-fields" class="hidden span-two">
-            <h3>Terraria · Vanilla</h3>
-            <p class="muted small">The world is generated on the first start. Its name, size and difficulty cannot be changed afterwards.</p>
+            <h3>Terraria</h3>
+            <p class="muted small">The world is generated on the first start. The server type and the world's name, size and difficulty cannot be changed afterwards.</p>
             <div class="form-grid">
+              <label class="span-two">Server type<select id="new-terraria-variant"><option value="vanilla">Vanilla (Re-Logic)</option><option value="tmodloader">tModLoader (mods)</option></select><small id="new-terraria-variant-help">The official dedicated server, without mods. x86-64 hosts only.</small></label>
               <label>World name<input id="new-terraria-world" maxlength="32" placeholder="Defaults to the server name"></label>
               <label>World size<select id="new-terraria-size"><option value="small">Small</option><option value="medium" selected>Medium</option><option value="large">Large</option></select></label>
               <label class="span-two">Version<input id="new-terraria-version" maxlength="16" value="latest" placeholder="latest or 1.4.4.9"></label>
@@ -469,6 +471,6 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/app.js?v=20261015-terraria2"></script>
+  <script src="/app.js?v=20261016-variants2"></script>
 </body>
 </html>

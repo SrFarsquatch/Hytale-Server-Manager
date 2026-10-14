@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestSupportedGameCatalogListsGamesAndEnablesImplementedAdapters(t *testing.T) {
 	games := supportedGameCatalog()
@@ -54,8 +57,8 @@ func TestGameCatalogCapabilitiesDoNotOverstatePlannedGameSupport(t *testing.T) {
 				c.Mods || c.NativeBackups || c.DeviceAuth || c.GameUpdates {
 				t.Errorf("Minecraft Java vanilla capabilities unexpected: %#v", game.Capabilities)
 			}
-			if len(game.Capabilities.Variants) != 1 || game.Capabilities.Variants[0] != "vanilla" {
-				t.Errorf("Minecraft variants = %#v, want vanilla only", game.Capabilities.Variants)
+			if strings.Join(game.Capabilities.Variants, ",") != "vanilla,paper,fabric" {
+				t.Errorf("Minecraft variants = %#v, want vanilla, paper and fabric", game.Capabilities.Variants)
 			}
 			continue
 		}
@@ -66,8 +69,8 @@ func TestGameCatalogCapabilitiesDoNotOverstatePlannedGameSupport(t *testing.T) {
 				c.LiveSnapshots || c.Mods || c.NativeBackups || c.ServerProperties || c.DeviceAuth || c.GameUpdates || len(c.ConfigFiles) != 0 {
 				t.Errorf("Terraria vanilla capabilities unexpected: %#v", c)
 			}
-			if len(c.Variants) != 1 || c.Variants[0] != "vanilla" {
-				t.Errorf("Terraria variants = %#v, want vanilla only", c.Variants)
+			if strings.Join(c.Variants, ",") != "vanilla,tmodloader" {
+				t.Errorf("Terraria variants = %#v, want vanilla and tmodloader", c.Variants)
 			}
 			continue
 		}

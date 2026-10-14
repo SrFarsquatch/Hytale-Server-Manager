@@ -369,6 +369,47 @@ try {
     assert.match(await text('#install-state'), /Terraria server installed/);
   });
 
+  await check('Paper servers manage plugins in the Mods tab', async () => {
+    await call('POST', '/api/servers', { game: 'minecraft-java', minecraftVariant: 'paper', minecraftVersion: 'latest', minecraftEulaAccepted: true, name: 'Echo Paper', memoryMin: '1G', memoryMax: '2G' });
+    try {
+      await page.waitForSelector('[data-select-server="echo-paper"]', { timeout: 10000 });
+      await select('echo-paper');
+      await waitForName('Echo Paper');
+      assert.equal(await text('#mods-tab-label'), 'Plugins');
+      await page.click('[data-view-tab="mods"]');
+      assert.equal(await text('#mods-title'), 'Plugins');
+      await page.setInputFiles('#mod-file', { name: 'EssentialsX.jar', mimeType: 'application/java-archive', buffer: Buffer.from('jar') });
+      await page.waitForFunction(() => document.querySelector('#mods-list').textContent.includes('EssentialsX.jar'), null, { timeout: 5000 });
+      await page.click('[data-view-tab="setup"]');
+      await page.waitForFunction(() => /Paper/.test(document.querySelector('#minecraft-install').textContent), null, { timeout: 5000 });
+      await select('bravo-minecraft');
+      await waitForName('Bravo Minecraft');
+      assert.ok(!(await visible('[data-view-tab="mods"]')), 'vanilla Minecraft has no Mods tab');
+    } finally {
+      await call('DELETE', '/api/servers/echo-paper').catch(() => {});
+    }
+  });
+
+  await check('tModLoader servers take .tmod mods', async () => {
+    await call('POST', '/api/servers', { game: 'terraria', terrariaVariant: 'tmodloader', name: 'Foxtrot Modded' });
+    try {
+      await page.waitForSelector('[data-select-server="foxtrot-modded"]', { timeout: 10000 });
+      await select('foxtrot-modded');
+      await waitForName('Foxtrot Modded');
+      assert.equal(await text('#mods-tab-label'), 'Mods');
+      await page.click('[data-view-tab="mods"]');
+      assert.equal(await page.getAttribute('#mod-file', 'accept'), '.tmod');
+      await page.setInputFiles('#mod-file', { name: 'CalamityMod.tmod', mimeType: 'application/octet-stream', buffer: Buffer.from('tmod') });
+      await page.waitForFunction(() => document.querySelector('#mods-list').textContent.includes('CalamityMod.tmod'), null, { timeout: 5000 });
+      const enabled = await (await fetch(base + '/api/files/content?path=' + encodeURIComponent('game/Mods/enabled.json'), { headers: { Cookie: cookie, 'X-HSM-Server': 'foxtrot-modded' } })).json();
+      assert.deepEqual(JSON.parse(enabled.content), ['CalamityMod']);
+      await page.click('[data-view-tab="setup"]');
+      await page.waitForFunction(() => /tModLoader/.test(document.querySelector('#terraria-install').textContent), null, { timeout: 5000 });
+    } finally {
+      await call('DELETE', '/api/servers/foxtrot-modded').catch(() => {});
+    }
+  });
+
   await check('the wizard applies each game\'s rules', async () => {
     await page.click('#add-server-side');
     await page.click('[data-game-choice="terraria"]');
@@ -378,6 +419,9 @@ try {
     assert.equal(await text('#new-mode-label'), 'Difficulty');
     assert.deepEqual(await page.$$eval('#new-server-mode option', o => o.map(x => x.value)), ['Classic', 'Expert', 'Master', 'Journey']);
     assert.equal(await value('#new-server-players'), '8');
+    await page.selectOption('#new-terraria-variant', 'tmodloader');
+    assert.match(await text('#new-terraria-variant-help'), /\.NET/);
+    assert.equal(await page.getAttribute('#new-terraria-version', 'placeholder'), 'latest or v2025.08.3.0');
     assert.ok(!(await visible('#new-whitelist-row')), 'no whitelist for Terraria');
     await page.click('#wizard-next');
     assert.ok(!(await visible('#new-xms-row')) && !(await visible('#new-backup-row')), 'no JVM memory or Hytale backups for Terraria');
@@ -388,6 +432,9 @@ try {
     await page.click('#wizard-next');
     await page.click('#wizard-next');
     assert.equal(await value('#new-server-mode'), 'Survival');
+    assert.ok(await visible('#new-minecraft-variant'), 'Minecraft offers vanilla, Paper and Fabric');
+    await page.selectOption('#new-minecraft-variant', 'fabric');
+    assert.match(await text('#new-minecraft-variant-help'), /Fabric/);
     assert.ok(!(await visible('#terraria-fields')), 'Terraria fields are hidden for Minecraft');
     await page.click('#cancel-server-dialog');
   });
