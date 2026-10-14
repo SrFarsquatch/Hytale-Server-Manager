@@ -55,6 +55,21 @@ type appUpdateState struct {
 	startedAt time.Time
 }
 
+// snapshot expires an update state that has stopped making progress. The manager
+// process can survive a failed helper, so an in-memory "updating" flag must not
+// disable retries forever.
+func (s *appUpdateState) snapshot(now time.Time) (status, message, target string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if (s.status == "starting" || s.status == "updating") &&
+		!s.startedAt.IsZero() && now.Sub(s.startedAt) > 12*time.Minute {
+		s.status = "failed"
+		s.message = "The update has not restarted the manager after 12 minutes. The helper may have failed; inspect the hsm-update-helper container logs, then retry."
+		s.target = ""
+	}
+	return s.status, s.message, s.target
+}
+
 var updateState = appUpdateState{status: "idle"}
 
 func (a *App) handleAppUpdateCheck(w http.ResponseWriter, r *http.Request) {
@@ -69,12 +84,10 @@ func (a *App) handleAppUpdateCheck(w http.ResponseWriter, r *http.Request) {
 	if !info.UpdaterReady {
 		info.Message = "Container updates require the Docker socket mount. Add it to the Compose configuration and recreate this container."
 	}
-	updateState.mu.RLock()
-	info.Status = updateState.status
-	if updateState.message != "" {
-		info.Message = updateState.message
+	info.Status, info.Message, _ = updateState.snapshot(time.Now())
+	if info.Status == "failed" {
+		info.UpdateAvailable = compareVersions(info.LatestVersion, info.CurrentVersion) > 0
 	}
-	updateState.mu.RUnlock()
 	jsonOut(w, http.StatusOK, info)
 }
 
@@ -328,7 +341,7 @@ func launchUpdateHelper(containerID, targetImage string) error {
 	hostConfig := map[string]any{
 		"Binds": []string{dockerSocketPath+":"+dockerSocketPath},
 		"RestartPolicy": map[string]any{"Name":"no"},
-		"AutoRemove": true,
+		"AutoRemove": false,
 	}
 	socketInfo, err := os.Stat(dockerSocketPath)
 	if err == nil {
