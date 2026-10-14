@@ -253,7 +253,7 @@
             <label>Server name<input id="set-name" required></label>
             <label>Public address<input id="set-host" placeholder="play.example.com or public IP"></label>
             <label>Game port<input id="set-port" type="number" min="1" max="65535" required><small id="port-help">Each server needs a unique game port. Minecraft Java uses TCP; Hytale and Dragonwilds use UDP.</small></label>
-            <label class="hytale-settings-only">Game mode<select id="set-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select><small>Default mode for newly created worlds.</small></label>
+            <label class="hytale-settings-only">Game mode<select id="set-mode"><option value="Survival">Survival</option><option value="Adventure">Adventure</option><option value="Creative">Creative</option><option value="Spectator">Spectator</option></select><small>Default mode for newly created worlds.</small></label>
             <label id="set-players-label" class="hytale-settings-only">Maximum players<input id="set-players" type="number" min="1" max="1000" required></label>
             <label class="hytale-settings-only">Server message<input id="set-motd" maxlength="160" placeholder="Welcome to your server"></label>
             <label class="toggle-row hytale-settings-only"><span><b>Require whitelist permission</b><small>Restrict joining to players granted server join access.</small></span><input id="set-whitelist" type="checkbox"></label>
@@ -322,7 +322,7 @@
       <div class="wizard-step hidden" data-wizard-step="2">
         <div class="wizard-heading"><p class="eyebrow">YOUR GAME, YOUR WAY</p><h2>Set up the experience.</h2><p>These become the default settings for the new server.</p></div>
         <div class="form-grid">
-          <label class="hytale-only">Game mode<select id="new-server-mode"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select></label>
+          <label class="hytale-only">Game mode<select id="new-server-mode"><option value="Survival">Survival</option><option value="Adventure">Adventure</option><option value="Creative">Creative</option><option value="Spectator">Spectator</option></select></label>
           <label class="hytale-only">Maximum players<input id="new-server-players" type="number" min="1" max="1000" value="20" required></label>
           <label class="span-two hytale-only">Server message<input id="new-server-motd" maxlength="160" value="Welcome to your Hytale server!"></label>
           <label class="toggle-row span-two hytale-only"><span><b>Require whitelist permission</b><small>Private server; players need join permission.</small></span><input id="new-server-whitelist" type="checkbox"></label>
