@@ -129,7 +129,44 @@ async function loadAppUpdate(){const check=$('#app-update-check');if(check)check
 function renderAppUpdate(info){$('#app-update-current').textContent='v'+(info.currentVersion||'unknown');$('#app-update-latest').textContent='v'+(info.latestVersion||info.currentVersion||'unknown');$('#app-update-date').textContent=info.publishedAt?fmtDate(info.publishedAt):'—';const badge=$('#app-update-badge');badge.textContent=info.updateAvailable?'Update available':(info.status==='updating'?'Updating…':(info.message?.includes('No stable release')?'No release yet':'Up to date'));badge.className='update-badge'+(info.updateAvailable?' available':'');$('#app-update-message').textContent=info.message||(info.updateAvailable?'A newer stable version is ready to install.':'You are running the latest release.');$('#app-update-apply').disabled=!info.updateAvailable||!info.updaterReady||info.status==='updating'||info.status==='starting';$('#app-update-apply').textContent=info.status==='updating'?'Updating…':'Update and restart';const link=$('#app-update-release-link');if(info.releaseUrl&&info.releaseUrl.startsWith('https://github.com/SrFarsquatch/Hytale-Server-Manager/releases/')){link.href=info.releaseUrl;link.classList.remove('hidden')}else link.classList.add('hidden');const notes=$('#app-update-notes');if(info.releaseNotes?.trim()){notes.textContent=info.releaseNotes;notes.classList.remove('hidden')}else{notes.textContent='';notes.classList.add('hidden')}}
 $('#app-update-check').addEventListener('click',loadAppUpdate);
 $('#app-update-apply').addEventListener('click',async()=>{const info=state.appUpdate;if(!info?.updateAvailable||!info.updaterReady)return;if(!confirm('Update Hytale Server Manager to v'+info.latestVersion+'? The dashboard will briefly go offline while the container restarts. Your server data volume and game worlds will be preserved.'))return;const btn=$('#app-update-apply');btn.disabled=true;btn.textContent='Starting update…';$('#app-update-badge').textContent='Updating…';$('#app-update-message').textContent='Preparing the update. Keep this page open while the manager restarts.';try{const result=await api('/api/app-update',{method:'POST',body:'{}'});$('#app-update-message').textContent=result.message||'Update started. Waiting for the new version…';waitForAppVersion(info.latestVersion)}catch(e){toast(e.message,true);$('#app-update-message').textContent=e.message;await loadAppUpdate()}});
-async function waitForAppVersion(target){for(let i=0;i<100;i++){await new Promise(resolve=>setTimeout(resolve,3000));try{const health=await fetch('/api/health',{cache:'no-store'});if(health.ok){const body=await health.json();if(String(body.version||'').replace(/^v/,'')===String(target).replace(/^v/,'')){toast('Updated successfully to v'+target);setTimeout(()=>location.reload(),900);return}}}catch{}}$('#app-update-message').textContent='The update is taking longer than expected. Refresh this page in a moment to check the manager status.';$('#app-update-apply').disabled=false}
+async function waitForAppVersion(target){
+  const started=Date.now(),timeout=15*60*1000;
+  let attempts=0,lastMessageAt=0,delay=2000;
+  while(Date.now()-started<timeout){
+    await new Promise(resolve=>setTimeout(resolve,delay));
+    attempts++;
+    try{
+      const health=await fetch('/api/health',{cache:'no-store'});
+      if(health.ok){
+        const body=await health.json();
+        if(String(body.version||'').replace(/^v/,'')===String(target).replace(/^v/,'')){
+          toast('Updated successfully to v'+target);
+          setTimeout(()=>location.reload(),900);
+          return;
+        }
+      }
+    }catch{}
+    const elapsed=Math.floor((Date.now()-started)/1000);
+    if(elapsed-lastMessageAt>=15){
+      $('#app-update-message').textContent='Waiting for v'+target+' to start… '+Math.floor(elapsed/60)+'m '+(elapsed%60)+'s elapsed. The dashboard may be unavailable briefly during container replacement.';
+      lastMessageAt=elapsed;
+    }
+    // Back off gently while Docker pulls or recreates the container.
+    delay=Math.min(10000,Math.round(delay*1.25));
+  }
+  $('#app-update-message').textContent='No new version detected after 15 minutes. The update status will be checked again; if it failed, the helper logs are retained in Docker so you can diagnose it and retry.';
+  try{
+    const response=await fetch('/api/app-update',{cache:'no-store'});
+    if(response.ok){
+      const info=await response.json();
+      state.appUpdate=info;
+      renderAppUpdate(info);
+      $('#app-update-message').textContent=info.message||'The manager is reachable but has not reported the target version. Check the updater helper logs before retrying.';
+      return;
+    }
+  }catch{}
+  $('#app-update-apply').disabled=true;
+}
 
 function renderOnboarding(){const empty=state.servers.length===0;$('#app').classList.toggle('onboarding',empty);$('#first-run')?.classList.toggle('hidden',!empty);$('#fleet-content')?.classList.toggle('hidden',empty);$('#server-list')?.classList.toggle('hidden',empty);$('#add-server-side')?.classList.toggle('hidden',empty);if(empty){$('#view-title').textContent='Welcome';$('#top-context').textContent='';$('#top-status').classList.add('hidden');$('#top-start').classList.add('hidden')}else if(state.current==='servers')$('#view-title').textContent='Servers'}
 function renderFleet(){if(!$('#fleet-grid'))return;const grid=$('#fleet-grid');if(!state.servers.length){grid.innerHTML='<div class="empty-state" style="padding:16px">No servers configured.</div>';return}grid.innerHTML=state.servers.map(s=>{const transitioning=s.state==='starting'||s.state==='stopping';const action=s.running?'stop':s.installed?'start':'install';const actionLabel=s.state==='starting'?'Starting…':s.state==='stopping'?'Stopping…':s.installBusy?'Installing…':s.running?'Stop':s.installed?'Start':'Install';return `<article class="fleet-card ${s.id===state.serverId?'selected':''}"><button class="fleet-open" data-fleet-open="${esc(s.id)}"><div class="fleet-name"><span class="game-icon game-icon-${esc(s.gameType)}" aria-hidden="true">${gameIcon(s.gameType)}</span><strong>${esc(s.serverName)}${s.primary?'<span class="primary-tag">primary</span>':''}</strong><small>${esc(gameLabel(s.gameType))} · UDP ${s.port}</small></div><div class="fleet-cell fleet-status"><span class="dot ${statusDotClass(s)}"></span>${esc(statusLabel(s))}</div><div class="fleet-cell fleet-address">${esc(s.publicHost||location.hostname)}:${s.port}</div><div class="fleet-cell fleet-uptime">${s.running?fmtUptime(s.uptimeSeconds):'—'}</div><div class="fleet-cell fleet-files">${s.installed?'Ready':'Missing'}</div></button><div class="fleet-actions"><button class="btn small ${s.running?'':'success'}" data-fleet-action="${action}" data-id="${esc(s.id)}" ${transitioning||s.installBusy?'disabled':''}>${actionLabel}</button><button class="btn small" data-fleet-open="${esc(s.id)}">Open</button></div></article>`}).join('');$$('[data-fleet-open]').forEach(b=>b.addEventListener('click',()=>selectServer(b.dataset.fleetOpen)));$$('[data-fleet-action]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();fleetAction(b.dataset.id,b.dataset.fleetAction)}))}
