@@ -133,8 +133,66 @@ async function waitForAppVersion(target){for(let i=0;i<100;i++){await new Promis
 
 function renderOnboarding(){const empty=state.servers.length===0;$('#app').classList.toggle('onboarding',empty);$('#first-run')?.classList.toggle('hidden',!empty);$('#fleet-content')?.classList.toggle('hidden',empty);$('#server-list')?.classList.toggle('hidden',empty);$('#add-server-side')?.classList.toggle('hidden',empty);if(empty){$('#view-title').textContent='Welcome';$('#top-context').textContent='';$('#top-status').classList.add('hidden');$('#top-start').classList.add('hidden')}else if(state.current==='servers')$('#view-title').textContent='Servers'}
 function renderFleet(){if(!$('#fleet-grid'))return;const grid=$('#fleet-grid');if(!state.servers.length){grid.innerHTML='<div class="empty-state" style="padding:16px">No servers configured.</div>';return}grid.innerHTML=state.servers.map(s=>{const transitioning=s.state==='starting'||s.state==='stopping';const action=s.running?'stop':s.installed?'start':'install';const actionLabel=s.state==='starting'?'Starting…':s.state==='stopping'?'Stopping…':s.installBusy?'Installing…':s.running?'Stop':s.installed?'Start':'Install';return `<article class="fleet-card ${s.id===state.serverId?'selected':''}"><button class="fleet-open" data-fleet-open="${esc(s.id)}"><div class="fleet-name"><span class="game-icon game-icon-${esc(s.gameType)}" aria-hidden="true">${gameIcon(s.gameType)}</span><strong>${esc(s.serverName)}${s.primary?'<span class="primary-tag">primary</span>':''}</strong><small>${esc(gameLabel(s.gameType))} · UDP ${s.port}</small></div><div class="fleet-cell fleet-status"><span class="dot ${statusDotClass(s)}"></span>${esc(statusLabel(s))}</div><div class="fleet-cell fleet-address">${esc(s.publicHost||location.hostname)}:${s.port}</div><div class="fleet-cell fleet-uptime">${s.running?fmtUptime(s.uptimeSeconds):'—'}</div><div class="fleet-cell fleet-files">${s.installed?'Ready':'Missing'}</div></button><div class="fleet-actions"><button class="btn small ${s.running?'':'success'}" data-fleet-action="${action}" data-id="${esc(s.id)}" ${transitioning||s.installBusy?'disabled':''}>${actionLabel}</button><button class="btn small" data-fleet-open="${esc(s.id)}">Open</button></div></article>`}).join('');$$('[data-fleet-open]').forEach(b=>b.addEventListener('click',()=>selectServer(b.dataset.fleetOpen)));$$('[data-fleet-action]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();fleetAction(b.dataset.id,b.dataset.fleetAction)}))}
-async function selectServer(id){if(!id||!state.servers.some(s=>s.id===id))return;if(id===state.serverId){switchView('dashboard');return}state.selectionGeneration++;state.events?.close();state.events=null;state.serverId=id;localStorage.setItem('hsm-server',id);state.logs=[];state.settings=null;state.status=null;state.resources=null;state.players=null;managedPath='.';managedOpenPath='';managedDirty=false;renderServerList();renderFleet();switchView('dashboard');await loadSelected()}
-async function loadSelected(){if(!state.serverId)return;const id=state.serverId,generation=state.selectionGeneration;await Promise.all([loadSettings(),refreshStatus(),refreshResources(),loadLogs(),refreshPlayers()]);if(id!==state.serverId||generation!==state.selectionGeneration)return;connectEvents();loadCurrent()}
+async function selectServer(id){
+  if(!id||!state.servers.some(s=>s.id===id))return;
+  if(id===state.serverId){switchView('dashboard');return}
+  // Invalidate every in-flight request before changing the selected server.
+  state.selectionGeneration++;
+  state.events?.close();
+  state.events=null;
+  state.serverId=id;
+  localStorage.setItem('hsm-server',id);
+  state.logs=[];
+  state.settings=null;
+  state.status=null;
+  state.resources=null;
+  state.players=null;
+  managedPath='.';
+  managedOpenPath='';
+  managedDirty=false;
+  const summary=selectedSummary();
+  $('#server-name').textContent=summary?.serverName||'Loading server…';
+  $('#top-context').textContent=summary?.serverName||'';
+  $('#console-output').innerHTML='';
+  $('#mini-log').innerHTML='<span class="muted">Loading server output…</span>';
+  $('#managed-files').innerHTML='<div class="empty-state">Select Files to load this server.</div>';
+  $('#metric-uptime').textContent='—';
+  $('#metric-memory').textContent='—';
+  $('#metric-memory-limit').textContent='—';
+  $('#metric-port').textContent='—';
+  $('#metric-installed').textContent='—';
+  $('#metric-players').textContent='Unknown';
+  $('#resource-cpu-value').textContent='—';
+  $('#resource-memory-value').textContent='—';
+  $('#resource-disk-value').textContent='—';
+  $('#resource-sampled').textContent='Loading selected server…';
+  $('#hero-state').textContent='LOADING';
+  $('#hero-detail').textContent='Loading details for '+(summary?.serverName||'the selected server')+'…';
+  $('#hero-detail').classList.remove('hidden');
+  $('#start-btn').disabled=true;
+  $('#stop-btn').disabled=true;
+  $('#restart-btn').disabled=true;
+  renderServerList();
+  renderFleet();
+  // Fall back to a universally supported page immediately; per-game tabs are
+  // recalculated from the new server rather than inherited from the old one.
+  switchView('dashboard');
+  await loadSelected();
+}
+async function loadSelected(){
+  if(!state.serverId)return;
+  const id=state.serverId,generation=state.selectionGeneration;
+  // One optional endpoint failing (for example, player discovery on Dragonwilds)
+  // must not abort the other requests or leave the previous server's workspace visible.
+  const results=await Promise.allSettled([
+    loadSettings(),refreshStatus(),refreshResources(),loadLogs(),refreshPlayers()
+  ]);
+  if(id!==state.serverId||generation!==state.selectionGeneration)return;
+  const failed=results.find(result=>result.status==='rejected');
+  if(failed)toast('Some server details could not be loaded: '+(failed.reason?.message||'request failed'),true);
+  connectEvents();
+  loadCurrent();
+}
 async function fleetAction(id,action){if(action==='install'){await selectServer(id);switchView('setup');return}const server=state.servers.find(s=>s.id===id);if(action==='stop'&&!confirm(`Stop ${server?.serverName||'this server'}? Players may be disconnected.`))return;try{await api(`/api/servers/${encodeURIComponent(id)}/${action}`,{method:'POST'});toast(`${action==='start'?'Start':'Stop'} requested`);setTimeout(async()=>{await loadServers(false);if(id===state.serverId)await refreshStatus()},450)}catch(e){toast(e.message,true)}}
 async function refreshPlayers(){if(!state.serverId)return;const id=state.serverId,generation=state.selectionGeneration;const button=$('#players-refresh');if(button)button.disabled=true;try{const players=await api('/api/players');if(id!==state.serverId||generation!==state.selectionGeneration)return;state.players=players;renderPlayers()}catch(e){if(id!==state.serverId||generation!==state.selectionGeneration)return;state.players={known:false,players:[],message:e.message};renderPlayers()}finally{if(button&&id===state.serverId)button.disabled=false}}
 function renderPlayers(){const p=state.players;if(!p)return;$('#metric-players').textContent=p.known?(p.count+' / '+p.maxPlayers):'Unknown';$('#players-message').textContent=p.message||(p.known?'Live player list':'Player count could not be verified');$('#players-list').innerHTML=p.known?(p.players&&p.players.length?p.players.map(name=>'<span class="player-chip">'+esc(name)+'</span>').join(''):'<span class="muted">No players online.</span>'):'<span class="muted">The server response was not recognized. Check Console for the /who output.</span>'}
