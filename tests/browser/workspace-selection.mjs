@@ -364,6 +364,44 @@ try {
     assert.deepEqual(leakedSecrets, []);
   });
 
+  await check('schedules can be created, listed, disabled and survive a reload', async () => {
+    await select('alpha-hytale');
+    await waitForName('Alpha Hytale');
+    await page.click('[data-view-tab="schedules"]');
+    await page.waitForFunction(() => /No schedules yet/.test(document.querySelector('#schedule-list').textContent), null, { timeout: 5000 });
+    await page.click('#schedule-add');
+    await page.fill('#sch-name', 'Nightly restart');
+    await page.selectOption('#sch-action', 'restart');
+    await page.selectOption('#sch-kind', 'daily');
+    await page.fill('#sch-time', '04:30');
+    await page.check('#sch-days-row input[value="1"]');
+    assert.ok(await visible('#sch-warn-row'), 'Hytale restart offers player warnings');
+    await page.click('#sch-save');
+    await page.waitForFunction(() => /Nightly restart/.test(document.querySelector('#schedule-list').textContent), null, { timeout: 5000 });
+    assert.match(await text('#schedule-list'), /Mon at 04:30/);
+    assert.match(await text('#schedule-list'), /Next: /);
+    await page.uncheck('[data-schedule-toggle]');
+    await page.waitForFunction(() => document.querySelector('.schedule-row')?.classList.contains('disabled'), null, { timeout: 5000 });
+    await page.reload();
+    await page.waitForSelector('#app:not(.hidden)');
+    await page.waitForTimeout(600);
+    await select('bravo-minecraft').catch(() => {});
+    await select('alpha-hytale');
+    await waitForName('Alpha Hytale');
+    await page.click('[data-view-tab="schedules"]');
+    await page.waitForFunction(() => /Nightly restart/.test(document.querySelector('#schedule-list').textContent), null, { timeout: 5000 });
+    assert.match(await text('#schedule-list'), /Disabled/);
+  });
+
+  await check('auto-restart on crash is saved with the server settings', async () => {
+    await page.click('[data-view-tab="settings"]');
+    await page.check('#set-autorestart');
+    await page.click('#settings-form button:not([type])');
+    await page.waitForTimeout(600);
+    const settings = await (await fetch(base + '/api/settings', { headers: { Cookie: cookie, 'X-HSM-Server': 'alpha-hytale' } })).json();
+    assert.equal(settings.autoRestart, true);
+  });
+
   await check('no uncaught page errors', async () => { assert.deepEqual(pageErrors, []); });
   await check('every server-scoped request names its server', async () => { assert.deepEqual([...new Set(unscoped)], []); });
 } finally {

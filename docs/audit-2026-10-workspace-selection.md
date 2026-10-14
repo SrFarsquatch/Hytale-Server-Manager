@@ -77,6 +77,7 @@ installers and lifecycles. All of these are backed by real endpoints and unit te
 | P2 | Move remaining `GameType ==` branches (install status, players, settings validation) behind adapter methods | Split | No game-ID string comparisons in handlers |
 | P2 | ✅ Done: Redact passwords from `GET /api/settings` (write-only fields) | — | Settings round-trip preserves secrets without exposing them |
 | P3 | ✅ Done: Minecraft: generic snapshot backups, structured `server.properties` editor, `list` player query (plus live snapshots and a Java version check) | Adapter capabilities | Phase 4 exit criteria in the product manifest |
+| P3 | ✅ Done: Schedules (restart/start/stop/backup/command, daily or repeating, player warnings) and opt-in crash auto-restart with backoff | — | Phase 7 operations |
 | P3 | Terraria adapter (vanilla) | Adapter cleanup | Phase 5 exit criteria |
 
 ## 7. Milestone 1 test plan and results

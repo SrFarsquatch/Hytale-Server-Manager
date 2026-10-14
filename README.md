@@ -26,6 +26,14 @@ A self-hosted web panel for running multiple Hytale dedicated servers from one L
   - a Java version check before start
 - **RuneScape: Dragonwilds:** SteamCMD install, dedicated-server settings and console output.
 
+### Schedules and crash recovery
+
+- **Schedules (per server):** restart, start, stop, back up or run a console command, either daily at a set time (optionally on chosen weekdays) or repeating every N minutes or hours.
+  - Restarts and stops can warn players in game first, through the game's broadcast command (Minecraft `say`, Hytale `/say`).
+  - Times use the container's time zone (set `TZ` in Compose).
+  - Runs missed while the manager is offline are skipped, not replayed.
+- **Auto-restart on crash** (opt-in, in Settings): a server that exits with an error without being asked to stop is started again after 5, 15 and 45 seconds. It is left stopped after 3 crashes in 10 minutes.
+
 Restoring a snapshot first saves a safety copy, then replaces the world and settings with the snapshot's contents. Files created after the snapshot are removed rather than mixed in.
 
 ## Run with Docker Compose

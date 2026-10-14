@@ -64,6 +64,8 @@ type ServerSettings struct {
 	MemoryMin       string `json:"memoryMin"`
 	MemoryMax       string `json:"memoryMax"`
 	AutoStart       bool   `json:"autoStart"`
+	// AutoRestart restarts the server after it crashes (see crash.go).
+	AutoRestart     bool   `json:"autoRestart"`
 	ExtraArgs       string `json:"extraArgs"`
 	PublicHost      string `json:"publicHost"`
 	BackupFrequency int    `json:"backupFrequency"`
@@ -88,6 +90,8 @@ type legacySettings struct {
 type ControllerConfig struct {
 	Admin    *AdminConfig     `json:"admin,omitempty"`
 	Servers  []ServerSettings `json:"servers"`
+	// Schedules holds each server's automated tasks, keyed by server ID.
+	Schedules map[string][]Schedule `json:"schedules,omitempty"`
 	Settings *legacySettings  `json:"settings,omitempty"`
 }
 
@@ -111,6 +115,11 @@ type App struct {
 	lastCPUSampleAt time.Time
 	lastCPUPercent float64
 	hasCPUPercent bool
+	sched        scheduler
+	crashMu      sync.Mutex
+	crashHistory map[string][]time.Time
+	// crashBackoff overrides the auto-restart delays in tests.
+	crashBackoff []time.Duration
 }
 
 type ServerManager struct {
@@ -133,6 +142,10 @@ type ServerManager struct {
 	stopInterrupt time.Duration
 	// backupMu serialises snapshot creation and restore for this server.
 	backupMu sync.Mutex
+	// stopRequested is set by Stop so an exit it caused is not a crash.
+	stopRequested bool
+	// onCrash runs after the process exits non-zero without a stop request.
+	onCrash func()
 }
 
 type LogLine struct {
@@ -202,6 +215,7 @@ func main() {
 	}
 	app.ensureManagers()
 	go app.backupMaintenanceLoop()
+	go app.schedulerLoop()
 	// Remove finished self-update helper containers. The helper is usually
 	// still exiting when the new manager starts, so check again shortly after.
 	go func() {
@@ -293,6 +307,8 @@ func (a *App) routes(mux *http.ServeMux) {
 	mux.Handle("POST /api/install/run-downloader", a.auth(http.HandlerFunc(a.handleDownloaderRun)))
 	mux.Handle("POST /api/install/dragonwilds", a.auth(http.HandlerFunc(a.handleDragonwildsInstall)))
 	mux.Handle("POST /api/install/minecraft", a.auth(http.HandlerFunc(a.handleMinecraftInstall)))
+	mux.Handle("GET /api/schedules", a.auth(http.HandlerFunc(a.handleSchedulesGet)))
+	mux.Handle("PUT /api/schedules", a.auth(http.HandlerFunc(a.handleSchedulesPut)))
 	mux.Handle("GET /api/minecraft/properties", a.auth(http.HandlerFunc(a.handleMinecraftPropertiesGet)))
 	mux.Handle("PUT /api/minecraft/properties", a.auth(http.HandlerFunc(a.handleMinecraftPropertiesPut)))
 	mux.Handle("POST /api/install/import-local", a.auth(http.HandlerFunc(a.handleImportLocal)))
@@ -727,7 +743,7 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.managersMu.Lock()
-	a.managers[id] = NewServerManager(a.serverRoot(s), filepath.Join(a.dataDir, "tools"), s.GameType)
+	a.managers[id] = a.newServerManager(s)
 	a.managersMu.Unlock()
 	if s.GameType == "hytale" { _ = a.writeJVMOptionsFor(s) }
 	jsonOut(w, 201, settingsView(s))
@@ -757,6 +773,7 @@ func (a *App) handleServersDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.cfg.Servers = append(a.cfg.Servers[:idx], a.cfg.Servers[idx+1:]...)
+	a.removeServerSchedulesLocked(id)
 	err = a.saveConfigLocked()
 	a.cfgMu.Unlock()
 	if err != nil {
@@ -790,6 +807,7 @@ func removeServerData(root string, sharedRoot bool) error {
 }
 
 func (a *App) handleServerStartByPath(w http.ResponseWriter, r *http.Request) {
+	a.resetCrashes(r.PathValue("id"))
 	if err := a.startServerByID(r.PathValue("id")); err != nil {
 		jsonError(w, 409, err.Error())
 		return
@@ -873,7 +891,7 @@ func (a *App) ensureManagers() {
 	for _, s := range servers {
 		_ = ensureServerDirs(a.serverRoot(s))
 		if a.managers[s.ID] == nil {
-			a.managers[s.ID] = NewServerManager(a.serverRoot(s), filepath.Join(a.dataDir, "tools"), s.GameType)
+			a.managers[s.ID] = a.newServerManager(s)
 		}
 	}
 }
@@ -1181,6 +1199,7 @@ func (a *App) handleStart(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 404, err.Error())
 		return
 	}
+	a.resetCrashes(s.ID)
 	if err := a.startServerByID(s.ID); err != nil {
 		jsonError(w, 409, err.Error())
 		return
@@ -1598,38 +1617,45 @@ func (a *App) handleSnapshotCreate(w http.ResponseWriter, r *http.Request) {
 	if !requireCapability(w, s, "Snapshots", func(c GameCapability) bool { return c.Backups }) {
 		return
 	}
+	name, status, err := a.createSnapshot(m, s)
+	if err != nil {
+		jsonError(w, status, err.Error())
+		return
+	}
+	jsonOut(w, 201, map[string]any{"ok": true, "name": name})
+}
+
+// createSnapshot archives a server according to its game's snapshot spec. On
+// failure it returns the HTTP status that describes the error.
+func (a *App) createSnapshot(m *ServerManager, s ServerSettings) (string, int, error) {
 	root := a.serverRoot(s)
 	spec, ok := snapshotSpecFor(root, s)
 	if !ok {
-		jsonError(w, 409, "snapshots are not supported for this game")
-		return
+		return "", 409, errors.New("snapshots are not supported for this game")
 	}
 	live := gameCapabilitiesFor(s.GameType).LiveSnapshots
 	if m.IsRunning() && !live {
-		jsonError(w, 409, "stop the server before making a full restorable snapshot")
-		return
+		return "", 409, errors.New("stop the server before making a full restorable snapshot")
 	}
 	if !m.backupMu.TryLock() {
-		jsonError(w, 409, "a snapshot or restore is already in progress for this server")
-		return
+		return "", 409, errors.New("a snapshot or restore is already in progress for this server")
 	}
 	defer m.backupMu.Unlock()
 	name := "snapshot-" + time.Now().Format("20060102-150405") + ".tar.gz"
 	dst := filepath.Join(root, "snapshots", name)
 	archive := func() error { return createTarGz(dst, spec.Base, spec.Include) }
-	var err2 error
+	var err error
 	if m.IsRunning() {
-		err2 = m.withMinecraftSaveHold(minecraftSaveTimeout, archive)
+		err = m.withMinecraftSaveHold(minecraftSaveTimeout, archive)
 	} else {
-		err2 = archive()
+		err = archive()
 	}
-	if err2 != nil {
+	if err != nil {
 		_ = os.Remove(dst)
-		jsonError(w, 500, err2.Error())
-		return
+		return "", 500, err
 	}
 	a.pruneBackupRetention(s)
-	jsonOut(w, 201, map[string]any{"ok": true, "name": name})
+	return name, 0, nil
 }
 func (a *App) handleSnapshotRestore(w http.ResponseWriter, r *http.Request) {
 	m, s, err := a.requestServer(r)
@@ -2159,6 +2185,7 @@ func (m *ServerManager) Start(args []string) error {
 	}
 	m.cmd = cmd
 	m.stdin = stdin
+	m.stopRequested = false
 	m.running = true
 	m.startedAt = time.Now()
 	m.phase = "starting"
@@ -2188,15 +2215,21 @@ func (m *ServerManager) wait(cmd *exec.Cmd) {
 		}
 	}
 	m.mu.Lock()
+	crashed := false
 	if m.cmd == cmd {
 		m.running = false
 		m.phase = ""
 		m.stdin = nil
 		m.exitCode = code
 		m.lastExitAt = time.Now()
+		crashed = code != 0 && !m.stopRequested
 	}
 	m.appendLogLocked("controller", fmt.Sprintf("Server process exited with code %d", code))
+	onCrash := m.onCrash
 	m.mu.Unlock()
+	if crashed && onCrash != nil {
+		go onCrash()
+	}
 }
 func (m *ServerManager) scanPipe(r io.Reader, source string) {
 	s := bufio.NewScanner(r)
@@ -2242,6 +2275,7 @@ func (m *ServerManager) Stop() error {
 	err := adapter.RequestStop(pid, stdin)
 	if err == nil {
 		m.phase = "stopping"
+		m.stopRequested = true
 	}
 	m.mu.Unlock()
 	if err != nil {
@@ -2627,6 +2661,10 @@ func jsonOut(w http.ResponseWriter, code int, v any) {
 }
 func jsonError(w http.ResponseWriter, code int, msg string) {
 	jsonOut(w, code, map[string]any{"error": msg})
+}
+// decodeJSONAllowUnknown is decodeJSON without rejecting unknown fields.
+func decodeJSONAllowUnknown(r *http.Request, v any) error {
+	return json.NewDecoder(io.LimitReader(r.Body, 4<<20)).Decode(v)
 }
 func decodeJSON(r *http.Request, v any) error {
 	dec := json.NewDecoder(io.LimitReader(r.Body, 4<<20))
