@@ -175,7 +175,6 @@ func TestApplyHytaleConfigAllowsFirstInstallWithoutConfig(t *testing.T) {
 	}
 }
 
-
 func TestLoadConfigDefaultsMissingGameTypeToHytale(t *testing.T) {
 	dir := t.TempDir()
 	controller := []byte(`{"servers":[{"id":"legacy","serverName":"Legacy World","port":5520,"storageDir":"."}]}`)

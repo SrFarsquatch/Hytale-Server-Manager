@@ -159,6 +159,7 @@ async function loadServers(initial=false){
   try{servers=await api('/api/servers',{serverId:null})}catch(e){if(initial)toast(e.message,true);return}
   state.servers=servers;
   servers.forEach(s=>rememberGameArt(s.gameType,s.art));
+  renderPortWarning();
   if(!servers.length){
     if(state.serverId!==null)setSelectedServer(null);
     renderServerList();renderFleet();renderFleetStats();populateCloneSources();renderOnboarding();
@@ -321,6 +322,7 @@ function resetWorkspaceView(){
   // Clear the settings form so one server's values can never be saved onto another.
   $('#settings-form').reset();
   $('#connect-address').textContent='—';
+  $('#port-warning').classList.add('hidden');
   $('#metric-uptime').textContent='—';
   $('#metric-memory').textContent='—';
   $('#metric-memory-limit').textContent='—';
@@ -440,6 +442,7 @@ function renderStatus(){
   start.lastChild.textContent=s&&!s.installed?'Install first':'Start Server';
   stop.lastChild.textContent=s?.state==='stopping'?'Stopping…':'Stop Server';
   if(state.settings){$('#metric-port').textContent=state.settings.port;updateAddress()}
+  renderPortWarning();
   if(state.current==='config')setConfigEditState(!on);
 }
 async function loadSettings(ctx=selectionContext()){if(!ctx.id)return;const settings=await scopedApi(ctx,'/api/settings');if(!ctx.current())return;state.settings=settings;const s=settings;const protocol=serverProtocol(selectedSummary());$('#server-name').textContent=s.serverName;$('#set-name').value=s.serverName;$('#set-host').value=s.publicHost||'';$('#set-port').value=s.port;$('#set-port').min=s.portMin||1;$('#set-port').max=s.portMax||65535;$('#port-help').textContent='Published '+protocol+' range: '+(s.portMin||1)+'–'+(s.portMax||65535)+'. Each server must use a unique port.';const minecraft=s.gameType==='minecraft-java';$('#set-mode').querySelectorAll('option').forEach(o=>{const mcMode=o.value==='Survival'||o.value==='Spectator';o.disabled=mcMode&&!minecraft;o.hidden=mcMode&&!minecraft});$('#set-mode').value=s.gameMode||(minecraft?'Survival':'Adventure');$('#set-players').value=s.maxPlayers||20;$('#set-motd').value=s.motd||'';$('#set-password').value='';$('#set-password').placeholder=s.passwordSet?'Password set · leave blank to keep it':'Leave blank for no password';$('#set-password-clear').checked=false;$('#set-password-clear-row').classList.toggle('hidden',!s.passwordSet||s.gameType==='runescape-dragonwilds');$('#set-whitelist').checked=!!s.whitelistEnabled;$('#set-xms').value=s.memoryMin;$('#set-xmx').value=s.memoryMax;$('#set-args').value=s.extraArgs||'';$('#set-autostart').checked=s.autoStart;$('#set-autorestart').checked=!!s.autoRestart;
@@ -454,6 +457,9 @@ $('#set-dragonwilds-world').value=s.dragonwildsWorldName||'Dragonwilds World';
 $('#set-dragonwilds-admin').value='';$('#set-dragonwilds-admin').placeholder=s.dragonwildsAdminPasswordSet?'Password set · leave blank to keep it':'Required';
 $('#set-dragonwilds-password').value='';$('#set-dragonwilds-password').placeholder=s.dragonwildsWorldPasswordSet?'Password set · leave blank to keep it':'Leave empty to allow anyone to join';$('#set-dragonwilds-password-clear').checked=false;$('#set-dragonwilds-password-clear-row').classList.toggle('hidden',!(dragon&&s.dragonwildsWorldPasswordSet));
 ['set-dragonwilds-owner','set-dragonwilds-world','set-dragonwilds-admin','set-dragonwilds-password'].forEach(id=>{const input=$('#'+id);input.disabled=!dragon;input.required=dragon&&(id==='set-dragonwilds-owner'||id==='set-dragonwilds-world'||(id==='set-dragonwilds-admin'&&!s.dragonwildsAdminPasswordSet))});$('#metric-port').textContent=s.port;const sel=selectedSummary();$('#delete-server').disabled=!sel||!!sel.running;$('#delete-server').title=sel?.running?'Stop this server before deleting it.':'';updateAddress()}
+// The app picks ports, but only Docker/CasaOS can publish them; say so when
+// the selected server's port is not published by the container.
+function renderPortWarning(){const sum=selectedSummary(),show=sum?.portPublished===false&&!!sum.protocol;$('#port-warning').classList.toggle('hidden',!show);if(!show)return;const p=serverProtocol(sum).toLowerCase();$('#port-warning-text').innerHTML=`<b>Port ${esc(String(sum.port))}/${esc(p.toUpperCase())} is not published.</b> Players can't connect until you add <code>${esc(String(sum.port))}:${esc(String(sum.port))}/${esc(p)}</code> to the ports in the CasaOS or Docker Compose app settings.`}
 function updateAddress(){const s=state.settings;if(!s)return;$('#connect-address').textContent=`${s.publicHost||location.hostname}:${s.port}`}
 $('#copy-address').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('#connect-address').textContent);toast('Address copied')}catch{toast('Could not copy address',true)}});
 for(const id of['start-btn','setup-start'])$('#'+id).addEventListener('click',()=>serverAction('start'));$('#stop-btn').addEventListener('click',()=>serverAction('stop'));$('#restart-btn').addEventListener('click',()=>serverAction('restart'));

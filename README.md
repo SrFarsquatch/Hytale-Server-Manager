@@ -96,7 +96,12 @@ If the error persists, the DNS servers may be unreachable or outbound HTTPS may 
 
 ## Networking
 
-The web panel uses TCP `8008` on the host and container. Hytale game servers use UDP/QUIC. The Compose and CasaOS definitions publish only UDP ports `5520`, `5521`, `5522`, `5523`, `5524`, and `5525`, allowing up to six instances to use unique ports.
+The web panel uses TCP `8008` on the host and container. The Compose and CasaOS definitions publish:
+
+- `5520`–`5525` over UDP and TCP, for Hytale (UDP/QUIC) and Minecraft Java (TCP) servers. `HSM_GAME_PORT_START` and `HSM_GAME_PORT_END` must match this range.
+- `7777`–`7782` over UDP, for RuneScape: Dragonwilds servers.
+
+The manager only assigns ports from these ranges; it never changes the container's published ports. If you widen a range, add the matching `ports:` entries in Compose or the CasaOS app settings too. When the manager can read its own container through the Docker socket, a server's Overview warns if its port is not published.
 
 ## Hytale files
 

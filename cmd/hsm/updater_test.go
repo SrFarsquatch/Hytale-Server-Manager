@@ -64,9 +64,9 @@ func TestIsDockerContainerID(t *testing.T) {
 func TestAppUpdateStateExpiresStaleUpdate(t *testing.T) {
 	started := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
 	state := appUpdateState{
-		status: "updating",
-		message: "Starting the updater helper",
-		target: "0.7.0",
+		status:    "updating",
+		message:   "Starting the updater helper",
+		target:    "0.7.0",
 		startedAt: started,
 	}
 	status, message, target := state.snapshot(started.Add(13 * time.Minute))

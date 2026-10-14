@@ -21,17 +21,138 @@ type ProcessLaunch struct {
 // GameAdapter owns game-specific install detection, launch preparation, process
 // selection, and graceful shutdown. Shared process lifecycle stays in
 // ServerManager so every game gets the same logging and crash-state behavior.
+//
+// Each adapter also owns the game's settings policy, so the generic create and
+// settings handlers never compare game IDs.
 type GameAdapter interface {
 	GameType() string
+	Rules() GameRules
 	Installed(rootDir string) bool
 	PrepareLaunch(app *App, settings ServerSettings) ([]string, error)
 	BuildProcess(rootDir string, args []string) (ProcessLaunch, error)
 	RequestStop(pid int, stdin io.WriteCloser) error
+	// ValidateNew checks and defaults the game's own fields of a server being
+	// created. The error is shown to the user.
+	ValidateNew(req *newServerRequest) error
+	// MergeSettings restores fields a settings update may not change from
+	// current, and validates the game's own editable fields.
+	MergeSettings(in *ServerSettings, current ServerSettings) error
+	// ApplySettings writes saved settings into the game's own files.
+	ApplySettings(app *App, m *ServerManager, s ServerSettings) error
+	// InstallStatus describes the install for the Install tab. The handler adds
+	// the shared installed and busy fields.
+	InstallStatus(app *App, s ServerSettings) map[string]any
+}
+
+// GameRules are the per-game limits the generic settings validation applies.
+type GameRules struct {
+	// GameModes lists the accepted modes; the first is the default.
+	GameModes         []string
+	DefaultMOTD       string
+	DefaultMaxPlayers int
+	// PlayerLimit is the most players the game supports.
+	PlayerLimit int
+	// PortMin and PortMax pin a fixed port range. Zero means the deployment's
+	// published game port range.
+	PortMin, PortMax int
+}
+
+var hytaleGameModes = []string{"Adventure", "Creative"}
+
+func (r GameRules) portRange() (int, int) {
+	if r.PortMin > 0 {
+		return r.PortMin, r.PortMax
+	}
+	minPort, maxPort, _ := deploymentPortRange()
+	return minPort, maxPort
+}
+
+func (r GameRules) checkGameMode(mode string) error {
+	for _, allowed := range r.GameModes {
+		if mode == allowed {
+			return nil
+		}
+	}
+	modes := r.GameModes
+	list := strings.Join(modes, " or ")
+	if len(modes) > 2 {
+		list = strings.Join(modes[:len(modes)-1], ", ") + ", or " + modes[len(modes)-1]
+	}
+	return errors.New("game mode must be " + list)
+}
+
+func (r GameRules) checkMaxPlayers(n int, gameName string) error {
+	if n > r.PlayerLimit && r.PlayerLimit < 1000 {
+		return fmt.Errorf("%s supports up to %d players", gameName, r.PlayerLimit)
+	}
+	if n < 1 || n > 1000 {
+		return errors.New("maximum players must be between 1 and 1000")
+	}
+	return nil
+}
+
+// portRangeForGame returns the ports a server of this game may use.
+func portRangeForGame(gameType string) (int, int) {
+	adapter, err := gameAdapterFor(gameType)
+	if err != nil {
+		return GameRules{}.portRange()
+	}
+	return adapter.Rules().portRange()
+}
+
+// keepMinecraftFields and keepDragonwildsFields stop a settings update from
+// changing another game's fields, or Minecraft's fixed install identity.
+func keepMinecraftFields(in *ServerSettings, current ServerSettings) {
+	in.MinecraftEulaAccepted = current.MinecraftEulaAccepted
+	in.MinecraftVersion = current.MinecraftVersion
+	in.MinecraftVariant = current.MinecraftVariant
+}
+
+func keepDragonwildsFields(in *ServerSettings, current ServerSettings) {
+	in.DragonwildsOwnerID = current.DragonwildsOwnerID
+	in.DragonwildsWorldName = current.DragonwildsWorldName
+	in.DragonwildsAdminPassword = current.DragonwildsAdminPassword
+	in.DragonwildsWorldPassword = current.DragonwildsWorldPassword
+	in.DragonwildsPublic = current.DragonwildsPublic
 }
 
 type HytaleAdapter struct{}
 
 func (HytaleAdapter) GameType() string { return "hytale" }
+
+func (HytaleAdapter) Rules() GameRules {
+	return GameRules{GameModes: hytaleGameModes, DefaultMOTD: "Welcome to your Hytale server!", DefaultMaxPlayers: 20, PlayerLimit: 1000}
+}
+
+func (HytaleAdapter) ValidateNew(*newServerRequest) error { return nil }
+
+func (HytaleAdapter) MergeSettings(in *ServerSettings, current ServerSettings) error {
+	keepMinecraftFields(in, current)
+	keepDragonwildsFields(in, current)
+	return nil
+}
+
+// ApplySettings writes jvm.options, and config.json while the server is
+// stopped (the running server owns config.json).
+func (HytaleAdapter) ApplySettings(app *App, m *ServerManager, s ServerSettings) error {
+	if err := app.writeJVMOptionsFor(s); err != nil {
+		return err
+	}
+	if m.IsRunning() {
+		return nil
+	}
+	if err := app.applyHytaleConfig(s); err != nil {
+		return fmt.Errorf("settings saved, but Hytale config could not be updated: %w", err)
+	}
+	return nil
+}
+
+func (HytaleAdapter) InstallStatus(app *App, s ServerSettings) map[string]any {
+	root := app.serverRoot(s)
+	downloader := filepath.Join(app.dataDir, "tools", "hytale-downloader")
+	bundle := filepath.Join(root, "imports", "game.zip")
+	return map[string]any{"downloaderPresent": fileExists(downloader), "bundlePresent": fileExists(bundle), "paths": map[string]string{"downloader": downloader, "bundle": bundle, "game": filepath.Join(root, "game")}}
+}
 
 func (HytaleAdapter) Installed(rootDir string) bool {
 	return fileExists(filepath.Join(rootDir, "game", "Server", "HytaleServer.jar")) &&

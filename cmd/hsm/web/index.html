@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#151a24">
   <title>HSM · Game Server Control Panel</title>
-  <link rel="stylesheet" href="/app.css?v=20261015-schedules1">
+  <link rel="stylesheet" href="/app.css?v=20261015-ports1">
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -144,6 +144,7 @@
 
         <section id="view-dashboard" class="view">
           <div id="memory-warning" class="notice warning hidden"><svg class="icon"><use href="#i-alert"/></svg><span><b>Memory limit below 4 GB.</b> Increase the Docker/CasaOS memory allocation before hosting players.</span></div>
+          <div id="port-warning" class="notice warning hidden" role="status"><svg class="icon"><use href="#i-alert"/></svg><span id="port-warning-text"></span></div>
           <div class="overview-grid">
             <div class="overview-col">
               <section class="card">
@@ -454,6 +455,6 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/app.js?v=20261015-schedules1"></script>
+  <script src="/app.js?v=20261015-ports1"></script>
 </body>
 </html>

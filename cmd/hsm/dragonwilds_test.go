@@ -27,12 +27,18 @@ func TestWriteDragonwildsConfig(t *testing.T) {
 		DragonwildsAdminPassword: "admin-secret", DragonwildsWorldPassword: "world-secret",
 		DragonwildsPublic: true,
 	}
-	if err := writeDragonwildsConfig(root, settings); err != nil { t.Fatalf("writeDragonwildsConfig() error = %v", err) }
+	if err := writeDragonwildsConfig(root, settings); err != nil {
+		t.Fatalf("writeDragonwildsConfig() error = %v", err)
+	}
 	path := filepath.Join(root, "game", "RSDragonwilds", "Saved", "Config", "LinuxServer", "DedicatedServer.ini")
 	data, err := os.ReadFile(path)
-	if err != nil { t.Fatalf("read config: %v", err) }
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
 	documentedPath := filepath.Join(root, "game", "RSDragonwilds", "Saved", "Config", "Linux", "DedicatedServer.ini")
-	if _, err := os.Stat(documentedPath); err != nil { t.Fatalf("officially documented Linux config path missing: %v", err) }
+	if _, err := os.Stat(documentedPath); err != nil {
+		t.Fatalf("officially documented Linux config path missing: %v", err)
+	}
 	text := string(data)
 	if strings.Contains(text, "\nPublic=") {
 		t.Errorf("wrote undocumented Public setting to DedicatedServer.ini:\n%s", text)
@@ -45,19 +51,25 @@ func TestWriteDragonwildsConfig(t *testing.T) {
 		"ServerName=Friends World",
 		"DefaultWorldName=Misty Valley",
 	} {
-		if !strings.Contains(text, expected) { t.Errorf("config missing %q:\n%s", expected, text) }
+		if !strings.Contains(text, expected) {
+			t.Errorf("config missing %q:\n%s", expected, text)
+		}
 	}
 	info, err := os.Stat(path)
-	if err != nil { t.Fatal(err) }
-	if info.Mode().Perm() != 0600 { t.Errorf("config permissions = %o, want 600", info.Mode().Perm()) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0600 {
+		t.Errorf("config permissions = %o, want 600", info.Mode().Perm())
+	}
 }
 
 func TestWriteDragonwildsConfigAllowsEmptyWorldPassword(t *testing.T) {
 	root := t.TempDir()
 	settings := ServerSettings{
-		ServerName: "Public World",
-		DragonwildsOwnerID: "owner-id",
-		DragonwildsWorldName: "World",
+		ServerName:               "Public World",
+		DragonwildsOwnerID:       "owner-id",
+		DragonwildsWorldName:     "World",
 		DragonwildsAdminPassword: "admin-secret",
 	}
 	if err := writeDragonwildsConfig(root, settings); err != nil {
@@ -81,36 +93,62 @@ func TestWriteDragonwildsConfigRejectsNewlineInjection(t *testing.T) {
 		ServerName: "Safe", DragonwildsOwnerID: "player\nPublic=1",
 		DragonwildsAdminPassword: "password", DragonwildsWorldName: "World",
 	})
-	if err == nil { t.Fatal("expected newline injection to be rejected") }
+	if err == nil {
+		t.Fatal("expected newline injection to be rejected")
+	}
 }
 
 func TestExtractSteamCMDArchiveRejectsTraversal(t *testing.T) {
 	root := t.TempDir()
 	src := filepath.Join(root, "bad.tar.gz")
 	out, err := os.Create(src)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	gz := gzip.NewWriter(out)
 	tw := tar.NewWriter(gz)
-	if err := tw.WriteHeader(&tar.Header{Name: "../escape", Mode: 0644, Size: 1, Typeflag: tar.TypeReg}); err != nil { t.Fatal(err) }
-	if _, err := tw.Write([]byte("x")); err != nil { t.Fatal(err) }
-	if err := tw.Close(); err != nil { t.Fatal(err) }
-	if err := gz.Close(); err != nil { t.Fatal(err) }
-	if err := out.Close(); err != nil { t.Fatal(err) }
-	if err := extractSteamCMDArchive(src, filepath.Join(root, "out")); err == nil { t.Fatal("expected traversal path to be rejected") }
+	if err := tw.WriteHeader(&tar.Header{Name: "../escape", Mode: 0644, Size: 1, Typeflag: tar.TypeReg}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write([]byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := out.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := extractSteamCMDArchive(src, filepath.Join(root, "out")); err == nil {
+		t.Fatal("expected traversal path to be rejected")
+	}
 }
 
 func TestWriteDragonwildsConfigPreservesUnmanagedEntries(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "game", "RSDragonwilds", "Saved", "Config", "LinuxServer", "DedicatedServer.ini")
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil { t.Fatal(err) }
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
 	existing := "; game metadata\n[/script/dominion.dedicatedserversettings]\nOwnerId=old-owner\nGeneratedAdminAccount=keep-me\n[OtherSection]\nKeep=also-me\n"
-	if err := os.WriteFile(path, []byte(existing), 0600); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(path, []byte(existing), 0600); err != nil {
+		t.Fatal(err)
+	}
 	settings := ServerSettings{ServerName: "New Name", DragonwildsOwnerID: "new-owner", DragonwildsAdminPassword: "new-admin", DragonwildsWorldName: "World"}
-	if err := writeDragonwildsConfig(root, settings); err != nil { t.Fatal(err) }
+	if err := writeDragonwildsConfig(root, settings); err != nil {
+		t.Fatal(err)
+	}
 	data, err := os.ReadFile(path)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	got := string(data)
 	for _, want := range []string{"OwnerId=new-owner", "GeneratedAdminAccount=keep-me", "[OtherSection]", "Keep=also-me", "AdminPassword=new-admin"} {
-		if !strings.Contains(got, want) { t.Errorf("config lost or missed %q:\n%s", want, got) }
+		if !strings.Contains(got, want) {
+			t.Errorf("config lost or missed %q:\n%s", want, got)
+		}
 	}
 }

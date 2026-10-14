@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -156,4 +157,103 @@ func (m *ServerManager) queryPlayers(q playerQuery, timeout time.Duration) ([]st
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
+}
+
+func (a *App) handlePlayers(w http.ResponseWriter, r *http.Request) {
+	m, settings, err := a.requestServer(r)
+	if err != nil {
+		jsonError(w, 404, err.Error())
+		return
+	}
+	maxPlayers := settings.MaxPlayers
+	if maxPlayers < 1 {
+		maxPlayers = 100
+	}
+	if entry, _ := gameCatalogEntryFor(settings.GameType); !entry.Capabilities.PlayerList {
+		jsonOut(w, 200, map[string]any{"known": false, "count": 0, "maxPlayers": maxPlayers, "players": []string{}, "message": "Player list integration is not available for " + entry.Name + " yet"})
+		return
+	}
+	if !m.IsRunning() {
+		jsonOut(w, 200, map[string]any{"known": true, "count": 0, "maxPlayers": maxPlayers, "players": []string{}, "message": "Server is stopped"})
+		return
+	}
+	query, ok := playerQueryFor(settings.GameType)
+	if !ok {
+		jsonOut(w, 200, map[string]any{"known": false, "count": 0, "maxPlayers": maxPlayers, "players": []string{}, "message": "Player list integration is not available for this game yet"})
+		return
+	}
+	players, reportedMax, known, err := m.queryPlayers(query, 1500*time.Millisecond)
+	if err != nil {
+		jsonOut(w, 200, map[string]any{"known": false, "maxPlayers": maxPlayers, "players": []string{}, "message": "Could not query the server"})
+		return
+	}
+	if reportedMax > 0 {
+		maxPlayers = reportedMax
+	}
+	message := "Waiting for a recognizable response to " + query.command
+	if known {
+		message = "Player list updated"
+	}
+	if players == nil {
+		players = []string{}
+	}
+	jsonOut(w, 200, map[string]any{"known": known, "count": len(players), "maxPlayers": maxPlayers, "players": players, "message": message})
+}
+
+var (
+	whoCountLine = regexp.MustCompile("(?i)(?:online players|players online|players)\\s*[(:]\\s*(\\d+)(?:\\s*/\\s*(\\d+))?\\s*\\)?\\s*:?\\s*(.*)")
+	whoSentence  = regexp.MustCompile("(?i)(?:there are|total of)\\s+(\\d+)\\s+players?\\s+online\\s*[:\\-]?\\s*(.*)")
+	whoNamesLine = regexp.MustCompile("(?i)(?:online players|players online|connected players)\\s*:\\s*(.+)")
+)
+
+func parseWhoOutput(lines []LogLine) ([]string, bool) {
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(stripANSI(lines[i].Line))
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "no players online") || strings.Contains(lower, "0 players online") {
+			return []string{}, true
+		}
+		match := whoCountLine.FindStringSubmatch(line)
+		if match == nil {
+			match = whoSentence.FindStringSubmatch(line)
+		}
+		if match == nil {
+			if names := whoNamesLine.FindStringSubmatch(line); names != nil {
+				players := parsePlayerNames(names[1])
+				if len(players) > 0 && !(len(players) == 1 && strings.TrimSpace(players[0]) == "0") {
+					return players, true
+				}
+			}
+			continue
+		}
+		count, err := strconv.Atoi(match[1])
+		if err != nil || count < 0 || count > 1000 {
+			continue
+		}
+		players := parsePlayerNames(strings.TrimSpace(match[len(match)-1]))
+		if count == 0 {
+			return []string{}, true
+		}
+		if len(players) > 0 {
+			return players, true
+		}
+		return nil, false
+	}
+	return nil, false
+}
+
+func parsePlayerNames(s string) []string {
+	s = strings.TrimSpace(strings.Trim(s, "[]{}"))
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	players := make([]string, 0, len(parts))
+	for _, part := range parts {
+		name := strings.TrimSpace(strings.Trim(part, "[]{}•*- "))
+		if name != "" {
+			players = append(players, name)
+		}
+	}
+	return players
 }

@@ -19,7 +19,9 @@ func TestSupportedGameCatalogListsGamesAndEnablesImplementedAdapters(t *testing.
 	if !available["hytale"] {
 		t.Fatal("Hytale should remain available")
 	}
-	if !available["runescape-dragonwilds"] { t.Fatal("Dragonwilds should be available after its dedicated-server adapter was added") }
+	if !available["runescape-dragonwilds"] {
+		t.Fatal("Dragonwilds should be available after its dedicated-server adapter was added")
+	}
 	if !available["minecraft-java"] {
 		t.Error("Minecraft Java vanilla should be available after its installer and lifecycle were implemented")
 	}
@@ -55,7 +57,9 @@ func TestGameCatalogCapabilitiesDoNotOverstatePlannedGameSupport(t *testing.T) {
 				c.Mods || c.NativeBackups || c.DeviceAuth || c.GameUpdates {
 				t.Errorf("Minecraft Java vanilla capabilities unexpected: %#v", game.Capabilities)
 			}
-			if len(game.Capabilities.Variants) != 1 || game.Capabilities.Variants[0] != "vanilla" { t.Errorf("Minecraft variants = %#v, want vanilla only", game.Capabilities.Variants) }
+			if len(game.Capabilities.Variants) != 1 || game.Capabilities.Variants[0] != "vanilla" {
+				t.Errorf("Minecraft variants = %#v, want vanilla only", game.Capabilities.Variants)
+			}
 			continue
 		}
 		if game.Capabilities.Console || game.Capabilities.Backups || game.Capabilities.FileManagement || game.Capabilities.Mods || game.Capabilities.PlayerList {

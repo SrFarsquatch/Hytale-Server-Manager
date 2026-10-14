@@ -333,6 +333,28 @@ try {
     await page.click('#cancel-server-dialog');
   });
 
+  await check('an unpublished game port shows a warning only for that server', async () => {
+    await page.route('**/api/servers', async route => {
+      const res = await route.fetch();
+      const servers = await res.json();
+      for (const s of servers) s.portPublished = s.id !== 'charlie-dragonwilds';
+      await route.fulfill({ response: res, json: servers });
+    });
+    try {
+      await select('charlie-dragonwilds');
+      await waitForName('Charlie Dragonwilds');
+      await page.click('[data-view-tab="dashboard"]');
+      await page.waitForSelector('#port-warning:not(.hidden)', { timeout: 5000 });
+      assert.match(await text('#port-warning'), /\/UDP is not published/);
+      await select('alpha-hytale');
+      await waitForName('Alpha Hytale');
+      await page.waitForTimeout(300);
+      assert.equal(await visible('#port-warning'), false, 'a published port shows no warning');
+    } finally {
+      await page.unroute('**/api/servers');
+    }
+  });
+
   await check('mobile overview has no horizontal page overflow', async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(400); // drawer hides after its slide-out transition

@@ -36,15 +36,15 @@ type AppRelease struct {
 }
 
 type AppUpdateInfo struct {
-	CurrentVersion string    `json:"currentVersion"`
-	LatestVersion  string    `json:"latestVersion"`
-	UpdateAvailable bool     `json:"updateAvailable"`
-	ReleaseURL     string    `json:"releaseUrl,omitempty"`
-	ReleaseNotes   string    `json:"releaseNotes,omitempty"`
-	PublishedAt    time.Time `json:"publishedAt,omitempty"`
-	UpdaterReady   bool      `json:"updaterReady"`
-	Status         string    `json:"status"`
-	Message        string    `json:"message,omitempty"`
+	CurrentVersion  string    `json:"currentVersion"`
+	LatestVersion   string    `json:"latestVersion"`
+	UpdateAvailable bool      `json:"updateAvailable"`
+	ReleaseURL      string    `json:"releaseUrl,omitempty"`
+	ReleaseNotes    string    `json:"releaseNotes,omitempty"`
+	PublishedAt     time.Time `json:"publishedAt,omitempty"`
+	UpdaterReady    bool      `json:"updaterReady"`
+	Status          string    `json:"status"`
+	Message         string    `json:"message,omitempty"`
 }
 
 type appUpdateState struct {
@@ -135,22 +135,26 @@ func (a *App) handleAppUpdateApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOut(w, http.StatusAccepted, map[string]any{
-		"ok": true,
-		"status": "updating",
+		"ok":            true,
+		"status":        "updating",
 		"targetVersion": info.LatestVersion,
-		"message": "Update started. The manager will restart automatically; refresh the page if it does not reconnect.",
+		"message":       "Update started. The manager will restart automatically; refresh the page if it does not reconnect.",
 	})
 }
 
 func checkAppUpdate(ctx context.Context) (AppUpdateInfo, error) {
 	info := AppUpdateInfo{CurrentVersion: version, LatestVersion: version, Status: "idle"}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, latestReleaseAPI, nil)
-	if err != nil { return info, err }
+	if err != nil {
+		return info, err
+	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	req.Header.Set("User-Agent", "Hytale-Server-Manager-Updater")
-	resp, err := (&http.Client{Timeout: 10*time.Second}).Do(req)
-	if err != nil { return info, fmt.Errorf("could not check GitHub releases: %w", err) }
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	if err != nil {
+		return info, fmt.Errorf("could not check GitHub releases: %w", err)
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
 		info.Message = "No stable release has been published yet."
@@ -191,16 +195,33 @@ func compareVersions(a, b string) int {
 		var nums [3]int
 		base, pre, _ := strings.Cut(v, "-")
 		parts := strings.Split(base, ".")
-		for i := 0; i < len(parts) && i < 3; i++ { nums[i], _ = strconv.Atoi(parts[i]) }
+		for i := 0; i < len(parts) && i < 3; i++ {
+			nums[i], _ = strconv.Atoi(parts[i])
+		}
 		return nums, pre
 	}
 	av, ap := parse(strings.TrimPrefix(a, "v"))
 	bv, bp := parse(strings.TrimPrefix(b, "v"))
-	for i := 0; i < 3; i++ { if av[i] > bv[i] { return 1 }; if av[i] < bv[i] { return -1 } }
-	if ap == bp { return 0 }
-	if ap == "" { return 1 }
-	if bp == "" { return -1 }
-	if ap > bp { return 1 }
+	for i := 0; i < 3; i++ {
+		if av[i] > bv[i] {
+			return 1
+		}
+		if av[i] < bv[i] {
+			return -1
+		}
+	}
+	if ap == bp {
+		return 0
+	}
+	if ap == "" {
+		return 1
+	}
+	if bp == "" {
+		return -1
+	}
+	if ap > bp {
+		return 1
+	}
 	return -1
 }
 
@@ -293,12 +314,12 @@ func currentContainerID() (string, error) {
 	return "", fmt.Errorf("could not identify this Docker container: HOSTNAME %q is not a container ID and did not match a Docker container name or hostname; check the Docker socket mount or update the app from CasaOS", host)
 }
 
-type dockerAPI struct { client *http.Client }
+type dockerAPI struct{ client *http.Client }
 
 func newDockerAPI() *dockerAPI {
 	return &dockerAPI{client: &http.Client{
 		Transport: &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-			return (&net.Dialer{Timeout: 5*time.Second}).DialContext(ctx, "unix", dockerSocketPath)
+			return (&net.Dialer{Timeout: 5 * time.Second}).DialContext(ctx, "unix", dockerSocketPath)
 		}},
 		Timeout: 0,
 	}}
@@ -307,25 +328,44 @@ func newDockerAPI() *dockerAPI {
 func (d *dockerAPI) request(ctx context.Context, method, endpoint string, body any) (*http.Response, error) {
 	var reader io.Reader
 	if body != nil {
-		b, err := json.Marshal(body); if err != nil { return nil, err }
+		b, err := json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
 		reader = bytes.NewReader(b)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, "http://docker"+endpoint, reader)
-	if err != nil { return nil, err }
-	if body != nil { req.Header.Set("Content-Type", "application/json") }
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	return d.client.Do(req)
 }
 
 func (d *dockerAPI) call(ctx context.Context, method, endpoint string, body any, allowed ...int) ([]byte, error) {
 	resp, err := d.request(ctx, method, endpoint, body)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer resp.Body.Close()
 	b, readErr := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
-	if readErr != nil { return nil, readErr }
-	for _, code := range allowed { if resp.StatusCode == code { return b, nil } }
-	var payload struct { Message string `json:"message"` }
+	if readErr != nil {
+		return nil, readErr
+	}
+	for _, code := range allowed {
+		if resp.StatusCode == code {
+			return b, nil
+		}
+	}
+	var payload struct {
+		Message string `json:"message"`
+	}
 	_ = json.Unmarshal(b, &payload)
-	if payload.Message == "" { payload.Message = strings.TrimSpace(string(b)) }
+	if payload.Message == "" {
+		payload.Message = strings.TrimSpace(string(b))
+	}
 	return nil, fmt.Errorf("Docker API %s %s returned HTTP %d: %s", method, endpoint, resp.StatusCode, payload.Message)
 }
 
@@ -334,29 +374,44 @@ func launchUpdateHelper(containerID, targetImage string) error {
 	defer cancel()
 	d := newDockerAPI()
 	inspectBytes, err := d.call(ctx, http.MethodGet, "/containers/"+url.PathEscape(containerID)+"/json", nil, http.StatusOK)
-	if err != nil { return fmt.Errorf("inspect current container: %w", err) }
-	var inspect struct { Config map[string]any `json:"Config"`; Image string `json:"Image"` }
-	if err := json.Unmarshal(inspectBytes, &inspect); err != nil { return err }
-	if inspect.Image == "" { return errors.New("Docker did not report the current application image") }
+	if err != nil {
+		return fmt.Errorf("inspect current container: %w", err)
+	}
+	var inspect struct {
+		Config map[string]any `json:"Config"`
+		Image  string         `json:"Image"`
+	}
+	if err := json.Unmarshal(inspectBytes, &inspect); err != nil {
+		return err
+	}
+	if inspect.Image == "" {
+		return errors.New("Docker did not report the current application image")
+	}
 	hostConfig := map[string]any{
-		"Binds": []string{dockerSocketPath+":"+dockerSocketPath},
-		"RestartPolicy": map[string]any{"Name":"no"},
-		"AutoRemove": false,
+		"Binds":         []string{dockerSocketPath + ":" + dockerSocketPath},
+		"RestartPolicy": map[string]any{"Name": "no"},
+		"AutoRemove":    false,
 	}
 	socketInfo, err := os.Stat(dockerSocketPath)
 	if err == nil {
-		if st, ok := socketInfo.Sys().(*syscall.Stat_t); ok { hostConfig["GroupAdd"] = []string{strconv.FormatUint(uint64(st.Gid), 10)} }
+		if st, ok := socketInfo.Sys().(*syscall.Stat_t); ok {
+			hostConfig["GroupAdd"] = []string{strconv.FormatUint(uint64(st.Gid), 10)}
+		}
 	}
-	name := "hsm-update-helper-"+strconv.FormatInt(time.Now().Unix(), 10)
+	name := "hsm-update-helper-" + strconv.FormatInt(time.Now().Unix(), 10)
 	createBody := map[string]any{
-		"Image": inspect.Image,
-		"Cmd": []string{"/usr/local/bin/hytale-server-manager", "--update-helper"},
-		"Env": []string{"HSM_UPDATE_CONTAINER_ID="+containerID, "HSM_UPDATE_TARGET_IMAGE="+targetImage},
+		"Image":      inspect.Image,
+		"Cmd":        []string{"/usr/local/bin/hytale-server-manager", "--update-helper"},
+		"Env":        []string{"HSM_UPDATE_CONTAINER_ID=" + containerID, "HSM_UPDATE_TARGET_IMAGE=" + targetImage},
 		"HostConfig": hostConfig,
 	}
 	createBytes, err := d.call(ctx, http.MethodPost, "/containers/create?name="+url.QueryEscape(name), createBody, http.StatusCreated)
-	if err != nil { return fmt.Errorf("create updater helper: %w", err) }
-	var created struct { ID string `json:"Id"` }
+	if err != nil {
+		return fmt.Errorf("create updater helper: %w", err)
+	}
+	var created struct {
+		ID string `json:"Id"`
+	}
 	if err := json.Unmarshal(createBytes, &created); err != nil || created.ID == "" {
 		return errors.New("Docker created the updater helper but returned no container ID")
 	}
@@ -391,43 +446,68 @@ func performContainerUpdate(ctx context.Context, containerID, targetImage string
 	if !hasTag || tag != "latest" {
 		return errors.New("refusing to install an invalid image tag")
 	}
-	if !hasTag || repo != containerImage { return errors.New("invalid target image") }
+	if !hasTag || repo != containerImage {
+		return errors.New("invalid target image")
+	}
 	resp, err := d.request(ctx, http.MethodPost, "/images/create?fromImage="+url.QueryEscape(repo)+"&tag="+url.QueryEscape(tag), nil)
-	if err != nil { return fmt.Errorf("pull release image: %w", err) }
+	if err != nil {
+		return fmt.Errorf("pull release image: %w", err)
+	}
 	pullLog, readErr := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
 	resp.Body.Close()
-	if readErr != nil { return readErr }
+	if readErr != nil {
+		return readErr
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("pull release image returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(pullLog)))
 	}
 	for _, line := range bytes.Split(pullLog, []byte("\n")) {
-		var item struct { Error string `json:"error"` }
+		var item struct {
+			Error string `json:"error"`
+		}
 		_ = json.Unmarshal(line, &item)
-		if item.Error != "" { return fmt.Errorf("pull release image failed: %s", item.Error) }
+		if item.Error != "" {
+			return fmt.Errorf("pull release image failed: %s", item.Error)
+		}
 	}
 
 	inspectBytes, err := d.call(ctx, http.MethodGet, "/containers/"+url.PathEscape(containerID)+"/json", nil, http.StatusOK)
-	if err != nil { return fmt.Errorf("inspect current manager: %w", err) }
+	if err != nil {
+		return fmt.Errorf("inspect current manager: %w", err)
+	}
 	var inspect map[string]any
-	if err := json.Unmarshal(inspectBytes, &inspect); err != nil { return err }
+	if err := json.Unmarshal(inspectBytes, &inspect); err != nil {
+		return err
+	}
 	config, ok := inspect["Config"].(map[string]any)
-	if !ok { return errors.New("Docker inspection did not include container configuration") }
+	if !ok {
+		return errors.New("Docker inspection did not include container configuration")
+	}
 	name, _ := inspect["Name"].(string)
 	name = strings.TrimPrefix(name, "/")
-	if name == "" { name = "hytale-server-manager" }
+	if name == "" {
+		name = "hytale-server-manager"
+	}
 	config["Image"] = targetImage
 	config["Hostname"] = ""
 	hostConfig, ok := inspect["HostConfig"].(map[string]any)
-	if !ok { return errors.New("Docker inspection did not include host configuration") }
+	if !ok {
+		return errors.New("Docker inspection did not include host configuration")
+	}
 	networking := make(map[string]any)
 	if settings, ok := inspect["NetworkSettings"].(map[string]any); ok {
 		if networks, ok := settings["Networks"].(map[string]any); ok {
 			endpoints := make(map[string]any)
 			for networkName, raw := range networks {
-				n, ok := raw.(map[string]any); if !ok { continue }
+				n, ok := raw.(map[string]any)
+				if !ok {
+					continue
+				}
 				ep := map[string]any{}
-				for _, key := range []string{"Aliases","Links","DriverOpts","IPAMConfig"} {
-					if v, exists := n[key]; exists && v != nil { ep[key] = v }
+				for _, key := range []string{"Aliases", "Links", "DriverOpts", "IPAMConfig"} {
+					if v, exists := n[key]; exists && v != nil {
+						ep[key] = v
+					}
 				}
 				endpoints[networkName] = ep
 			}
@@ -435,13 +515,19 @@ func performContainerUpdate(ctx context.Context, containerID, targetImage string
 		}
 	}
 	createBody := map[string]any{}
-	for key, value := range config { createBody[key] = value }
+	for key, value := range config {
+		createBody[key] = value
+	}
 	createBody["HostConfig"] = hostConfig
-	if len(networking) > 0 { createBody["NetworkingConfig"] = networking }
+	if len(networking) > 0 {
+		createBody["NetworkingConfig"] = networking
+	}
 
 	shortID := containerID
-	if len(shortID) > 12 { shortID = shortID[:12] }
-	oldName := "hsm-rollback-"+shortID
+	if len(shortID) > 12 {
+		shortID = shortID[:12]
+	}
+	oldName := "hsm-rollback-" + shortID
 	if _, err := d.call(ctx, http.MethodPost, "/containers/"+url.PathEscape(containerID)+"/stop?t=30", nil, http.StatusNoContent, http.StatusNotModified); err != nil {
 		return fmt.Errorf("stop current manager: %w", err)
 	}
@@ -454,7 +540,9 @@ func performContainerUpdate(ctx context.Context, containerID, targetImage string
 		rollbackOldContainer(d, containerID, oldName, name)
 		return fmt.Errorf("create updated manager: %w", err)
 	}
-	var newContainer struct { ID string `json:"Id"` }
+	var newContainer struct {
+		ID string `json:"Id"`
+	}
 	if err := json.Unmarshal(newBytes, &newContainer); err != nil || newContainer.ID == "" {
 		rollbackOldContainer(d, containerID, oldName, name)
 		return errors.New("Docker did not return the new manager container ID")
@@ -476,4 +564,3 @@ func rollbackOldContainer(d *dockerAPI, oldID, oldName, originalName string) {
 	_, _ = d.call(ctx, http.MethodPost, "/containers/"+url.PathEscape(oldID)+"/start", nil, http.StatusNoContent, http.StatusNotModified)
 	_ = oldName
 }
-
