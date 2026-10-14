@@ -36,6 +36,7 @@ type App struct {
 	crashHistory    map[string][]time.Time
 	// crashBackoff overrides the auto-restart delays in tests.
 	crashBackoff []time.Duration
+	ports        publishedPorts
 }
 
 func main() {
@@ -54,6 +55,7 @@ func main() {
 	app.ensureManagers()
 	go app.backupMaintenanceLoop()
 	go app.schedulerLoop()
+	go app.watchPublishedPorts()
 	// Remove finished self-update helper containers. The helper is usually
 	// still exiting when the new manager starts, so check again shortly after.
 	go func() {
