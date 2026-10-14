@@ -138,7 +138,7 @@ func (m *ServerManager) installMinecraft(version string) error {
 	if copyErr != nil { _ = os.Remove(tmpPath); return copyErr }
 	if closeErr != nil { _ = os.Remove(tmpPath); return closeErr }
 	if err := os.Rename(tmpPath, finalPath); err != nil { _ = os.Remove(tmpPath); return err }
-	if err := os.WriteFile(filepath.Join(gameDir, "eula.txt"), []byte("# Accepted by the server owner in HSM. See https://aka.ms/MinecraftEULA.\\neula=true\\n"), 0600); err != nil { return err }
+	if err := os.WriteFile(filepath.Join(gameDir, "eula.txt"), []byte("# Accepted by the server owner in HSM. See https://aka.ms/MinecraftEULA.\neula=true\n"), 0600); err != nil { return err }
 	m.appendLog("installer", "Downloaded Minecraft "+resolvedVersion+" server jar")
 	return nil
 }
