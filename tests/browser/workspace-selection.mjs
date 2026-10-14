@@ -1,0 +1,292 @@
+// Browser regression test for server selection and workspace isolation.
+//
+// It starts a real HSM binary against a throwaway data directory, creates a
+// Hytale server backed by a fake start.sh (no game download), a Minecraft Java
+// server and a Dragonwilds server, then drives the UI in Chromium.
+//
+// Usage:
+//   go build -o /tmp/hsm ./cmd/hsm
+//   node tests/browser/workspace-selection.mjs /tmp/hsm
+//
+// Playwright is resolved from PLAYWRIGHT_MODULE when set, otherwise from the
+// "playwright" package (npm install playwright).
+import { spawn } from 'node:child_process';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import assert from 'node:assert/strict';
+
+const binary = process.argv[2];
+if (!binary) {
+  console.error('usage: node tests/browser/workspace-selection.mjs <path-to-hsm-binary>');
+  process.exit(2);
+}
+const playwrightModule = process.env.PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : 'playwright';
+const { chromium } = await import(playwrightModule);
+
+const port = 18000 + Math.floor(Math.random() * 1000);
+const base = `http://127.0.0.1:${port}`;
+const dataDir = mkdtempSync(join(tmpdir(), 'hsm-browser-'));
+const server = spawn(binary, [], {
+  env: { ...process.env, HSM_DATA_DIR: dataDir, HSM_LISTEN: `127.0.0.1:${port}`, HSM_GAME_PORT_START: '5520', HSM_GAME_PORT_END: '5525' },
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
+let serverOutput = '';
+server.stdout.on('data', d => { serverOutput += d; });
+server.stderr.on('data', d => { serverOutput += d; });
+
+let cookie = '';
+async function call(method, path, body) {
+  const res = await fetch(base + path, {
+    method,
+    headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const setCookie = res.headers.get('set-cookie');
+  if (setCookie) cookie = setCookie.split(';')[0];
+  const text = await res.text();
+  if (!res.ok) throw new Error(`${method} ${path} -> ${res.status} ${text}`);
+  return text ? JSON.parse(text) : null;
+}
+
+async function waitForServer() {
+  for (let i = 0; i < 50; i++) {
+    try { await fetch(base + '/api/health'); return; } catch { await new Promise(r => setTimeout(r, 100)); }
+  }
+  throw new Error('HSM did not start:\n' + serverOutput);
+}
+
+function fakeHytaleInstall(id) {
+  const game = join(dataDir, 'servers', id, 'game');
+  mkdirSync(join(game, 'Server'), { recursive: true });
+  writeFileSync(join(game, 'Server', 'HytaleServer.jar'), '');
+  writeFileSync(join(game, 'Assets.zip'), '');
+  writeFileSync(join(game, 'start.sh'), [
+    '#!/bin/bash',
+    'echo "fake server ready"',
+    'while read -r line; do',
+    '  echo "received: $line"',
+    '  if [ "$line" = "/stop" ]; then echo "fake server stopping"; exit 0; fi',
+    'done',
+  ].join('\n'), { mode: 0o755 });
+}
+
+const results = [];
+async function check(name, fn) {
+  try {
+    await fn();
+    results.push(['PASS', name]);
+  } catch (err) {
+    results.push(['FAIL', name, err.message.split('\n')[0]]);
+  }
+}
+
+let browser;
+try {
+  await waitForServer();
+  await call('POST', '/api/bootstrap', { username: 'admin', password: 'password123' });
+  await call('POST', '/api/servers', { game: 'hytale', name: 'Alpha Hytale', memoryMin: '1G', memoryMax: '2G', backupFrequency: 30, maxPlayers: 20, gameMode: 'Adventure' });
+  await call('POST', '/api/servers', { game: 'minecraft-java', minecraftVariant: 'vanilla', minecraftVersion: 'latest', minecraftEulaAccepted: true, name: 'Bravo Minecraft', memoryMin: '1G', memoryMax: '2G', maxPlayers: 20, gameMode: 'Survival' });
+  await call('POST', '/api/servers', { game: 'runescape-dragonwilds', name: 'Charlie Dragonwilds', maxPlayers: 6, dragonwildsOwnerId: 'owner-1', dragonwildsWorldName: 'World', dragonwildsAdminPassword: 'adminpass' });
+  fakeHytaleInstall('alpha-hytale');
+
+  browser = await chromium.launch();
+  const page = await browser.newPage();
+  const pageErrors = [];
+  page.on('pageerror', e => pageErrors.push(e.message));
+  // Requests that reach the backend without naming a server would be ambiguous.
+  const unscoped = [];
+  page.on('request', req => {
+    const url = new URL(req.url());
+    const serverScoped = /^\/api\/(status|players|resources|settings|server\/|console|logs|files|mods|backups|install\/(status|run-downloader|import-local|minecraft|dragonwilds)|auth|update)/.test(url.pathname);
+    if (serverScoped && !req.headers()['x-hsm-server']) unscoped.push(req.method() + ' ' + url.pathname);
+  });
+
+  const text = sel => page.textContent(sel);
+  const value = sel => page.inputValue(sel);
+  const visible = sel => page.isVisible(sel);
+  const select = async id => { await page.click(`[data-select-server="${id}"]`); };
+  const waitForName = name => page.waitForFunction(n => document.querySelector('#set-name').value === n, name, { timeout: 5000 });
+
+  await page.goto(base);
+  await page.fill('#auth-user', 'admin');
+  await page.fill('#auth-pass', 'password123');
+  await page.click('#auth-submit');
+  await page.waitForSelector('#app:not(.hidden)');
+  await page.waitForTimeout(500);
+
+  await check('selecting a server loads its whole workspace', async () => {
+    await select('bravo-minecraft');
+    await waitForName('Bravo Minecraft');
+    assert.equal(await text('#server-name'), 'Bravo Minecraft');
+    assert.equal(await text('#view-title'), 'Overview');
+    assert.notEqual(await text('#hero-state'), 'LOADING');
+  });
+
+  await check('switching games recalculates workspace tabs and controls', async () => {
+    await select('alpha-hytale');
+    await waitForName('Alpha Hytale');
+    assert.ok(await visible('[data-view-tab="mods"]'), 'Hytale shows Mods');
+    assert.ok(await visible('[data-view-tab="backups"]'), 'Hytale shows Backups');
+    assert.ok(await visible('.players-panel'), 'Hytale shows players');
+    await select('bravo-minecraft');
+    await waitForName('Bravo Minecraft');
+    assert.ok(!(await visible('[data-view-tab="mods"]')), 'Minecraft hides Mods');
+    assert.ok(!(await visible('[data-view-tab="backups"]')), 'Minecraft hides Backups');
+    assert.ok(!(await visible('.players-panel')), 'Minecraft hides players');
+    assert.match(await text('#game-capability-note'), /Minecraft Java servers do not support/);
+    await select('charlie-dragonwilds');
+    await waitForName('Charlie Dragonwilds');
+    await page.click('[data-view-tab="console"]');
+    assert.ok(!(await visible('#console-form')), 'Dragonwilds hides console command input');
+    assert.ok(await visible('#console-output'), 'Dragonwilds still shows console output');
+  });
+
+  await check('only the active workspace section is shown', async () => {
+    await select('alpha-hytale');
+    await waitForName('Alpha Hytale');
+    for (const tab of ['config', 'console', 'settings']) {
+      await page.click(`[data-view-tab="${tab}"]`);
+      const shown = await page.$$eval('.view', views => views.filter(v => getComputedStyle(v).display !== 'none').map(v => v.id));
+      assert.deepEqual(shown, ['view-' + tab]);
+    }
+    await page.click('[data-view-tab="dashboard"]');
+  });
+
+  await check('server list labels each game with its own protocol', async () => {
+    assert.match(await text('[data-select-server="bravo-minecraft"]'), /TCP 552\d/);
+    assert.match(await text('[data-select-server="alpha-hytale"]'), /UDP 552\d/);
+  });
+
+  await check('a delayed response from the previous server is discarded', async () => {
+    await select('bravo-minecraft');
+    await waitForName('Bravo Minecraft');
+    await page.route('**/api/settings', async route => {
+      if (route.request().headers()['x-hsm-server'] === 'alpha-hytale') await new Promise(r => setTimeout(r, 1500));
+      await route.continue().catch(() => {});
+    });
+    await select('alpha-hytale');
+    await page.waitForTimeout(100);
+    assert.equal(await value('#set-name'), '', 'settings form is cleared while loading, not showing the previous server');
+    await select('bravo-minecraft');
+    await page.waitForTimeout(2200);
+    assert.equal(await value('#set-name'), 'Bravo Minecraft');
+    assert.equal(await text('#server-name'), 'Bravo Minecraft');
+    await page.unroute('**/api/settings');
+  });
+
+  await check('rapid switching settles on the last selected server', async () => {
+    for (let i = 0; i < 8; i++) await select(i % 2 ? 'alpha-hytale' : 'bravo-minecraft');
+    await select('charlie-dragonwilds');
+    await waitForName('Charlie Dragonwilds');
+    await page.waitForTimeout(800);
+    assert.equal(await value('#set-name'), 'Charlie Dragonwilds');
+    assert.equal(await text('#top-context'), 'Charlie Dragonwilds');
+  });
+
+  await check('an essential API failure shows an error with a working retry', async () => {
+    let fail = true;
+    await page.route('**/api/settings', route => fail && route.request().headers()['x-hsm-server'] === 'bravo-minecraft'
+      ? route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"simulated failure"}' })
+      : route.continue());
+    await select('bravo-minecraft');
+    await page.waitForSelector('#workspace-error:not(.hidden)', { timeout: 3000 });
+    assert.match(await text('#workspace-error-text'), /simulated failure/);
+    fail = false;
+    await page.click('#workspace-retry');
+    await waitForName('Bravo Minecraft');
+    assert.ok(!(await visible('#workspace-error')), 'error clears after a successful retry');
+    await page.unroute('**/api/settings');
+  });
+
+  await check('settings cannot be saved while the selected server is still loading', async () => {
+    let release;
+    const gate = new Promise(r => { release = r; });
+    let saves = 0;
+    await page.route('**/api/settings', async route => {
+      if (route.request().method() === 'PUT') saves++;
+      if (route.request().method() === 'GET' && route.request().headers()['x-hsm-server'] === 'alpha-hytale') await gate;
+      await route.continue().catch(() => {});
+    });
+    await select('alpha-hytale');
+    await page.click('[data-view-tab="settings"]');
+    await page.fill('#set-name', 'Should not be saved');
+    await page.click('#settings-form button[type="submit"], #settings-form button:not([type])');
+    await page.waitForTimeout(300);
+    assert.equal(saves, 0, 'no PUT was sent');
+    release();
+    await waitForName('Alpha Hytale');
+    await page.unroute('**/api/settings');
+    const servers = await call('GET', '/api/servers');
+    assert.ok(servers.some(s => s.serverName === 'Alpha Hytale'), 'name unchanged on the backend');
+  });
+
+  await check('console output streams once and commands reach only the selected server', async () => {
+    await select('alpha-hytale');
+    await waitForName('Alpha Hytale');
+    await page.click('#start-btn');
+    await page.waitForFunction(() => /Online|Starting/.test(document.querySelector('#top-status').textContent), null, { timeout: 5000 });
+    await page.click('[data-view-tab="console"]');
+    await page.waitForFunction(() => document.querySelector('#console-output').textContent.includes('fake server ready'), null, { timeout: 5000 });
+    await page.fill('#console-command', 'hello-alpha');
+    await page.press('#console-command', 'Enter');
+    await page.waitForFunction(() => document.querySelector('#console-output').textContent.includes('received: hello-alpha'), null, { timeout: 5000 });
+    await page.waitForTimeout(2500); // let at least one poll cycle pass
+    const count = await page.$$eval('#console-output .log-line', lines => lines.filter(l => l.textContent.includes('received: hello-alpha')).length);
+    assert.equal(count, 1, 'streamed line appears exactly once');
+
+    await select('bravo-minecraft');
+    await waitForName('Bravo Minecraft');
+    await page.click('[data-view-tab="console"]');
+    assert.ok(!(await text('#console-output')).includes('hello-alpha'), "previous server's output is cleared");
+    await page.fill('#console-command', 'meant-for-bravo');
+    await page.press('#console-command', 'Enter');
+    await page.waitForTimeout(500);
+    const alphaLogs = await (await fetch(base + '/api/logs', { headers: { Cookie: cookie, 'X-HSM-Server': 'alpha-hytale' } })).json();
+    assert.ok(!alphaLogs.some(l => l.line.includes('meant-for-bravo')), 'command was not delivered to the other server');
+  });
+
+  await check('a server stopping while open updates the workspace', async () => {
+    await select('alpha-hytale');
+    await waitForName('Alpha Hytale');
+    await fetch(base + '/api/servers/alpha-hytale/stop', { method: 'POST', headers: { Cookie: cookie } });
+    await page.waitForFunction(() => /Stopped/.test(document.querySelector('#top-status').textContent), null, { timeout: 8000 });
+    assert.ok(!(await page.isDisabled('#start-btn')), 'start is available again');
+  });
+
+  await check('a selected server deleted elsewhere moves the workspace to a valid server', async () => {
+    await select('bravo-minecraft');
+    await waitForName('Bravo Minecraft');
+    await call('DELETE', '/api/servers/bravo-minecraft');
+    await page.waitForFunction(() => !document.querySelector('[data-select-server="bravo-minecraft"]'), null, { timeout: 5000 });
+    await page.waitForFunction(() => document.querySelector('#set-name').value && document.querySelector('#set-name').value !== 'Bravo Minecraft', null, { timeout: 5000 });
+    assert.notEqual(await text('#server-name'), 'Bravo Minecraft');
+  });
+
+  await check('the create-server wizard opens', async () => {
+    await page.click('#add-server-side');
+    assert.equal(await page.evaluate(() => document.querySelector('#server-dialog').open), true);
+    await page.click('#cancel-server-dialog');
+  });
+
+  await check('mobile overview has no horizontal page overflow', async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await select('alpha-hytale');
+    await page.waitForTimeout(500);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    assert.ok(overflow <= 0, `page overflows by ${overflow}px`);
+  });
+
+  await check('no uncaught page errors', async () => { assert.deepEqual(pageErrors, []); });
+  await check('every server-scoped request names its server', async () => { assert.deepEqual([...new Set(unscoped)], []); });
+} finally {
+  await browser?.close();
+  server.kill('SIGTERM');
+  rmSync(dataDir, { recursive: true, force: true });
+}
+
+for (const [status, name, detail] of results) console.log(`${status}  ${name}${detail ? ' — ' + detail : ''}`);
+const failed = results.filter(r => r[0] === 'FAIL').length;
+console.log(`\n${results.length - failed} passed, ${failed} failed`);
+process.exit(failed ? 1 : 0);

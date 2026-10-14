@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0a0d12">
   <title>HSM · Game Server Control Panel</title>
-  <link rel="stylesheet" href="/app.css?v=20261014-crafty-ui1">
-  <link rel="stylesheet" href="/panel-redesign.css?v=20261014-crafty-ui1">
+  <link rel="stylesheet" href="/app.css?v=20261014-selection-fix1">
+  <link rel="stylesheet" href="/panel-redesign.css?v=20261014-selection-fix1">
 </head>
 <body>
   <div id="auth" class="auth-shell hidden">
@@ -66,6 +66,7 @@
         <button data-view-tab="settings">Settings</button>
       </nav>
       <div id="game-capability-note" class="game-capability-note hidden" role="status" aria-live="polite"></div>
+      <div id="workspace-error" class="workspace-error hidden" role="alert"><span id="workspace-error-text"></span><button type="button" class="btn small" id="workspace-retry">Retry</button></div>
 
       <section id="view-servers" class="view active">
         <div id="first-run" class="welcome-shell hidden">
@@ -187,8 +188,7 @@
             </div>
           </div>
         </div>
-        <div class="panel hidden">
-
+        <div id="config-editor-panel" class="panel hidden">
           <div class="panel-head file-head"><div><h3>Server configuration</h3><p class="help">Edit supported JSON files directly in the app. Changes are checked for valid JSON before saving.</p></div><div class="file-actions"><select id="config-file"><option>config.json</option><option>permissions.json</option><option>whitelist.json</option><option>bans.json</option></select><button class="btn" id="reload-config">Reload</button></div></div>
           <div id="config-running-note" class="inline-notice hidden">Stop this server to edit the file.</div><p id="config-mode-note" class="help">Checking whether this file can be edited…</p>
           <textarea id="server-config" class="code-editor" spellcheck="false"></textarea>
@@ -360,6 +360,6 @@
   </dialog>
 
   <div id="toast" class="toast"></div>
-  <script src="/app.js?v=20261014-crafty-ui1"></script>
+  <script src="/app.js?v=20261014-selection-fix1"></script>
 </body>
 </html>

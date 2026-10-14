@@ -175,6 +175,10 @@ type ServerSummary struct {
 	UptimeSeconds int64  `json:"uptimeSeconds"`
 	StorageDir    string `json:"storageDir"`
 	Primary       bool   `json:"primary"`
+	// Protocol and Capabilities come from the game catalog so the browser does
+	// not keep its own, possibly divergent, copy of what each game supports.
+	Protocol     string         `json:"protocol"`
+	Capabilities GameCapability `json:"capabilities"`
 }
 
 func main() {
@@ -278,13 +282,22 @@ func (a *App) routes(mux *http.ServeMux) {
 	mux.Handle("POST /api/install/minecraft", a.auth(http.HandlerFunc(a.handleMinecraftInstall)))
 	mux.Handle("POST /api/install/import-local", a.auth(http.HandlerFunc(a.handleImportLocal)))
 
-	for _, x := range []struct{ path, cmd string }{
-		{"/api/update/check", "/update check"}, {"/api/update/download", "/update download"}, {"/api/update/apply", "/update apply --confirm"},
-		{"/api/update/status", "/update status"}, {"/api/update/cancel", "/update cancel"}, {"/api/update/setup", "/update setup"},
-		{"/api/update/force-download", "/update download --force"}, {"/api/auth/device", "/auth login device"},
+	gameUpdates := func(c GameCapability) bool { return c.GameUpdates }
+	deviceAuth := func(c GameCapability) bool { return c.DeviceAuth }
+	for _, x := range []struct {
+		path, cmd, feature string
+		supported func(GameCapability) bool
+	}{
+		{"/api/update/check", "/update check", "Game updates", gameUpdates}, {"/api/update/download", "/update download", "Game updates", gameUpdates},
+		{"/api/update/apply", "/update apply --confirm", "Game updates", gameUpdates}, {"/api/update/status", "/update status", "Game updates", gameUpdates},
+		{"/api/update/cancel", "/update cancel", "Game updates", gameUpdates}, {"/api/update/setup", "/update setup", "Game updates", gameUpdates},
+		{"/api/update/force-download", "/update download --force", "Game updates", gameUpdates},
+		{"/api/auth/device", "/auth login device", "Device authentication", deviceAuth},
 	} {
-		cmd := x.cmd
-		mux.Handle("POST "+x.path, a.auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { a.commandShortcut(w, r, cmd) })))
+		x := x
+		mux.Handle("POST "+x.path, a.auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			a.commandShortcut(w, r, x.cmd, x.feature, x.supported)
+		})))
 	}
 
 	sub, _ := fs.Sub(webFS, "web")
@@ -496,7 +509,8 @@ func (a *App) handleServersList(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		st := m.Status()
-		out = append(out, ServerSummary{ID: s.ID, GameType: s.GameType, ServerName: s.ServerName, Port: s.Port, PublicHost: s.PublicHost, Running: st.Running, Installed: st.Installed, InstallBusy: st.InstallBusy, State: st.State, ExitCode: st.ExitCode, LastExitAt: st.LastExitAt, UptimeSeconds: st.UptimeSeconds, StorageDir: s.StorageDir, Primary: i == 0})
+		game, _ := gameCatalogEntryFor(s.GameType)
+		out = append(out, ServerSummary{ID: s.ID, GameType: s.GameType, ServerName: s.ServerName, Port: s.Port, PublicHost: s.PublicHost, Running: st.Running, Installed: st.Installed, InstallBusy: st.InstallBusy, State: st.State, ExitCode: st.ExitCode, LastExitAt: st.LastExitAt, UptimeSeconds: st.UptimeSeconds, StorageDir: s.StorageDir, Primary: i == 0, Protocol: game.Protocol, Capabilities: game.Capabilities})
 	}
 	jsonOut(w, 200, out)
 }
@@ -792,11 +806,17 @@ func (a *App) requestServer(r *http.Request) (*ServerManager, ServerSettings, er
 		id = strings.TrimSpace(r.URL.Query().Get("server"))
 	}
 	if id == "" {
+		// Single-server clients from before multi-server support omit the ID.
+		// With several servers, guessing could stop or edit the wrong one.
 		a.cfgMu.RLock()
-		if len(a.cfg.Servers) > 0 {
+		count := len(a.cfg.Servers)
+		if count == 1 {
 			id = a.cfg.Servers[0].ID
 		}
 		a.cfgMu.RUnlock()
+		if count > 1 {
+			return nil, ServerSettings{}, errors.New("server id is required when more than one server is configured")
+		}
 	}
 	return a.serverByID(id)
 }
@@ -859,6 +879,10 @@ func (a *App) handlePlayers(w http.ResponseWriter, r *http.Request) {
 	if maxPlayers < 1 { maxPlayers = 100 }
 	if settings.GameType == "runescape-dragonwilds" {
 		jsonOut(w, 200, map[string]any{"known": false, "count": 0, "maxPlayers": 6, "players": []string{}, "message": "Player list integration is not available for Dragonwilds yet"})
+		return
+	}
+	if entry, _ := gameCatalogEntryFor(settings.GameType); !entry.Capabilities.PlayerList {
+		jsonOut(w, 200, map[string]any{"known": false, "count": 0, "maxPlayers": maxPlayers, "players": []string{}, "message": "Player list integration is not available for " + entry.Name + " yet"})
 		return
 	}
 	if !m.IsRunning() {
@@ -1160,9 +1184,12 @@ func (a *App) handleRestart(w http.ResponseWriter, r *http.Request) {
 	a.restartByID(w, s.ID)
 }
 func (a *App) handleConsole(w http.ResponseWriter, r *http.Request) {
-	m, _, err := a.requestServer(r)
+	m, s, err := a.requestServer(r)
 	if err != nil {
 		jsonError(w, 404, err.Error())
+		return
+	}
+	if !requireCapability(w, s, "Console commands", func(c GameCapability) bool { return c.ConsoleCommands }) {
 		return
 	}
 	var body struct {
@@ -1178,10 +1205,13 @@ func (a *App) handleConsole(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOut(w, 200, map[string]any{"ok": true})
 }
-func (a *App) commandShortcut(w http.ResponseWriter, r *http.Request, cmd string) {
-	m, _, err := a.requestServer(r)
+func (a *App) commandShortcut(w http.ResponseWriter, r *http.Request, cmd, feature string, supported func(GameCapability) bool) {
+	m, s, err := a.requestServer(r)
 	if err != nil {
 		jsonError(w, 404, err.Error())
+		return
+	}
+	if !requireCapability(w, s, feature, supported) {
 		return
 	}
 	if err := m.SendCommand(cmd); err != nil {
@@ -1262,6 +1292,9 @@ func (a *App) serveServerJSONGet(w http.ResponseWriter, r *http.Request, name st
 		jsonError(w, 404, err.Error())
 		return
 	}
+	if !requireCapability(w, s, "Editing "+name, func(c GameCapability) bool { return c.allowsConfigFile(name) }) {
+		return
+	}
 	path := filepath.Join(a.serverRoot(s), "game", "Server", name)
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -1278,6 +1311,9 @@ func (a *App) serveServerJSONPut(w http.ResponseWriter, r *http.Request, name st
 	m, s, err := a.requestServer(r)
 	if err != nil {
 		jsonError(w, 404, err.Error())
+		return
+	}
+	if !requireCapability(w, s, "Editing "+name, func(c GameCapability) bool { return c.allowsConfigFile(name) }) {
 		return
 	}
 	if m.IsRunning() {
@@ -1323,6 +1359,9 @@ func (a *App) handleModsList(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 404, err.Error())
 		return
 	}
+	if !requireCapability(w, s, "Mods", func(c GameCapability) bool { return c.Mods }) {
+		return
+	}
 	dir := filepath.Join(a.serverRoot(s), "game", "Server", "mods")
 	_ = os.MkdirAll(dir, 0755)
 	entries, err := os.ReadDir(dir)
@@ -1348,6 +1387,9 @@ func (a *App) handleModUpload(w http.ResponseWriter, r *http.Request) {
 	m, s, err := a.requestServer(r)
 	if err != nil {
 		jsonError(w, 404, err.Error())
+		return
+	}
+	if !requireCapability(w, s, "Mods", func(c GameCapability) bool { return c.Mods }) {
 		return
 	}
 	if err := r.ParseMultipartForm(64 << 20); err != nil {
@@ -1381,6 +1423,9 @@ func (a *App) handleModDelete(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 404, err.Error())
 		return
 	}
+	if !requireCapability(w, s, "Mods", func(c GameCapability) bool { return c.Mods }) {
+		return
+	}
 	name := filepath.Base(r.PathValue("name"))
 	if name == "." || name == "" {
 		jsonError(w, 400, "invalid mod name")
@@ -1400,6 +1445,9 @@ func (a *App) handleBackupsList(w http.ResponseWriter, r *http.Request) {
 	_, s, err := a.requestServer(r)
 	if err != nil {
 		jsonError(w, 404, err.Error())
+		return
+	}
+	if !requireCapability(w, s, "Backups", func(c GameCapability) bool { return c.Backups }) {
 		return
 	}
 	a.pruneBackupRetention(s)
@@ -1449,6 +1497,9 @@ func (a *App) handleNativeBackup(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 404, err.Error())
 		return
 	}
+	if !requireCapability(w, s, "Native backups", func(c GameCapability) bool { return c.Backups }) {
+		return
+	}
 	if !m.IsRunning() {
 		jsonError(w, 409, "server must be running for a native Hytale backup")
 		return
@@ -1464,6 +1515,9 @@ func (a *App) handleSnapshotCreate(w http.ResponseWriter, r *http.Request) {
 	m, s, err := a.requestServer(r)
 	if err != nil {
 		jsonError(w, 404, err.Error())
+		return
+	}
+	if !requireCapability(w, s, "Snapshots", func(c GameCapability) bool { return c.Backups }) {
 		return
 	}
 	if m.IsRunning() {
@@ -1486,6 +1540,9 @@ func (a *App) handleSnapshotRestore(w http.ResponseWriter, r *http.Request) {
 	m, s, err := a.requestServer(r)
 	if err != nil {
 		jsonError(w, 404, err.Error())
+		return
+	}
+	if !requireCapability(w, s, "Snapshots", func(c GameCapability) bool { return c.Backups }) {
 		return
 	}
 	if m.IsRunning() {
@@ -1516,6 +1573,9 @@ func (a *App) handleSnapshotDelete(w http.ResponseWriter, r *http.Request) {
 	_, s, err := a.requestServer(r)
 	if err != nil {
 		jsonError(w, 404, err.Error())
+		return
+	}
+	if !requireCapability(w, s, "Snapshots", func(c GameCapability) bool { return c.Backups }) {
 		return
 	}
 	name := filepath.Base(r.PathValue("name"))
@@ -1603,9 +1663,13 @@ func (a *App) handleDownloaderUpload(w http.ResponseWriter, r *http.Request) {
 	jsonOut(w, 201, map[string]any{"ok": true, "filename": header.Filename})
 }
 func (a *App) handleDownloaderRun(w http.ResponseWriter, r *http.Request) {
-	m, _, err := a.requestServer(r)
+	m, s, err := a.requestServer(r)
 	if err != nil {
 		jsonError(w, 404, err.Error())
+		return
+	}
+	if normalizeGameType(s.GameType) != "hytale" {
+		jsonError(w, 400, "select a Hytale server before running the Hytale downloader")
 		return
 	}
 	if m.IsRunning() {
@@ -1622,6 +1686,10 @@ func (a *App) handleImportLocal(w http.ResponseWriter, r *http.Request) {
 	m, s, err := a.requestServer(r)
 	if err != nil {
 		jsonError(w, 404, err.Error())
+		return
+	}
+	if normalizeGameType(s.GameType) != "hytale" {
+		jsonError(w, 400, "select a Hytale server before importing a Hytale server bundle")
 		return
 	}
 	if m.IsRunning() {
