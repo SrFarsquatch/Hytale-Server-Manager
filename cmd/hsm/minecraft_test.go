@@ -17,6 +17,8 @@ func TestMinecraftAdapterRequiresJarAndAcceptedEULA(t *testing.T) {
 	if (MinecraftAdapter{}).Installed(root) { t.Fatal("server with no EULA file must not be considered installed") }
 	if err := os.WriteFile(filepath.Join(gameDir, "eula.txt"), []byte("eula=false\n"), 0600); err != nil { t.Fatal(err) }
 	if (MinecraftAdapter{}).Installed(root) { t.Fatal("server with eula=false must not be considered installed") }
+	if err := os.WriteFile(filepath.Join(gameDir, "eula.txt"), []byte("not-eula=true\n"), 0600); err != nil { t.Fatal(err) }
+	if (MinecraftAdapter{}).Installed(root) { t.Fatal("server with unrelated key containing eula=true must not be considered installed") }
 	if err := os.WriteFile(filepath.Join(gameDir, "eula.txt"), []byte("eula=true\n"), 0600); err != nil { t.Fatal(err) }
 	if !(MinecraftAdapter{}).Installed(root) { t.Fatal("server with jar and eula=true should be installed") }
 }
