@@ -23,6 +23,15 @@ jobs:
         run: go test ./...
       - name: Check browser JavaScript syntax
         run: node --check cmd/hsm/web/app.js
+      - name: Check browser JavaScript for undefined names
+        # A call to an undefined function only fails at runtime, after the UI has
+        # partly updated; catch it before release.
+        run: >-
+          npx --yes eslint@10.1.0 --no-config-lookup
+          --rule '{"no-undef":"error"}'
+          --parser-options ecmaVersion:2022
+          --global document,window,localStorage,fetch,EventSource,FormData,AbortController,location,navigator,confirm,prompt,setTimeout,clearTimeout,setInterval,clearInterval,URL,Option,console
+          cmd/hsm/web/app.js
       - name: Run vet
         run: go vet ./...
       - name: Build application

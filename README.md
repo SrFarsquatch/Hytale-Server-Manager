@@ -81,3 +81,14 @@ The web panel uses TCP `8008` on the host and container. Hytale game servers use
 ## Hytale files
 
 This project does not bundle proprietary Hytale server files. Install them with the official Hytale downloader or import your own authorized `game.zip`.
+
+## Development checks
+
+```bash
+go vet ./... && go test ./...
+node --check cmd/hsm/web/app.js
+# Browser regression test for server switching (needs the `playwright` npm package and Chromium):
+go build -o /tmp/hsm ./cmd/hsm && node tests/browser/workspace-selection.mjs /tmp/hsm
+```
+
+The browser test starts its own HSM instance against a temporary data directory and uses a fake Hytale `start.sh`, so it never downloads games or touches real server data. See `docs/audit-2026-10-workspace-selection.md` for the current audit and backlog.

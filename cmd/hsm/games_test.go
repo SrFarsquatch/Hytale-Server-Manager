@@ -40,7 +40,11 @@ func TestGameCatalogCapabilitiesDoNotOverstatePlannedGameSupport(t *testing.T) {
 			continue
 		}
 		if game.ID == "runescape-dragonwilds" {
-			if game.Capabilities.Backups || game.Capabilities.FileManagement || game.Capabilities.Mods || game.Capabilities.PlayerList { t.Errorf("Dragonwilds exposes unimplemented capabilities: %#v", game.Capabilities) }
+			// The file manager is game-neutral and was already exposed for Dragonwilds.
+			// Dragonwilds is stopped with SIGINT and has no stdin command channel.
+			if game.Capabilities.Backups || game.Capabilities.Mods || game.Capabilities.PlayerList || game.Capabilities.ConsoleCommands || game.Capabilities.DeviceAuth || game.Capabilities.GameUpdates || len(game.Capabilities.ConfigFiles) != 0 {
+				t.Errorf("Dragonwilds exposes unimplemented capabilities: %#v", game.Capabilities)
+			}
 			continue
 		}
 		if game.ID == "minecraft-java" {

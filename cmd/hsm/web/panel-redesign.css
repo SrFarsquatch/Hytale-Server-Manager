@@ -750,7 +750,7 @@ body {
 }
 .server-tabs button:hover:not(.active) { background:#15222e; color:#e2edf5; }
 .view { min-width:0; }
-.server-overview { display:flex; flex-direction:column; gap:18px; }
+.server-overview.active { display:flex; flex-direction:column; gap:18px; }
 .server-header {
   position:relative; overflow:hidden; display:flex; align-items:center; justify-content:space-between;
   gap:30px; padding:30px 32px; min-height:190px;
@@ -1570,3 +1570,20 @@ a:hover { color:#b1f5db; }
 @media(prefers-reduced-motion:reduce) {
   *,*::before,*::after { animation-duration:.01ms!important; animation-iteration-count:1!important; scroll-behavior:auto!important; transition-duration:.01ms!important; }
 }
+
+/* Essential workspace data failed to load; offer a retry instead of stale data. */
+.workspace-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 9px 12px;
+  border: 1px solid rgba(226, 112, 104, .45);
+  border-radius: 8px;
+  background: rgba(226, 112, 104, .08);
+  color: #f0b7b1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.workspace-error .btn { flex: none; }
