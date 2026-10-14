@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/fs"
 	"net/http"
 	"strings"
 )
@@ -38,6 +39,40 @@ type GameCatalogEntry struct {
 	Available    bool           `json:"available"`
 	Protocol     string         `json:"protocol"`
 	Capabilities GameCapability `json:"capabilities"`
+	Art          GameArt        `json:"art"`
+}
+
+// GameArt holds URLs for optional official artwork bundled under
+// web/assets/games/art. Empty fields mean the file is absent and the browser
+// falls back to a generated monogram, so a missing image is never requested.
+type GameArt struct {
+	Icon   string `json:"icon,omitempty"`
+	Banner string `json:"banner,omitempty"`
+}
+
+var gameArtExtensions = []string{"png", "webp", "jpg", "jpeg", "svg"}
+
+// gameArtFrom looks for <id>-icon.<ext> and <id>-banner.<ext> in fsys, which is
+// rooted at the embedded web directory.
+func gameArtFrom(fsys fs.FS, id string) GameArt {
+	find := func(kind string) string {
+		for _, ext := range gameArtExtensions {
+			name := "assets/games/art/" + id + "-" + kind + "." + ext
+			if info, err := fs.Stat(fsys, name); err == nil && !info.IsDir() {
+				return "/" + name
+			}
+		}
+		return ""
+	}
+	return GameArt{Icon: find("icon"), Banner: find("banner")}
+}
+
+func embeddedGameArt(id string) GameArt {
+	web, err := fs.Sub(webFS, "web")
+	if err != nil {
+		return GameArt{}
+	}
+	return gameArtFrom(web, id)
 }
 
 var hytaleConfigFiles = []string{"config.json", "permissions.json", "whitelist.json", "bans.json"}
@@ -89,7 +124,7 @@ func normalizeGameType(gameType string) string {
 // and unknown games fail closed with no capabilities.
 func gameCatalogEntryFor(gameType string) (GameCatalogEntry, bool) {
 	gameType = normalizeGameType(gameType)
-	for _, entry := range supportedGameCatalog() {
+	for _, entry := range catalogWithArt() {
 		if entry.ID == gameType && entry.Available {
 			return entry, true
 		}
@@ -123,6 +158,15 @@ func requireCapability(w http.ResponseWriter, s ServerSettings, feature string, 
 	return false
 }
 
+// catalogWithArt is the catalog as served to the browser, with artwork URLs.
+func catalogWithArt() []GameCatalogEntry {
+	games := supportedGameCatalog()
+	for i := range games {
+		games[i].Art = embeddedGameArt(games[i].ID)
+	}
+	return games
+}
+
 func (a *App) handleGameCatalog(w http.ResponseWriter, r *http.Request) {
-	jsonOut(w, 200, map[string]any{"games": supportedGameCatalog()})
+	jsonOut(w, 200, map[string]any{"games": catalogWithArt()})
 }

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 )
 
 // newCapabilityTestApp builds an App with one stopped server per game type.
@@ -195,4 +196,22 @@ func newTestMux(app *App) http.Handler {
 		r.AddCookie(&http.Cookie{Name: "hsm_session", Value: token})
 		mux.ServeHTTP(w, r)
 	})
+}
+
+func TestGameArtOnlyReportsFilesThatExist(t *testing.T) {
+	fsys := fstest.MapFS{
+		"assets/games/art/hytale-icon.png":                {Data: []byte("png")},
+		"assets/games/art/hytale-banner.webp":             {Data: []byte("webp")},
+		"assets/games/art/minecraft-java-icon.svg":        {Data: []byte("<svg/>")},
+		"assets/games/art/runescape-dragonwilds-icon.gif": {Data: []byte("unsupported")},
+	}
+	if got := gameArtFrom(fsys, "hytale"); got.Icon != "/assets/games/art/hytale-icon.png" || got.Banner != "/assets/games/art/hytale-banner.webp" {
+		t.Errorf("hytale art = %#v", got)
+	}
+	if got := gameArtFrom(fsys, "minecraft-java"); got.Icon == "" || got.Banner != "" {
+		t.Errorf("minecraft art = %#v, want icon only", got)
+	}
+	if got := gameArtFrom(fsys, "runescape-dragonwilds"); got != (GameArt{}) {
+		t.Errorf("unsupported extension produced art %#v", got)
+	}
 }

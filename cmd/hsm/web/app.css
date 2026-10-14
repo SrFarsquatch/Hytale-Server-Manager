@@ -385,6 +385,14 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
   display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 16px;
   background: linear-gradient(120deg, var(--card-3), var(--card-2)); border: 1px solid var(--line-2); border-radius: 12px;
 }
+/* Official banner art sits behind a dark gradient so text stays readable. */
+.game-tile.has-banner {
+  min-height: 112px;
+  background: linear-gradient(90deg, rgba(20, 25, 37, .94) 0%, rgba(20, 25, 37, .72) 55%, rgba(20, 25, 37, .35) 100%), var(--banner) center / cover no-repeat;
+}
+.game-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
+.game-wordmark.is-icon { width: 54px; padding: 0; overflow: hidden; }
+.game-wordmark.is-icon img { width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover; }
 .game-tile-copy { display: grid; gap: 6px; flex: 1 1 120px; min-width: 0; }
 .game-tile-copy strong { font-size: 16px; }
 .hero-detail { margin-top: 12px; color: var(--muted); font-size: 12.5px; }

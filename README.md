@@ -82,6 +82,17 @@ The web panel uses TCP `8008` on the host and container. Hytale game servers use
 
 This project does not bundle proprietary Hytale server files. Install them with the official Hytale downloader or import your own authorized `game.zip`.
 
+## Game artwork
+
+The panel shows a coloured monogram for each game until official artwork is added. Artwork is optional, bundled into the build, and only used when the file exists:
+
+```text
+cmd/hsm/web/assets/games/art/<game-id>-icon.png     square, 256×256 or larger
+cmd/hsm/web/assets/games/art/<game-id>-banner.jpg   wide, about 1200×400 (optional)
+```
+
+Game IDs: `hytale`, `minecraft-java`, `runescape-dragonwilds`, `terraria`. Accepted formats: PNG, WebP, JPG/JPEG or SVG. Rebuild the image after adding files. Game logos and artwork belong to their publishers; only add artwork you are permitted to use.
+
 ## Development checks
 
 ```bash
