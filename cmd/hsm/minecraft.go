@@ -113,6 +113,7 @@ func (m *ServerManager) RunMinecraftInstaller(version string) error {
 	if m.running { m.mu.Unlock(); return errors.New("server is running") }
 	if m.installBusy { m.mu.Unlock(); return errors.New("an install job is already running") }
 	if m.gameType != "minecraft-java" { m.mu.Unlock(); return errors.New("select a Minecraft Java server before installing Minecraft files") }
+	if (MinecraftAdapter{}).Installed(m.rootDir) { m.mu.Unlock(); return errors.New("Minecraft server files are already installed; updating them is not supported by this installer yet") }
 	m.installBusy = true
 	m.mu.Unlock()
 	go func() {
