@@ -69,11 +69,10 @@ This is stronger than checking only whether a request completed successfully and
 
 ### Step B — isolate the game contract
 
-- Introduce a small game-adapter interface and a registry keyed by stable game IDs.
-- First wrap existing Hytale behavior without changing its implementation or storage paths.
-- Wrap Dragonwilds behavior second.
+- Complete the existing `GameAdapter` seam so install detection, process specification, and graceful shutdown are adapter-owned; keep process supervision shared.
+- Preserve the current Hytale and Dragonwilds launch behavior while moving one responsibility at a time.
 - Keep existing API endpoints and persisted JSON fields stable.
-- Add contract tests shared by every adapter.
+- Add contract tests shared by every adapter before moving installation and configuration handlers.
 
 ### Step C — extract shared lifecycle services
 
