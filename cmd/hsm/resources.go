@@ -179,3 +179,69 @@ func maxInt(a, b int) int {
 	}
 	return b
 }
+
+func readEffectiveMemoryLimit() int64 {
+	paths := []string{"/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"}
+	for _, p := range paths {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		v := strings.TrimSpace(string(b))
+		if v == "max" || v == "" {
+			return 0
+		}
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err == nil && n > 0 && n < (1<<60) {
+			return n
+		}
+	}
+	return 0
+}
+
+func readProcessGroupMemory(pgid int) int64 {
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return 0
+	}
+	var total int64
+	for _, e := range entries {
+		pid, err := strconv.Atoi(e.Name())
+		if err != nil || pid <= 0 {
+			continue
+		}
+		g, err := syscall.Getpgid(pid)
+		if err != nil || g != pgid {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join("/proc", e.Name(), "status"))
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(b), "\n") {
+			if strings.HasPrefix(line, "VmRSS:") {
+				f := strings.Fields(line)
+				if len(f) >= 2 {
+					if kb, err := strconv.ParseInt(f[1], 10, 64); err == nil {
+						total += kb * 1024
+					}
+				}
+				break
+			}
+		}
+	}
+	return total
+}
+
+func readContainerMemory() int64 {
+	paths := []string{"/sys/fs/cgroup/memory.current", "/sys/fs/cgroup/memory/memory.usage_in_bytes"}
+	for _, p := range paths {
+		b, err := os.ReadFile(p)
+		if err == nil {
+			if n, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64); err == nil {
+				return n
+			}
+		}
+	}
+	return 0
+}

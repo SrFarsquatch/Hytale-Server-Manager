@@ -1,0 +1,776 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+type ServerSummary struct {
+	ID            string `json:"id"`
+	GameType      string `json:"gameType"`
+	ServerName    string `json:"serverName"`
+	Port          int    `json:"port"`
+	PublicHost    string `json:"publicHost"`
+	Running       bool   `json:"running"`
+	Installed     bool   `json:"installed"`
+	InstallBusy   bool   `json:"installBusy"`
+	State         string `json:"state"`
+	ExitCode      int    `json:"exitCode"`
+	LastExitAt    string `json:"lastExitAt,omitempty"`
+	UptimeSeconds int64  `json:"uptimeSeconds"`
+	StorageDir    string `json:"storageDir"`
+	Primary       bool   `json:"primary"`
+	// Protocol and Capabilities come from the game catalog so the browser does
+	// not keep its own, possibly divergent, copy of what each game supports.
+	Protocol     string         `json:"protocol"`
+	Capabilities GameCapability `json:"capabilities"`
+	Art          GameArt        `json:"art"`
+}
+
+func (a *App) handleServersList(w http.ResponseWriter, r *http.Request) {
+	a.cfgMu.RLock()
+	servers := append([]ServerSettings(nil), a.cfg.Servers...)
+	a.cfgMu.RUnlock()
+	out := make([]ServerSummary, 0, len(servers))
+	for i, s := range servers {
+		m, _, err := a.serverByID(s.ID)
+		if err != nil {
+			continue
+		}
+		st := m.Status()
+		game, _ := gameCatalogEntryFor(s.GameType)
+		out = append(out, ServerSummary{ID: s.ID, GameType: s.GameType, ServerName: s.ServerName, Port: s.Port, PublicHost: s.PublicHost, Running: st.Running, Installed: st.Installed, InstallBusy: st.InstallBusy, State: st.State, ExitCode: st.ExitCode, LastExitAt: st.LastExitAt, UptimeSeconds: st.UptimeSeconds, StorageDir: s.StorageDir, Primary: i == 0, Protocol: game.Protocol, Capabilities: game.Capabilities, Art: game.Art})
+	}
+	jsonOut(w, 200, out)
+}
+
+func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Game                     string `json:"game"`
+		DragonwildsOwnerID       string `json:"dragonwildsOwnerId"`
+		DragonwildsWorldName     string `json:"dragonwildsWorldName"`
+		DragonwildsAdminPassword string `json:"dragonwildsAdminPassword"`
+		DragonwildsWorldPassword string `json:"dragonwildsWorldPassword"`
+		DragonwildsPublic        bool   `json:"dragonwildsPublic"`
+		Name                     string `json:"name"`
+		Port                     int    `json:"port"`
+		GameMode                 string `json:"gameMode"`
+		MaxPlayers               int    `json:"maxPlayers"`
+		MOTD                     string `json:"motd"`
+		Password                 string `json:"password"`
+		WhitelistEnabled         bool   `json:"whitelistEnabled"`
+		PublicHost               string `json:"publicHost"`
+		MemoryMin                string `json:"memoryMin"`
+		MemoryMax                string `json:"memoryMax"`
+		BackupFrequency          int    `json:"backupFrequency"`
+		AutoStart                bool   `json:"autoStart"`
+		SourceServerID           string `json:"sourceServerId"`
+		MinecraftVersion         string `json:"minecraftVersion"`
+		MinecraftVariant         string `json:"minecraftVariant"`
+		MinecraftEulaAccepted    bool   `json:"minecraftEulaAccepted"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		jsonError(w, 400, err.Error())
+		return
+	}
+	game := strings.ToLower(strings.TrimSpace(body.Game))
+	if game == "" {
+		game = "hytale"
+	}
+	if game != "hytale" && game != "runescape-dragonwilds" && game != "minecraft-java" {
+		jsonError(w, 400, "this release supports Hytale, Minecraft Java vanilla, and RuneScape: Dragonwilds; see GET /api/games for supported games")
+		return
+	}
+	if game == "minecraft-java" {
+		if body.MinecraftVariant == "" {
+			body.MinecraftVariant = "vanilla"
+		}
+		if body.MinecraftVariant != "vanilla" {
+			jsonError(w, 400, "only vanilla Minecraft Java servers are currently supported")
+			return
+		}
+		if !body.MinecraftEulaAccepted {
+			jsonError(w, 400, "you must accept the Minecraft EULA before creating this server")
+			return
+		}
+		if body.MinecraftVersion == "" {
+			body.MinecraftVersion = "latest"
+		}
+		if len(body.MinecraftVersion) > 32 || strings.ContainsAny(body.MinecraftVersion, "\r\n\x00") {
+			jsonError(w, 400, "invalid Minecraft version")
+			return
+		}
+	}
+	if game == "runescape-dragonwilds" {
+		if strings.TrimSpace(body.DragonwildsOwnerID) == "" {
+			jsonError(w, 400, "RuneScape: Dragonwilds requires your in-game Player ID as the server Owner ID")
+			return
+		}
+		if len(strings.TrimSpace(body.DragonwildsOwnerID)) > 128 || strings.ContainsAny(body.DragonwildsOwnerID, "\r\n\x00") {
+			jsonError(w, 400, "invalid Dragonwilds Owner ID")
+			return
+		}
+		if strings.TrimSpace(body.DragonwildsWorldName) == "" {
+			body.DragonwildsWorldName = nameSafeDefault(body.Name)
+		}
+		if len(body.DragonwildsWorldName) > 32 || strings.ContainsAny(body.DragonwildsWorldName, "\r\n\x00") {
+			jsonError(w, 400, "Dragonwilds world name must be 1–32 characters")
+			return
+		}
+		if strings.TrimSpace(body.DragonwildsAdminPassword) == "" {
+			jsonError(w, 400, "Dragonwilds requires an admin password")
+			return
+		}
+		if len(body.DragonwildsAdminPassword) > 128 || len(body.DragonwildsWorldPassword) > 128 || strings.ContainsAny(body.DragonwildsAdminPassword, "\r\n\x00") || strings.ContainsAny(body.DragonwildsWorldPassword, "\r\n\x00") {
+			jsonError(w, 400, "invalid Dragonwilds password")
+			return
+		}
+	}
+	name := strings.TrimSpace(body.Name)
+	if len(name) < 2 || len(name) > 64 {
+		jsonError(w, 400, "server name must be between 2 and 64 characters")
+		return
+	}
+	if body.GameMode == "" {
+		if game == "minecraft-java" {
+			body.GameMode = "Survival"
+		} else {
+			body.GameMode = "Adventure"
+		}
+	}
+	if game == "minecraft-java" {
+		if body.GameMode != "Survival" && body.GameMode != "Adventure" && body.GameMode != "Creative" && body.GameMode != "Spectator" {
+			jsonError(w, 400, "Minecraft game mode must be Survival, Adventure, Creative, or Spectator")
+			return
+		}
+	} else if body.GameMode != "Adventure" && body.GameMode != "Creative" {
+		jsonError(w, 400, "game mode must be Adventure or Creative")
+		return
+	}
+	if body.MaxPlayers == 0 {
+		if game == "runescape-dragonwilds" {
+			body.MaxPlayers = 6
+		} else {
+			body.MaxPlayers = 20
+		}
+	}
+	if game == "runescape-dragonwilds" && body.MaxPlayers > 6 {
+		jsonError(w, 400, "RuneScape: Dragonwilds supports up to 6 players")
+		return
+	}
+	if body.MaxPlayers < 1 || body.MaxPlayers > 1000 {
+		jsonError(w, 400, "maximum players must be between 1 and 1000")
+		return
+	}
+	if body.MOTD == "" {
+		if game == "minecraft-java" {
+			body.MOTD = "A Minecraft Server"
+		} else {
+			body.MOTD = "Welcome to your Hytale server!"
+		}
+	}
+	if body.MemoryMin == "" {
+		body.MemoryMin = "2G"
+	}
+	if body.MemoryMax == "" {
+		body.MemoryMax = "4G"
+	}
+	if !validMemory(body.MemoryMin) || !validMemory(body.MemoryMax) {
+		jsonError(w, 400, "memory values must look like 2G, 4096M, or 1024K")
+		return
+	}
+	if body.BackupFrequency == 0 {
+		body.BackupFrequency = 30
+	}
+	if body.BackupFrequency < 5 || body.BackupFrequency > 10080 {
+		jsonError(w, 400, "backup frequency must be between 5 and 10080 minutes")
+		return
+	}
+	id := a.uniqueServerID(slugify(name))
+	if id == "" {
+		jsonError(w, 500, "could not generate server id")
+		return
+	}
+	port := body.Port
+	if port == 0 {
+		if game == "runescape-dragonwilds" {
+			port = a.nextAvailablePortForRange(7777, 7782)
+		} else {
+			port = a.nextAvailablePort()
+		}
+	}
+	min, max, _ := deploymentPortRange()
+	if game == "runescape-dragonwilds" {
+		min, max = 7777, 7782
+	}
+	if port < min || port > max {
+		protocol := "UDP"
+		if game == "minecraft-java" {
+			protocol = "TCP"
+		}
+		jsonError(w, 400, fmt.Sprintf("port must be within the published %s range %d-%d", protocol, min, max))
+		return
+	}
+	if a.portInUse(port, "") {
+		jsonError(w, 409, "that game port is already assigned to another server")
+		return
+	}
+	s := defaultServerSettings(id, name, port, filepath.Join("servers", id))
+	s.GameType = game
+	s.MinecraftVersion = body.MinecraftVersion
+	s.MinecraftVariant = body.MinecraftVariant
+	s.MinecraftEulaAccepted = body.MinecraftEulaAccepted
+	s.DragonwildsOwnerID = strings.TrimSpace(body.DragonwildsOwnerID)
+	s.DragonwildsWorldName = strings.TrimSpace(body.DragonwildsWorldName)
+	s.DragonwildsAdminPassword = body.DragonwildsAdminPassword
+	s.DragonwildsWorldPassword = body.DragonwildsWorldPassword
+	s.DragonwildsPublic = body.DragonwildsPublic
+	if game == "runescape-dragonwilds" {
+		s.MaxPlayers = 6
+	}
+	s.GameMode = body.GameMode
+	s.MaxPlayers = body.MaxPlayers
+	s.MOTD = body.MOTD
+	s.Password = body.Password
+	s.WhitelistEnabled = body.WhitelistEnabled
+	s.PublicHost = strings.TrimSpace(body.PublicHost)
+	s.MemoryMin = body.MemoryMin
+	s.MemoryMax = body.MemoryMax
+	s.BackupFrequency = body.BackupFrequency
+	s.AutoStart = body.AutoStart
+	// Validate a clone source before creating the destination directory. Otherwise
+	// a stale, running, or incompatible source can leave an orphan server folder.
+	var cloneSource *ServerManager
+	var cloneSettings ServerSettings
+	if body.SourceServerID != "" {
+		srcM, srcS, err := a.serverByID(body.SourceServerID)
+		if err != nil {
+			jsonError(w, 404, "source server not found")
+			return
+		}
+		if srcS.GameType != s.GameType {
+			jsonError(w, 400, "servers can only be cloned from the same game type")
+			return
+		}
+		if srcM.IsRunning() {
+			jsonError(w, 409, "stop the source server before cloning it")
+			return
+		}
+		if !srcM.Installed() {
+			jsonError(w, 409, "source server is not installed")
+			return
+		}
+		cloneSource = srcM
+		cloneSettings = srcS
+	}
+
+	destinationRoot := a.serverRoot(s)
+	if err := ensureServerDirs(destinationRoot); err != nil {
+		_ = removeServerData(destinationRoot, false)
+		jsonError(w, 500, err.Error())
+		return
+	}
+	if cloneSource != nil {
+		if err := cloneGameInstall(a.serverRoot(cloneSettings), destinationRoot); err != nil {
+			_ = removeServerData(destinationRoot, false)
+			jsonError(w, 500, "clone failed: "+err.Error())
+			return
+		}
+	}
+
+	a.cfgMu.Lock()
+	a.cfg.Servers = append(a.cfg.Servers, s)
+	err := a.saveConfigLocked()
+	if err != nil {
+		// Roll back the in-memory entry as well as the on-disk destination.
+		a.cfg.Servers = a.cfg.Servers[:len(a.cfg.Servers)-1]
+	}
+	a.cfgMu.Unlock()
+	if err != nil {
+		_ = removeServerData(destinationRoot, false)
+		jsonError(w, 500, err.Error())
+		return
+	}
+	a.managersMu.Lock()
+	a.managers[id] = a.newServerManager(s)
+	a.managersMu.Unlock()
+	if s.GameType == "hytale" {
+		_ = a.writeJVMOptionsFor(s)
+	}
+	jsonOut(w, 201, settingsView(s))
+}
+
+func (a *App) handleServersDelete(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	m, s, err := a.serverByID(id)
+	if err != nil {
+		jsonError(w, 404, "server not found")
+		return
+	}
+	if m.IsRunning() {
+		jsonError(w, 409, "stop the server before deleting it")
+		return
+	}
+	a.cfgMu.Lock()
+	idx := -1
+	for i, x := range a.cfg.Servers {
+		if x.ID == id {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		a.cfgMu.Unlock()
+		jsonError(w, 404, "server not found")
+		return
+	}
+	a.cfg.Servers = append(a.cfg.Servers[:idx], a.cfg.Servers[idx+1:]...)
+	a.removeServerSchedulesLocked(id)
+	err = a.saveConfigLocked()
+	a.cfgMu.Unlock()
+	if err != nil {
+		jsonError(w, 500, err.Error())
+		return
+	}
+	a.managersMu.Lock()
+	delete(a.managers, id)
+	a.managersMu.Unlock()
+	if err := removeServerData(a.serverRoot(s), s.StorageDir == "" || s.StorageDir == "."); err != nil {
+		jsonError(w, 500, err.Error())
+		return
+	}
+	jsonOut(w, 200, map[string]any{"ok": true})
+}
+
+// removeServerData removes a server's files without deleting manager-wide state.
+// The legacy primary server lives directly in dataDir, alongside config.json,
+// shared tools, and other server directories, so only its server-owned folders
+// may be removed in that case.
+func removeServerData(root string, sharedRoot bool) error {
+	if !sharedRoot {
+		return os.RemoveAll(root)
+	}
+	for _, name := range []string{"game", "imports", "snapshots", "home", "backups"} {
+		if err := os.RemoveAll(filepath.Join(root, name)); err != nil {
+			return fmt.Errorf("remove server data %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+func (a *App) handleServerStartByPath(w http.ResponseWriter, r *http.Request) {
+	a.resetCrashes(r.PathValue("id"))
+	if err := a.startServerByID(r.PathValue("id")); err != nil {
+		jsonError(w, 409, err.Error())
+		return
+	}
+	jsonOut(w, 202, map[string]any{"ok": true})
+}
+
+func (a *App) handleServerStopByPath(w http.ResponseWriter, r *http.Request) {
+	m, _, err := a.serverByID(r.PathValue("id"))
+	if err != nil {
+		jsonError(w, 404, "server not found")
+		return
+	}
+	if err := m.Stop(); err != nil {
+		jsonError(w, 409, err.Error())
+		return
+	}
+	jsonOut(w, 202, map[string]any{"ok": true})
+}
+
+func (a *App) handleServerRestartByPath(w http.ResponseWriter, r *http.Request) {
+	a.restartByID(w, r.PathValue("id"))
+}
+
+func (a *App) requestServer(r *http.Request) (*ServerManager, ServerSettings, error) {
+	id := strings.TrimSpace(r.Header.Get("X-HSM-Server"))
+	if id == "" {
+		id = strings.TrimSpace(r.Header.Get("X-Orbis-Server")) // legacy client compatibility
+	}
+	if id == "" {
+		id = strings.TrimSpace(r.URL.Query().Get("server"))
+	}
+	if id == "" {
+		// Single-server clients from before multi-server support omit the ID.
+		// With several servers, guessing could stop or edit the wrong one.
+		a.cfgMu.RLock()
+		count := len(a.cfg.Servers)
+		if count == 1 {
+			id = a.cfg.Servers[0].ID
+		}
+		a.cfgMu.RUnlock()
+		if count > 1 {
+			return nil, ServerSettings{}, errors.New("server id is required when more than one server is configured")
+		}
+	}
+	return a.serverByID(id)
+}
+
+func (a *App) serverByID(id string) (*ServerManager, ServerSettings, error) {
+	a.cfgMu.RLock()
+	var s ServerSettings
+	found := false
+	for _, x := range a.cfg.Servers {
+		if x.ID == id {
+			s = x
+			found = true
+			break
+		}
+	}
+	a.cfgMu.RUnlock()
+	if !found {
+		return nil, s, errors.New("server not found")
+	}
+	a.managersMu.RLock()
+	m := a.managers[id]
+	a.managersMu.RUnlock()
+	if m == nil {
+		return nil, s, errors.New("server manager missing")
+	}
+	return m, s, nil
+}
+
+func (a *App) serverRoot(s ServerSettings) string {
+	if s.StorageDir == "" || s.StorageDir == "." {
+		return a.dataDir
+	}
+	return filepath.Join(a.dataDir, filepath.Clean(s.StorageDir))
+}
+
+func (a *App) ensureManagers() {
+	a.cfgMu.RLock()
+	servers := append([]ServerSettings(nil), a.cfg.Servers...)
+	a.cfgMu.RUnlock()
+	a.managersMu.Lock()
+	defer a.managersMu.Unlock()
+	for _, s := range servers {
+		_ = ensureServerDirs(a.serverRoot(s))
+		if a.managers[s.ID] == nil {
+			a.managers[s.ID] = a.newServerManager(s)
+		}
+	}
+}
+
+func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
+	m, _, err := a.requestServer(r)
+	if err != nil {
+		jsonError(w, 404, err.Error())
+		return
+	}
+	jsonOut(w, 200, m.Status())
+}
+
+func (a *App) handleResources(w http.ResponseWriter, r *http.Request) {
+	jsonOut(w, 200, a.resourceMetrics())
+}
+
+// SettingsView is ServerSettings as sent to the browser. Passwords are never
+// returned; the *Set fields say whether each one is configured.
+type SettingsView struct {
+	ServerSettings
+	PasswordSet                 bool `json:"passwordSet"`
+	DragonwildsAdminPasswordSet bool `json:"dragonwildsAdminPasswordSet"`
+	DragonwildsWorldPasswordSet bool `json:"dragonwildsWorldPasswordSet"`
+}
+
+func settingsView(s ServerSettings) SettingsView {
+	v := SettingsView{
+		ServerSettings:              s,
+		PasswordSet:                 s.Password != "",
+		DragonwildsAdminPasswordSet: s.DragonwildsAdminPassword != "",
+		DragonwildsWorldPasswordSet: s.DragonwildsWorldPassword != "",
+	}
+	v.Password = ""
+	v.DragonwildsAdminPassword = ""
+	v.DragonwildsWorldPassword = ""
+	return v
+}
+
+// settingsUpdate is the PUT /api/settings body. Clear flags remove optional
+// passwords explicitly, because a blank password field means "unchanged".
+type settingsUpdate struct {
+	ServerSettings
+	ClearPassword                 bool `json:"clearPassword"`
+	ClearDragonwildsWorldPassword bool `json:"clearDragonwildsWorldPassword"`
+	// Read-only SettingsView fields, accepted and ignored so a GET response
+	// can be sent back unchanged.
+	PasswordSet                 bool `json:"passwordSet"`
+	DragonwildsAdminPasswordSet bool `json:"dragonwildsAdminPasswordSet"`
+	DragonwildsWorldPasswordSet bool `json:"dragonwildsWorldPasswordSet"`
+}
+
+func keepSecret(submitted, current string, clear bool) string {
+	if clear {
+		return ""
+	}
+	if submitted == "" {
+		return current
+	}
+	return submitted
+}
+
+func (a *App) handleSettingsGet(w http.ResponseWriter, r *http.Request) {
+	_, s, err := a.requestServer(r)
+	if err != nil {
+		jsonError(w, 404, err.Error())
+		return
+	}
+	min, max := portRangeForGame(s.GameType)
+	s.PortMin = min
+	s.PortMax = max
+	jsonOut(w, 200, settingsView(s))
+}
+
+func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
+	m, current, err := a.requestServer(r)
+	if err != nil {
+		jsonError(w, 404, err.Error())
+		return
+	}
+	var req settingsUpdate
+	if err := decodeJSON(r, &req); err != nil {
+		jsonError(w, 400, err.Error())
+		return
+	}
+	in := req.ServerSettings
+	// Secrets are never sent to the browser, so a blank value means "keep".
+	in.Password = keepSecret(in.Password, current.Password, req.ClearPassword)
+	in.DragonwildsAdminPassword = keepSecret(in.DragonwildsAdminPassword, current.DragonwildsAdminPassword, false)
+	in.DragonwildsWorldPassword = keepSecret(in.DragonwildsWorldPassword, current.DragonwildsWorldPassword, req.ClearDragonwildsWorldPassword)
+	in.ID = current.ID
+	in.GameType = current.GameType // game identity is immutable through generic settings updates
+	in.StorageDir = current.StorageDir
+	if current.GameType == "minecraft-java" {
+		in.MinecraftEulaAccepted = current.MinecraftEulaAccepted
+		in.MinecraftVersion = current.MinecraftVersion
+		in.MinecraftVariant = current.MinecraftVariant
+	}
+	if current.GameType == "runescape-dragonwilds" {
+		in.DragonwildsOwnerID = strings.TrimSpace(in.DragonwildsOwnerID)
+		in.DragonwildsWorldName = strings.TrimSpace(in.DragonwildsWorldName)
+		if in.DragonwildsOwnerID == "" || len(in.DragonwildsOwnerID) > 128 || strings.ContainsAny(in.DragonwildsOwnerID, "\r\n\x00") {
+			jsonError(w, 400, "Dragonwilds Owner ID is required and must be valid")
+			return
+		}
+		if in.DragonwildsWorldName == "" || len(in.DragonwildsWorldName) > 32 || strings.ContainsAny(in.DragonwildsWorldName, "\r\n\x00") {
+			jsonError(w, 400, "Dragonwilds default world name is required and must be 1–32 characters")
+			return
+		}
+		if in.DragonwildsAdminPassword == "" || len(in.DragonwildsAdminPassword) > 128 || len(in.DragonwildsWorldPassword) > 128 || strings.ContainsAny(in.DragonwildsAdminPassword, "\r\n\x00") || strings.ContainsAny(in.DragonwildsWorldPassword, "\r\n\x00") {
+			jsonError(w, 400, "Dragonwilds admin password is required; passwords must be 128 characters or fewer")
+			return
+		}
+		in.GameMode = current.GameMode
+		in.MaxPlayers = current.MaxPlayers
+		in.MOTD = current.MOTD
+		in.Password = current.Password
+		in.WhitelistEnabled = current.WhitelistEnabled
+		in.MemoryMin = current.MemoryMin
+		in.MemoryMax = current.MemoryMax
+		in.ExtraArgs = current.ExtraArgs
+		in.BackupFrequency = current.BackupFrequency
+		in.BackupRetention = current.BackupRetention
+		in.SnapshotRetention = current.SnapshotRetention
+	} else {
+		in.DragonwildsOwnerID = current.DragonwildsOwnerID
+		in.DragonwildsWorldName = current.DragonwildsWorldName
+		in.DragonwildsAdminPassword = current.DragonwildsAdminPassword
+		in.DragonwildsWorldPassword = current.DragonwildsWorldPassword
+		in.DragonwildsPublic = current.DragonwildsPublic
+	}
+	min, max := portRangeForGame(current.GameType)
+	in.PortMin = min
+	in.PortMax = max
+	in.ServerName = strings.TrimSpace(in.ServerName)
+	if len(in.ServerName) < 2 || len(in.ServerName) > 64 || strings.ContainsAny(in.ServerName, "\r\n\x00") {
+		jsonError(w, 400, "server name must be between 2 and 64 characters")
+		return
+	}
+	if in.Port < min || in.Port > max {
+		jsonError(w, 400, fmt.Sprintf("port must be within the Docker/CasaOS %s range %d-%d", map[bool]string{true: "TCP", false: "UDP"}[current.GameType == "minecraft-java"], min, max))
+		return
+	}
+	if a.portInUse(in.Port, current.ID) {
+		jsonError(w, 409, "that game port is already assigned to another server")
+		return
+	}
+	if !validMemory(in.MemoryMin) || !validMemory(in.MemoryMax) {
+		jsonError(w, 400, "memory values must look like 2G, 4096M, or 1024K")
+		return
+	}
+	if in.GameMode == "" {
+		in.GameMode = current.GameMode
+	}
+	if current.GameType == "minecraft-java" {
+		if in.GameMode != "Survival" && in.GameMode != "Adventure" && in.GameMode != "Creative" && in.GameMode != "Spectator" {
+			jsonError(w, 400, "Minecraft game mode must be Survival, Adventure, Creative, or Spectator")
+			return
+		}
+	} else if in.GameMode != "Adventure" && in.GameMode != "Creative" {
+		jsonError(w, 400, "game mode must be Adventure or Creative")
+		return
+	}
+	if in.MaxPlayers == 0 {
+		in.MaxPlayers = current.MaxPlayers
+	}
+	if in.MaxPlayers < 1 || in.MaxPlayers > 1000 {
+		jsonError(w, 400, "maximum players must be between 1 and 1000")
+		return
+	}
+	if current.GameType == "runescape-dragonwilds" && in.MaxPlayers > 6 {
+		jsonError(w, 400, "RuneScape: Dragonwilds currently supports up to 6 players")
+		return
+	}
+	if in.MOTD == "" {
+		in.MOTD = current.MOTD
+	}
+	if in.BackupFrequency == 0 {
+		in.BackupFrequency = current.BackupFrequency
+	}
+	if in.BackupFrequency < 5 || in.BackupFrequency > 10080 {
+		jsonError(w, 400, "backup frequency must be between 5 and 10080 minutes")
+		return
+	}
+	if in.BackupRetention == 0 {
+		in.BackupRetention = current.BackupRetention
+	}
+	if in.BackupRetention < 1 || in.BackupRetention > 100 {
+		jsonError(w, 400, "automatic backup retention must be between 1 and 100")
+		return
+	}
+	if in.SnapshotRetention == 0 {
+		in.SnapshotRetention = current.SnapshotRetention
+	}
+	if in.SnapshotRetention < 1 || in.SnapshotRetention > 100 {
+		jsonError(w, 400, "snapshot retention must be between 1 and 100")
+		return
+	}
+	if m.IsRunning() && in.Port != current.Port {
+		jsonError(w, 409, "stop the server before changing its port")
+		return
+	}
+	a.cfgMu.Lock()
+	for i := range a.cfg.Servers {
+		if a.cfg.Servers[i].ID == current.ID {
+			a.cfg.Servers[i] = in
+			break
+		}
+	}
+	err = a.saveConfigLocked()
+	a.cfgMu.Unlock()
+	if err != nil {
+		jsonError(w, 500, err.Error())
+		return
+	}
+	if current.GameType == "runescape-dragonwilds" {
+		// Never edit DedicatedServer.ini while the game is running: the game may
+		// discard live edits. PrepareLaunch writes the persisted values before the
+		// next start; when stopped and installed, also keep the file in sync now.
+		if !m.IsRunning() && m.Installed() {
+			if err := writeDragonwildsConfig(a.serverRoot(in), in); err != nil {
+				jsonError(w, 500, "settings saved, but Dragonwilds config could not be updated: "+err.Error())
+				return
+			}
+		}
+	} else {
+		if err := a.writeJVMOptionsFor(in); err != nil {
+			jsonError(w, 500, err.Error())
+			return
+		}
+		if !m.IsRunning() {
+			if err := a.applyHytaleConfig(in); err != nil {
+				jsonError(w, 500, "settings saved, but Hytale config could not be updated: "+err.Error())
+				return
+			}
+		}
+	}
+	jsonOut(w, 200, settingsView(in))
+}
+
+func (a *App) handleStart(w http.ResponseWriter, r *http.Request) {
+	_, s, err := a.requestServer(r)
+	if err != nil {
+		jsonError(w, 404, err.Error())
+		return
+	}
+	a.resetCrashes(s.ID)
+	if err := a.startServerByID(s.ID); err != nil {
+		jsonError(w, 409, err.Error())
+		return
+	}
+	jsonOut(w, 202, map[string]any{"ok": true})
+}
+
+func (a *App) startServerByID(id string) error {
+	m, s, err := a.serverByID(id)
+	if err != nil {
+		return err
+	}
+	adapter, err := gameAdapterFor(s.GameType)
+	if err != nil {
+		return err
+	}
+	args, err := adapter.PrepareLaunch(a, s)
+	if err != nil {
+		return err
+	}
+	return m.Start(args)
+}
+
+func (a *App) handleStop(w http.ResponseWriter, r *http.Request) {
+	m, _, err := a.requestServer(r)
+	if err != nil {
+		jsonError(w, 404, err.Error())
+		return
+	}
+	if err := m.Stop(); err != nil {
+		jsonError(w, 409, err.Error())
+		return
+	}
+	jsonOut(w, 202, map[string]any{"ok": true})
+}
+
+func (a *App) restartByID(w http.ResponseWriter, id string) {
+	m, _, err := a.serverByID(id)
+	if err != nil {
+		jsonError(w, 404, err.Error())
+		return
+	}
+	if !m.IsRunning() {
+		if err := a.startServerByID(id); err != nil {
+			jsonError(w, 409, err.Error())
+			return
+		}
+		jsonOut(w, 202, map[string]any{"ok": true})
+		return
+	}
+	go func() {
+		_ = m.Stop()
+		deadline := time.Now().Add(100 * time.Second)
+		for m.IsRunning() && time.Now().Before(deadline) {
+			time.Sleep(500 * time.Millisecond)
+		}
+		if !m.IsRunning() {
+			if err := a.startServerByID(id); err != nil {
+				m.appendLog("controller", "Restart failed: "+err.Error())
+			}
+		}
+	}()
+	jsonOut(w, 202, map[string]any{"ok": true})
+}
+
+func (a *App) handleRestart(w http.ResponseWriter, r *http.Request) {
+	_, s, err := a.requestServer(r)
+	if err != nil {
+		jsonError(w, 404, err.Error())
+		return
+	}
+	a.restartByID(w, s.ID)
+}
