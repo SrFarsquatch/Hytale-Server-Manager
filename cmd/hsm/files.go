@@ -37,7 +37,7 @@ func (a *App) handleFilesList(w http.ResponseWriter, r *http.Request) {
 	if err != nil { jsonError(w, 500, err.Error()); return }
 	out := make([]ManagedFileDTO, 0, len(entries))
 	for _, entry := range entries {
-		if strings.HasPrefix(entry.Name(), ".hsm-tmp-") { continue }
+		if strings.HasPrefix(entry.Name(), ".hsm-tmp-") || strings.HasPrefix(entry.Name(), ".hsm-restore-") { continue }
 		info, err := entry.Info()
 		if err != nil { continue }
 		out = append(out, ManagedFileDTO{Name: entry.Name(), Path: filepath.ToSlash(filepath.Join(clean, entry.Name())), Directory: entry.IsDir(), Size: info.Size(), Modified: info.ModTime().Format(time.RFC3339)})

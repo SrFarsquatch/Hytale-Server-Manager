@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#151a24">
   <title>HSM · Game Server Control Panel</title>
-  <link rel="stylesheet" href="/app.css?v=20261015-safety1">
+  <link rel="stylesheet" href="/app.css?v=20261015-minecraft2">
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -262,17 +262,17 @@
         </section>
 
         <section id="view-backups" class="view">
-          <section class="card">
-            <div class="card-head"><div><h3>Schedule &amp; retention</h3><p class="muted small">How often Hytale makes automatic backups and how many copies to keep. Oldest automatic backups are removed first.</p></div><button type="button" class="btn primary small" id="save-backup-settings">Save</button></div>
+          <section class="card" id="backup-schedule-card">
+            <div class="card-head"><div><h3>Schedule &amp; retention</h3><p class="muted small" id="backup-schedule-help">How often Hytale makes automatic backups and how many copies to keep. Oldest automatic backups are removed first.</p></div><button type="button" class="btn primary small" id="save-backup-settings">Save</button></div>
             <div class="form-grid three">
-              <label>Automatic backup interval<select id="backup-frequency"><option value="5">Every 5 minutes</option><option value="10">Every 10 minutes</option><option value="15">Every 15 minutes</option><option value="30">Every 30 minutes</option><option value="60">Every hour</option><option value="120">Every 2 hours</option><option value="360">Every 6 hours</option><option value="720">Every 12 hours</option><option value="1440">Daily</option><option value="10080">Weekly</option></select><small>Applies when Hytale next starts.</small></label>
-              <label>Keep automatic backups<input id="backup-retention" type="number" min="1" max="100" value="10" required><small>Newest 1–100 native backups.</small></label>
+              <label class="native-only">Automatic backup interval<select id="backup-frequency"><option value="5">Every 5 minutes</option><option value="10">Every 10 minutes</option><option value="15">Every 15 minutes</option><option value="30">Every 30 minutes</option><option value="60">Every hour</option><option value="120">Every 2 hours</option><option value="360">Every 6 hours</option><option value="720">Every 12 hours</option><option value="1440">Daily</option><option value="10080">Weekly</option></select><small>Applies when Hytale next starts.</small></label>
+              <label class="native-only">Keep automatic backups<input id="backup-retention" type="number" min="1" max="100" value="10" required><small>Newest 1–100 native backups.</small></label>
               <label>Keep full snapshots<input id="snapshot-retention" type="number" min="1" max="100" value="5" required><small>Newest 1–100 snapshots. Restore safety copies are kept separately.</small></label>
             </div>
           </section>
-          <div class="two-col">
-            <section class="card"><div class="card-head"><div><h3>Native backups</h3><p class="muted small">Hytale's automatic and on-demand backups.</p></div><button type="button" class="btn primary small" id="native-backup">Back up now</button></div><div id="native-backups" class="file-list empty-state">No native backups found.</div></section>
-            <section class="card"><div class="card-head"><div><h3>Full snapshots</h3><p class="muted small">World, configuration, permissions and mods. Server must be stopped.</p></div><button type="button" class="btn small" id="snapshot-backup">Create snapshot</button></div><div id="snapshots" class="file-list empty-state">No snapshots found.</div></section>
+          <div class="two-col" id="backup-columns">
+            <section class="card" id="native-backups-card"><div class="card-head"><div><h3>Native backups</h3><p class="muted small">Hytale's automatic and on-demand backups.</p></div><button type="button" class="btn primary small" id="native-backup">Back up now</button></div><div id="native-backups" class="file-list empty-state">No native backups found.</div></section>
+            <section class="card"><div class="card-head"><div><h3>Full snapshots</h3><p class="muted small" id="snapshot-help">World, configuration, permissions and mods. Server must be stopped.</p></div><button type="button" class="btn small" id="snapshot-backup">Create snapshot</button></div><div id="snapshots" class="file-list empty-state">No snapshots found.</div></section>
           </div>
         </section>
 
@@ -337,6 +337,10 @@
             <div id="hytale-settings-note" class="notice"><span><b>Networking.</b> The container publishes a port range. Each server needs a different port in that range.</span></div>
             <p id="dragonwilds-player-limit" class="muted small hidden">RuneScape: Dragonwilds currently supports up to 6 players. The game-managed player limit is not changed by this panel.</p>
           </form>
+          <section id="mc-properties-card" class="card hidden">
+            <div class="card-head"><div><h3>Game rules</h3><p class="muted small" id="mc-properties-note">Saved to server.properties. Changes apply the next time the server starts.</p></div><button type="button" class="btn small primary" id="mc-properties-save">Save game rules</button></div>
+            <div id="mc-properties-fields" class="form-grid"></div>
+          </section>
         </section>
 
         <section id="view-app-settings" class="view">
@@ -426,6 +430,6 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/app.js?v=20261015-safety1"></script>
+  <script src="/app.js?v=20261015-minecraft2"></script>
 </body>
 </html>

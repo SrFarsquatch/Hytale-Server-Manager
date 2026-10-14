@@ -28,8 +28,21 @@ const { chromium } = await import(playwrightModule);
 const port = 18000 + Math.floor(Math.random() * 1000);
 const base = `http://127.0.0.1:${port}`;
 const dataDir = mkdtempSync(join(tmpdir(), 'hsm-browser-'));
+// A stand-in `java` so Minecraft servers can run without Mojang's jar.
+const fakeBin = mkdtempSync(join(tmpdir(), 'hsm-fake-java-'));
+writeFileSync(join(fakeBin, 'java'), [
+  '#!/bin/bash',
+  'if [ "$1" = "-version" ]; then echo \'openjdk version "21.0.4"\' >&2; exit 0; fi',
+  'echo \'[Server thread/INFO]: Done (1.0s)! For help, type "help"\'',
+  'while read -r line; do',
+  '  echo "[Server thread/INFO]: got $line"',
+  '  if [ "$line" = "save-all flush" ]; then echo "[Server thread/INFO]: Saved the game"; fi',
+  '  if [ "$line" = "list" ]; then echo "[Server thread/INFO]: There are 2 of a max of 20 players online: Alex, Steve"; fi',
+  '  if [ "$line" = "stop" ]; then exit 0; fi',
+  'done',
+].join('\n'), { mode: 0o755 });
 const server = spawn(binary, [], {
-  env: { ...process.env, HSM_DATA_DIR: dataDir, HSM_LISTEN: `127.0.0.1:${port}`, HSM_GAME_PORT_START: '5520', HSM_GAME_PORT_END: '5525' },
+  env: { ...process.env, PATH: fakeBin + ':' + process.env.PATH, HSM_DATA_DIR: dataDir, HSM_LISTEN: `127.0.0.1:${port}`, HSM_GAME_PORT_START: '5520', HSM_GAME_PORT_END: '5525' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let serverOutput = '';
@@ -55,6 +68,14 @@ async function waitForServer() {
     try { await fetch(base + '/api/health'); return; } catch { await new Promise(r => setTimeout(r, 100)); }
   }
   throw new Error('HSM did not start:\n' + serverOutput);
+}
+
+function fakeMinecraftInstall(id) {
+  const game = join(dataDir, 'servers', id, 'game');
+  mkdirSync(join(game, 'world'), { recursive: true });
+  writeFileSync(join(game, 'server.jar'), 'jar');
+  writeFileSync(join(game, 'eula.txt'), 'eula=true\n');
+  writeFileSync(join(game, 'world', 'level.dat'), 'level');
 }
 
 function fakeHytaleInstall(id) {
@@ -90,6 +111,7 @@ try {
   await call('POST', '/api/servers', { game: 'minecraft-java', minecraftVariant: 'vanilla', minecraftVersion: 'latest', minecraftEulaAccepted: true, name: 'Bravo Minecraft', memoryMin: '1G', memoryMax: '2G', maxPlayers: 20, gameMode: 'Survival' });
   await call('POST', '/api/servers', { game: 'runescape-dragonwilds', name: 'Charlie Dragonwilds', maxPlayers: 6, dragonwildsOwnerId: 'owner-1', dragonwildsWorldName: 'World', dragonwildsAdminPassword: 'adminpass' });
   fakeHytaleInstall('alpha-hytale');
+  fakeMinecraftInstall('bravo-minecraft');
 
   browser = await chromium.launch();
   const page = await browser.newPage();
@@ -141,8 +163,8 @@ try {
     await select('bravo-minecraft');
     await waitForName('Bravo Minecraft');
     assert.ok(!(await visible('[data-view-tab="mods"]')), 'Minecraft hides Mods');
-    assert.ok(!(await visible('[data-view-tab="backups"]')), 'Minecraft hides Backups');
-    assert.ok(!(await visible('.players-panel')), 'Minecraft hides players');
+    assert.ok(await visible('[data-view-tab="backups"]'), 'Minecraft shows Backups (snapshots)');
+    assert.ok(await visible('.players-panel'), 'Minecraft shows players');
     assert.match(await text('#game-capability-note'), /Minecraft Java servers do not support/);
     await select('charlie-dragonwilds');
     await waitForName('Charlie Dragonwilds');
@@ -263,6 +285,34 @@ try {
     assert.ok(!(await page.isDisabled('#start-btn')), 'start is available again');
   });
 
+  await check('Minecraft: players, live snapshot and game rules', async () => {
+    await select('bravo-minecraft');
+    await waitForName('Bravo Minecraft');
+    await page.click('#start-btn');
+    await page.waitForFunction(() => /Online|Starting/.test(document.querySelector('#top-status').textContent), null, { timeout: 8000 });
+    await page.click('#players-refresh');
+    await page.waitForFunction(() => document.querySelector('#players-list').textContent.includes('Steve'), null, { timeout: 5000 });
+    assert.match(await text('#metric-players'), /2 \/ 20/);
+
+    await page.click('[data-view-tab="backups"]');
+    await page.waitForTimeout(600);
+    assert.ok(!(await page.evaluate(() => document.querySelector('#toast').classList.contains('error') && document.querySelector('#toast').classList.contains('show'))), 'Backups tab loads without an error: ' + await text('#toast'));
+    assert.ok(!(await visible('#native-backups-card')), 'Hytale native backups are hidden for Minecraft');
+    assert.ok(!(await visible('#backup-frequency')), 'Hytale backup interval is hidden for Minecraft');
+    await page.click('#snapshot-backup');
+    await page.waitForFunction(() => /snapshot-/.test(document.querySelector('#snapshots').textContent), null, { timeout: 8000 });
+
+    await page.click('[data-view-tab="settings"]');
+    await page.waitForSelector('#mcp-difficulty', { timeout: 5000 });
+    await page.selectOption('#mcp-difficulty', 'hard');
+    await page.click('#mc-properties-save');
+    await page.waitForTimeout(500);
+    const props = await (await fetch(base + '/api/files/content?path=' + encodeURIComponent('game/server.properties'), { headers: { Cookie: cookie, 'X-HSM-Server': 'bravo-minecraft' } })).json();
+    assert.match(props.content, /^difficulty=hard$/m);
+    await fetch(base + '/api/servers/bravo-minecraft/stop', { method: 'POST', headers: { Cookie: cookie } });
+    await page.waitForFunction(() => /Stopped/.test(document.querySelector('#top-status').textContent), null, { timeout: 8000 });
+  });
+
   await check('a selected server deleted elsewhere moves the workspace to a valid server', async () => {
     await select('bravo-minecraft');
     await waitForName('Bravo Minecraft');
@@ -315,6 +365,7 @@ try {
   await browser?.close();
   server.kill('SIGTERM');
   rmSync(dataDir, { recursive: true, force: true });
+  rmSync(fakeBin, { recursive: true, force: true });
 }
 
 for (const [status, name, detail] of results) console.log(`${status}  ${name}${detail ? ' — ' + detail : ''}`);

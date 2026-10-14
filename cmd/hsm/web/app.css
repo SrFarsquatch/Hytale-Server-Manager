@@ -319,6 +319,7 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
 .card-head h3 { font-size: 16.5px; }
 .card-head p { margin-top: 4px; }
 .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
+.two-col.single { grid-template-columns: minmax(0, 1fr); }
 .empty-state { padding: 22px 6px; color: var(--muted); text-align: center; font-size: 13px; }
 
 /* ---------- My Servers ---------- */

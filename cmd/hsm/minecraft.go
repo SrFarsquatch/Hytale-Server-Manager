@@ -10,7 +10,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -37,6 +39,9 @@ func (MinecraftAdapter) PrepareLaunch(app *App, settings ServerSettings) ([]stri
 	}
 	if !validMemory(settings.MemoryMin) || !validMemory(settings.MemoryMax) {
 		return nil, errors.New("invalid Minecraft JVM memory settings")
+	}
+	if err := checkMinecraftJava(filepath.Join(app.serverRoot(settings), "game"), detectJavaMajor); err != nil {
+		return nil, err
 	}
 	if err := writeMinecraftProperties(app.serverRoot(settings), settings); err != nil {
 		return nil, err
@@ -71,6 +76,8 @@ type minecraftVersionMeta struct {
 	Downloads struct {
 		Server struct { URL string `json:"url"` } `json:"server"`
 	} `json:"downloads"`
+	// JavaVersion is Mojang's declared minimum Java for this release.
+	JavaVersion struct { MajorVersion int `json:"majorVersion"` } `json:"javaVersion"`
 }
 
 func isOfficialMojangURL(raw string) bool {
@@ -80,36 +87,36 @@ func isOfficialMojangURL(raw string) bool {
 	return host == "mojang.com" || strings.HasSuffix(host, ".mojang.com")
 }
 
-func resolveMinecraftServerURL(ctx context.Context, client *http.Client, version string) (string, string, error) {
+func resolveMinecraftServerURL(ctx context.Context, client *http.Client, version string) (string, string, int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, minecraftVersionManifestURL, nil)
-	if err != nil { return "", "", err }
+	if err != nil { return "", "", 0, err }
 	resp, err := client.Do(req)
-	if err != nil { return "", "", fmt.Errorf("fetch Minecraft version manifest: %w", err) }
+	if err != nil { return "", "", 0, fmt.Errorf("fetch Minecraft version manifest: %w", err) }
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK { return "", "", fmt.Errorf("Minecraft version manifest returned HTTP %d", resp.StatusCode) }
+	if resp.StatusCode != http.StatusOK { return "", "", 0, fmt.Errorf("Minecraft version manifest returned HTTP %d", resp.StatusCode) }
 	var manifest minecraftManifest
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(&manifest); err != nil { return "", "", fmt.Errorf("parse Minecraft version manifest: %w", err) }
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(&manifest); err != nil { return "", "", 0, fmt.Errorf("parse Minecraft version manifest: %w", err) }
 	version = strings.TrimSpace(version)
 	if version == "" || strings.EqualFold(version, "latest") { version = manifest.Latest.Release }
 	var metadataURL string
 	for _, entry := range manifest.Versions {
 		if entry.ID == version {
-			if !isOfficialMojangURL(entry.URL) { return "", "", errors.New("Minecraft version metadata URL is not an official HTTPS Mojang URL") }
+			if !isOfficialMojangURL(entry.URL) { return "", "", 0, errors.New("Minecraft version metadata URL is not an official HTTPS Mojang URL") }
 			metadataURL = entry.URL; break
 		}
 	}
-	if metadataURL == "" { return "", "", fmt.Errorf("Minecraft version %q was not found in the official version manifest", version) }
+	if metadataURL == "" { return "", "", 0, fmt.Errorf("Minecraft version %q was not found in the official version manifest", version) }
 	metaReq, err := http.NewRequestWithContext(ctx, http.MethodGet, metadataURL, nil)
-	if err != nil { return "", "", err }
+	if err != nil { return "", "", 0, err }
 	metaResp, err := client.Do(metaReq)
-	if err != nil { return "", "", fmt.Errorf("fetch Minecraft %s metadata: %w", version, err) }
+	if err != nil { return "", "", 0, fmt.Errorf("fetch Minecraft %s metadata: %w", version, err) }
 	defer metaResp.Body.Close()
-	if metaResp.StatusCode != http.StatusOK { return "", "", fmt.Errorf("Minecraft version metadata returned HTTP %d", metaResp.StatusCode) }
+	if metaResp.StatusCode != http.StatusOK { return "", "", 0, fmt.Errorf("Minecraft version metadata returned HTTP %d", metaResp.StatusCode) }
 	var meta minecraftVersionMeta
-	if err := json.NewDecoder(io.LimitReader(metaResp.Body, 8<<20)).Decode(&meta); err != nil { return "", "", fmt.Errorf("parse Minecraft version metadata: %w", err) }
-	if meta.Downloads.Server.URL == "" { return "", "", fmt.Errorf("official Minecraft version %s does not publish a server jar", version) }
-	if !isOfficialMojangURL(meta.Downloads.Server.URL) { return "", "", errors.New("Minecraft server download URL is not an official HTTPS Mojang URL") }
-	return version, meta.Downloads.Server.URL, nil
+	if err := json.NewDecoder(io.LimitReader(metaResp.Body, 8<<20)).Decode(&meta); err != nil { return "", "", 0, fmt.Errorf("parse Minecraft version metadata: %w", err) }
+	if meta.Downloads.Server.URL == "" { return "", "", 0, fmt.Errorf("official Minecraft version %s does not publish a server jar", version) }
+	if !isOfficialMojangURL(meta.Downloads.Server.URL) { return "", "", 0, errors.New("Minecraft server download URL is not an official HTTPS Mojang URL") }
+	return version, meta.Downloads.Server.URL, meta.JavaVersion.MajorVersion, nil
 }
 
 func (m *ServerManager) RunMinecraftInstaller(version string) error {
@@ -135,7 +142,7 @@ func (m *ServerManager) installMinecraft(version string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	client := &http.Client{Timeout: 8*time.Minute}
-	resolvedVersion, downloadURL, err := resolveMinecraftServerURL(ctx, client, version)
+	resolvedVersion, downloadURL, javaMajor, err := resolveMinecraftServerURL(ctx, client, version)
 	if err != nil { return err }
 	gameDir := filepath.Join(m.rootDir, "game")
 	if err := os.MkdirAll(gameDir, 0755); err != nil { return err }
@@ -159,6 +166,7 @@ func (m *ServerManager) installMinecraft(version string) error {
 	if err := validateMinecraftJar(tmpPath); err != nil { _ = os.Remove(tmpPath); return err }
 	if err := os.Rename(tmpPath, finalPath); err != nil { _ = os.Remove(tmpPath); return err }
 	if err := os.WriteFile(filepath.Join(gameDir, "eula.txt"), []byte("# Accepted by the server owner in HSM. See https://aka.ms/MinecraftEULA.\neula=true\n"), 0600); err != nil { return err }
+	if err := writeMinecraftInstallInfo(gameDir, minecraftInstallInfo{Version: resolvedVersion, JavaMajor: javaMajor}); err != nil { return err }
 	m.appendLog("installer", "Downloaded Minecraft "+resolvedVersion+" server jar")
 	return nil
 }
@@ -230,3 +238,66 @@ func mergeMinecraftProperties(path string, values []struct{ key, value string })
 	return nil
 }
 
+
+// minecraftInstallInfo is written next to server.jar at install time so the
+// Java requirement is known without contacting Mojang again before each start.
+type minecraftInstallInfo struct {
+	Version   string `json:"version"`
+	JavaMajor int    `json:"javaMajor"`
+}
+
+const minecraftInstallInfoFile = ".hsm-minecraft.json"
+
+func writeMinecraftInstallInfo(gameDir string, info minecraftInstallInfo) error {
+	b, err := json.MarshalIndent(info, "", "  ")
+	if err != nil { return err }
+	return atomicWrite(filepath.Join(gameDir, minecraftInstallInfoFile), append(b, '\n'), 0644)
+}
+
+func readMinecraftInstallInfo(gameDir string) (minecraftInstallInfo, bool) {
+	var info minecraftInstallInfo
+	b, err := os.ReadFile(filepath.Join(gameDir, minecraftInstallInfoFile))
+	if err != nil || json.Unmarshal(b, &info) != nil { return minecraftInstallInfo{}, false }
+	return info, true
+}
+
+// checkMinecraftJava refuses to start a server whose release needs a newer
+// Java than the one installed. Servers installed before the requirement was
+// recorded are not checked, because the requirement is unknown.
+func checkMinecraftJava(gameDir string, detect func() (int, error)) error {
+	info, ok := readMinecraftInstallInfo(gameDir)
+	if !ok || info.JavaMajor <= 0 { return nil }
+	have, err := detect()
+	if err != nil { return fmt.Errorf("could not check the installed Java version: %w", err) }
+	if have < info.JavaMajor {
+		return fmt.Errorf("Minecraft %s needs Java %d or newer, but this container has Java %d; update the HSM image to one with a newer Java runtime", info.Version, info.JavaMajor, have)
+	}
+	return nil
+}
+
+var javaVersionPattern = regexp.MustCompile(`version "(\d+)(?:\.(\d+))?`)
+
+// parseJavaMajor reads the major version from `java -version` output:
+// "21.0.4" is 21, and the legacy "1.8.0_392" scheme is 8.
+func parseJavaMajor(output string) (int, bool) {
+	m := javaVersionPattern.FindStringSubmatch(output)
+	if m == nil { return 0, false }
+	major, err := strconv.Atoi(m[1])
+	if err != nil { return 0, false }
+	if major == 1 && m[2] != "" {
+		minor, err := strconv.Atoi(m[2])
+		if err != nil { return 0, false }
+		return minor, true
+	}
+	return major, true
+}
+
+func detectJavaMajor() (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "java", "-version").CombinedOutput()
+	if err != nil { return 0, fmt.Errorf("java -version failed: %w", err) }
+	major, ok := parseJavaMajor(string(out))
+	if !ok { return 0, fmt.Errorf("unrecognised java -version output: %q", strings.TrimSpace(string(out))) }
+	return major, nil
+}

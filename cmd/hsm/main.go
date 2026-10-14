@@ -131,6 +131,8 @@ type ServerManager struct {
 	// Stop escalation delays; zero uses the production defaults.
 	stopGrace     time.Duration
 	stopInterrupt time.Duration
+	// backupMu serialises snapshot creation and restore for this server.
+	backupMu sync.Mutex
 }
 
 type LogLine struct {
@@ -284,6 +286,8 @@ func (a *App) routes(mux *http.ServeMux) {
 	mux.Handle("POST /api/install/run-downloader", a.auth(http.HandlerFunc(a.handleDownloaderRun)))
 	mux.Handle("POST /api/install/dragonwilds", a.auth(http.HandlerFunc(a.handleDragonwildsInstall)))
 	mux.Handle("POST /api/install/minecraft", a.auth(http.HandlerFunc(a.handleMinecraftInstall)))
+	mux.Handle("GET /api/minecraft/properties", a.auth(http.HandlerFunc(a.handleMinecraftPropertiesGet)))
+	mux.Handle("PUT /api/minecraft/properties", a.auth(http.HandlerFunc(a.handleMinecraftPropertiesPut)))
 	mux.Handle("POST /api/install/import-local", a.auth(http.HandlerFunc(a.handleImportLocal)))
 
 	gameUpdates := func(c GameCapability) bool { return c.GameUpdates }
@@ -893,18 +897,20 @@ func (a *App) handlePlayers(w http.ResponseWriter, r *http.Request) {
 		jsonOut(w, 200, map[string]any{"known": true, "count": 0, "maxPlayers": maxPlayers, "players": []string{}, "message": "Server is stopped"})
 		return
 	}
-	before := m.logs.Snapshot()
-	if err := m.SendCommand("/who"); err != nil {
+	query, ok := playerQueryFor(settings.GameType)
+	if !ok {
+		jsonOut(w, 200, map[string]any{"known": false, "count": 0, "maxPlayers": maxPlayers, "players": []string{}, "message": "Player list integration is not available for this game yet"})
+		return
+	}
+	players, reportedMax, known, err := m.queryPlayers(query, 1500*time.Millisecond)
+	if err != nil {
 		jsonOut(w, 200, map[string]any{"known": false, "maxPlayers": maxPlayers, "players": []string{}, "message": "Could not query the server"})
 		return
 	}
-	// Hytale prints command output asynchronously. Give /who a moment to reach the log.
-	time.Sleep(1200 * time.Millisecond)
-	after := m.logs.Snapshot()
-	if len(after) > len(before) { after = after[len(before):] } else { after = nil }
-	players, known := parseWhoOutput(after)
-	message := "Waiting for a recognizable /who response"
+	if reportedMax > 0 { maxPlayers = reportedMax }
+	message := "Waiting for a recognizable response to " + query.command
 	if known { message = "Player list updated" }
+	if players == nil { players = []string{} }
 	jsonOut(w, 200, map[string]any{"known": known, "count": len(players), "maxPlayers": maxPlayers, "players": players, "message": message})
 }
 
@@ -1506,7 +1512,18 @@ func (a *App) handleBackupsList(w http.ResponseWriter, r *http.Request) {
 	}
 	a.pruneBackupRetention(s)
 	root := a.serverRoot(s)
-	jsonOut(w, 200, map[string]any{"snapshots": listFiles(filepath.Join(root, "snapshots"), ".tar.gz"), "native": listAllFiles(filepath.Join(root, "game", "Server", "backups"))})
+	native := []FileInfoDTO{}
+	if gameCapabilitiesFor(s.GameType).NativeBackups {
+		native = listAllFiles(filepath.Join(root, "game", "Server", "backups"))
+	}
+	snapshots := listFiles(filepath.Join(root, "snapshots"), ".tar.gz")
+	if snapshots == nil {
+		snapshots = []FileInfoDTO{} // a server with no snapshots yet has no folder
+	}
+	if native == nil {
+		native = []FileInfoDTO{}
+	}
+	jsonOut(w, 200, map[string]any{"snapshots": snapshots, "native": native})
 }
 
 func (a *App) backupMaintenanceLoop() {
@@ -1551,7 +1568,7 @@ func (a *App) handleNativeBackup(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 404, err.Error())
 		return
 	}
-	if !requireCapability(w, s, "Native backups", func(c GameCapability) bool { return c.Backups }) {
+	if !requireCapability(w, s, "Native backups", func(c GameCapability) bool { return c.NativeBackups }) {
 		return
 	}
 	if !m.IsRunning() {
@@ -1574,17 +1591,34 @@ func (a *App) handleSnapshotCreate(w http.ResponseWriter, r *http.Request) {
 	if !requireCapability(w, s, "Snapshots", func(c GameCapability) bool { return c.Backups }) {
 		return
 	}
-	if m.IsRunning() {
+	root := a.serverRoot(s)
+	spec, ok := snapshotSpecFor(root, s)
+	if !ok {
+		jsonError(w, 409, "snapshots are not supported for this game")
+		return
+	}
+	live := gameCapabilitiesFor(s.GameType).LiveSnapshots
+	if m.IsRunning() && !live {
 		jsonError(w, 409, "stop the server before making a full restorable snapshot")
 		return
 	}
-	root := a.serverRoot(s)
+	if !m.backupMu.TryLock() {
+		jsonError(w, 409, "a snapshot or restore is already in progress for this server")
+		return
+	}
+	defer m.backupMu.Unlock()
 	name := "snapshot-" + time.Now().Format("20060102-150405") + ".tar.gz"
 	dst := filepath.Join(root, "snapshots", name)
-	gameServer := filepath.Join(root, "game", "Server")
-	include := []string{"universe", "mods", "config.json", "permissions.json", "whitelist.json", "bans.json"}
-	if err := createTarGz(dst, gameServer, include); err != nil {
-		jsonError(w, 500, err.Error())
+	archive := func() error { return createTarGz(dst, spec.Base, spec.Include) }
+	var err2 error
+	if m.IsRunning() {
+		err2 = m.withMinecraftSaveHold(minecraftSaveTimeout, archive)
+	} else {
+		err2 = archive()
+	}
+	if err2 != nil {
+		_ = os.Remove(dst)
+		jsonError(w, 500, err2.Error())
 		return
 	}
 	a.pruneBackupRetention(s)
@@ -1603,6 +1637,11 @@ func (a *App) handleSnapshotRestore(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 409, "stop the server before restoring a snapshot")
 		return
 	}
+	if !m.backupMu.TryLock() {
+		jsonError(w, 409, "a snapshot or restore is already in progress for this server")
+		return
+	}
+	defer m.backupMu.Unlock()
 	name := filepath.Base(r.PathValue("name"))
 	if !strings.HasSuffix(name, ".tar.gz") {
 		jsonError(w, 400, "invalid snapshot")
@@ -1614,11 +1653,20 @@ func (a *App) handleSnapshotRestore(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 404, "snapshot not found")
 		return
 	}
-	serverDir := filepath.Join(root, "game", "Server")
+	spec, ok := snapshotSpecFor(root, s)
+	if !ok {
+		jsonError(w, 409, "snapshots are not supported for this game")
+		return
+	}
+	// Never restore without a copy of what is about to be replaced.
 	safety := filepath.Join(root, "snapshots", "pre-restore-"+time.Now().Format("20060102-150405")+".tar.gz")
-	_ = createTarGz(safety, serverDir, []string{"universe", "mods", "config.json", "permissions.json", "whitelist.json", "bans.json"})
-	if err := extractTarGz(src, serverDir); err != nil {
-		jsonError(w, 500, err.Error())
+	if err := createTarGz(safety, spec.Base, spec.Include); err != nil {
+		_ = os.Remove(safety)
+		jsonError(w, 500, "could not create the safety snapshot, so nothing was restored: "+err.Error())
+		return
+	}
+	if err := restoreSnapshot(src, spec); err != nil {
+		jsonError(w, 500, err.Error()+" (safety snapshot: "+filepath.Base(safety)+")")
 		return
 	}
 	jsonOut(w, 200, map[string]any{"ok": true, "safetySnapshot": filepath.Base(safety)})

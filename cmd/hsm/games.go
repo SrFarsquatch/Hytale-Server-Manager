@@ -17,8 +17,14 @@ type GameCapability struct {
 	// ConsoleCommands means commands can be written to the server's stdin.
 	ConsoleCommands bool `json:"consoleCommands"`
 	FileManagement  bool `json:"fileManagement"`
-	// Backups covers the native backup command and full offline snapshots.
+	// Backups means full snapshots (create, list, restore, delete) are supported.
 	Backups bool `json:"backups"`
+	// NativeBackups is Hytale's own /backup command and its schedule settings.
+	NativeBackups bool `json:"nativeBackups"`
+	// LiveSnapshots means a snapshot can be taken while the server is running.
+	LiveSnapshots bool `json:"liveSnapshots"`
+	// ServerProperties means the structured server.properties form applies.
+	ServerProperties bool `json:"serverProperties"`
 	// Configuration means the server settings form applies to this game.
 	Configuration bool `json:"configuration"`
 	// ConfigFiles lists the structured files the in-app config editor may open.
@@ -83,7 +89,7 @@ func supportedGameCatalog() []GameCatalogEntry {
 		{
 			ID: "hytale", Name: "Hytale", Available: true, Protocol: "udp",
 			Capabilities: GameCapability{
-				Console: true, ConsoleCommands: true, FileManagement: true, Backups: true,
+				Console: true, ConsoleCommands: true, FileManagement: true, Backups: true, NativeBackups: true,
 				Configuration: true, ConfigFiles: hytaleConfigFiles, Mods: true, PlayerList: true,
 				DeviceAuth: true, GameUpdates: true,
 				Variants: []string{"dedicated"},
@@ -93,6 +99,7 @@ func supportedGameCatalog() []GameCatalogEntry {
 			ID: "minecraft-java", Name: "Minecraft Java Edition", Available: true, Protocol: "tcp",
 			Capabilities: GameCapability{
 				Console: true, ConsoleCommands: true, FileManagement: true, Configuration: true,
+				Backups: true, LiveSnapshots: true, PlayerList: true, ServerProperties: true,
 				ConfigFiles: []string{}, Variants: []string{"vanilla"},
 			},
 		},
