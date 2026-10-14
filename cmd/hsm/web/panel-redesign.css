@@ -1177,3 +1177,53 @@ body {
   .file-manager-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
   .file-manager-actions>* { width:100%; justify-content:center; }
 }
+
+
+/* Crafty-inspired fleet navigation: grouped game sections with clear instance state. */
+.server-list {
+  max-height: min(48vh, 460px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.server-group { min-width: 0; padding: 2px 0 8px; }
+.server-group + .server-group { border-top: 1px solid var(--line); padding-top: 8px; }
+.server-group-heading {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 5px 8px 6px; color: var(--muted);
+  font-size: 10px; font-weight: 700; letter-spacing: .075em; text-transform: uppercase;
+}
+.server-group-count {
+  display: inline-flex; min-width: 18px; height: 18px; align-items: center;
+  justify-content: center; padding: 0 5px; border: 1px solid var(--line);
+  border-radius: 5px; color: var(--faint); font-size: 10px; letter-spacing: 0;
+}
+.server-group-items { display: flex; flex-direction: column; gap: 2px; }
+.server-list-item {
+  grid-template-columns: 25px minmax(0, 1fr);
+  min-height: 45px; gap: 8px; padding: 6px 8px;
+  border: 1px solid transparent; border-radius: 6px;
+}
+.server-list-item.active {
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.server-list-mark { position: relative; display: grid; width: 23px; height: 23px; place-items: center; }
+.server-list-mark .game-icon { display: grid; width: 22px; height: 22px; place-items: center; }
+.server-list-mark .game-icon img { display: block; width: 21px; height: 21px; object-fit: contain; }
+.server-list-dot {
+  position: absolute; right: -2px; bottom: -2px; width: 8px; height: 8px;
+  border: 2px solid var(--sidebar); border-radius: 50%; background: #747d89;
+}
+.server-list-dot.online { background: #46c78a; }
+.server-list-dot.busy { background: #e8b65a; }
+.server-list-dot.crashed { background: #f06a75; }
+.server-list-item.active .server-list-dot { border-color: #1e2727; }
+.server-list-copy b { font-size: 12px; }
+.server-list-copy small { font-size: 10px; }
+@media (max-width: 620px) {
+  .server-list { max-height: 35vh; }
+  .server-group-heading { padding-inline: 6px; }
+  .server-list-item { min-height: 43px; }
+}
