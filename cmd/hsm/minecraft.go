@@ -183,7 +183,7 @@ func writeMinecraftProperties(root string, s ServerSettings) error {
 	eula := filepath.Join(gameDir, "eula.txt")
 	if err := os.WriteFile(eula, []byte("# Accepted by the server owner in HSM. See https://aka.ms/MinecraftEULA.\neula=true\n"), 0600); err != nil { return err }
 	mode := "survival"
-	if strings.EqualFold(s.GameMode, "creative") { mode = "creative" } else if strings.EqualFold(s.GameMode, "adventure") { mode = "adventure" }
+	if strings.EqualFold(s.GameMode, "creative") { mode = "creative" } else if strings.EqualFold(s.GameMode, "adventure") { mode = "adventure" } else if strings.EqualFold(s.GameMode, "spectator") { mode = "spectator" }
 	props := []struct{ key, value string }{
 		{"motd", strings.ReplaceAll(strings.ReplaceAll(s.MOTD, "\r", " "), "\n", " ")},
 		{"server-port", strconv.Itoa(s.Port)},
