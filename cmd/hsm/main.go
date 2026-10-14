@@ -540,7 +540,7 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		if body.MinecraftVariant != "vanilla" { jsonError(w, 400, "only vanilla Minecraft Java servers are currently supported"); return }
 		if !body.MinecraftEulaAccepted { jsonError(w, 400, "you must accept the Minecraft EULA before creating this server"); return }
 		if body.MinecraftVersion == "" { body.MinecraftVersion = "latest" }
-		if len(body.MinecraftVersion) > 32 || strings.ContainsAny(body.MinecraftVersion, "\\r\\n\\x00") { jsonError(w, 400, "invalid Minecraft version"); return }
+		if len(body.MinecraftVersion) > 32 || strings.ContainsAny(body.MinecraftVersion, "\r\n\x00") { jsonError(w, 400, "invalid Minecraft version"); return }
 	}
 	if game == "runescape-dragonwilds" {
 		if strings.TrimSpace(body.DragonwildsOwnerID) == "" {
