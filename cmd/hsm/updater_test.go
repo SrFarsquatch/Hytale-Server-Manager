@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+	"time"
+)
 
 func TestCompareVersions(t *testing.T) {
 	cases := []struct {
@@ -54,5 +58,34 @@ func TestIsDockerContainerID(t *testing.T) {
 		if isDockerContainerID(value) {
 			t.Errorf("isDockerContainerID(%q) = true, want false", value)
 		}
+	}
+}
+
+func TestAppUpdateStateExpiresStaleUpdate(t *testing.T) {
+	started := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	state := appUpdateState{
+		status: "updating",
+		message: "Starting the updater helper",
+		target: "0.7.0",
+		startedAt: started,
+	}
+	status, message, target := state.snapshot(started.Add(13 * time.Minute))
+	if status != "failed" {
+		t.Fatalf("status = %q, want failed", status)
+	}
+	if !strings.Contains(message, "12 minutes") {
+		t.Fatalf("message = %q, want stale-update explanation", message)
+	}
+	if target != "" {
+		t.Fatalf("target = %q, want empty after expiration", target)
+	}
+}
+
+func TestAppUpdateStateDoesNotExpireRecentUpdate(t *testing.T) {
+	started := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	state := appUpdateState{status: "updating", message: "Pulling image", target: "0.7.0", startedAt: started}
+	status, message, target := state.snapshot(started.Add(2 * time.Minute))
+	if status != "updating" || message != "Pulling image" || target != "0.7.0" {
+		t.Fatalf("snapshot = (%q, %q, %q), want active update", status, message, target)
 	}
 }
