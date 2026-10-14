@@ -49,6 +49,31 @@ func TestWriteMinecraftPropertiesRequiresEULAAcceptance(t *testing.T) {
 	if !strings.Contains(string(eula), "eula=true") { t.Fatalf("eula.txt = %q, want accepted EULA", eula) }
 }
 
+func TestMinecraftPropertiesPreserveGameManagedAndCustomSettings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "server.properties")
+	initial := "motd=old\nserver-port=25565\nview-distance=12\nonline-mode=false\n"
+	if err := os.WriteFile(path, []byte(initial), 0644); err != nil { t.Fatal(err) }
+	values := []struct{ key, value string }{{"motd", "new"}, {"server-port", "5520"}, {"online-mode", "true"}}
+	if err := mergeMinecraftProperties(path, values); err != nil { t.Fatal(err) }
+	got, err := os.ReadFile(path)
+	if err != nil { t.Fatal(err) }
+	for _, expected := range []string{"motd=new", "server-port=5520", "online-mode=true", "view-distance=12"} {
+		if !strings.Contains(string(got), expected) { t.Errorf("merged properties missing %q: %s", expected, got) }
+	}
+	if strings.Contains(string(got), "motd=old") || strings.Contains(string(got), "online-mode=false") {
+		t.Fatalf("managed property was not replaced: %s", got)
+	}
+}
+
+func TestMojangURLValidationRejectsNonOfficialOrInsecureURLs(t *testing.T) {
+	for _, raw := range []string{"http://piston-data.mojang.com/server.jar", "https://example.com/server.jar", "https://mojang.com.evil.test/server.jar", "https://user@piston-data.mojang.com/server.jar"} {
+		if isOfficialMojangURL(raw) { t.Errorf("isOfficialMojangURL(%q) = true, want false", raw) }
+	}
+	for _, raw := range []string{"https://piston-meta.mojang.com/manifest.json", "https://piston-data.mojang.com/server.jar"} {
+		if !isOfficialMojangURL(raw) { t.Errorf("isOfficialMojangURL(%q) = false, want true", raw) }
+	}
+}
+
 func TestMinecraftInstallerRejectsOtherGameManager(t *testing.T) {
 	m := NewServerManager(t.TempDir(), t.TempDir(), "hytale")
 	if err := m.RunMinecraftInstaller("latest"); err == nil || !strings.Contains(err.Error(), "Minecraft Java") {
