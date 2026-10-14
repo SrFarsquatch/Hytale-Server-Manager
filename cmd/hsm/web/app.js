@@ -44,7 +44,28 @@ $('#file-editor-close').addEventListener('click',()=>{if(managedDirty&&!confirm(
 function loadCurrent(){if(state.current==='servers')renderFleet();if(state.current==='app-settings')loadAppUpdate();if(!state.serverId)return;if(state.current==='mods')loadMods();if(state.current==='backups')loadBackups();if(state.current==='config')loadFiles();if(state.current==='setup')loadInstallStatus()}
 async function loadServers(initial=false){try{state.servers=await api('/api/servers');const saved=localStorage.getItem('hsm-server');if(!state.servers.length){state.serverId=null;state.settings=null;state.status=null;state.logs=[];state.events?.close();state.events=null;renderServerList();renderFleet();renderFleetStats();populateCloneSources();renderOnboarding();if(initial)switchView('servers');return}if(!state.serverId||!state.servers.some(s=>s.id===state.serverId)){state.serverId=(saved&&state.servers.some(s=>s.id===saved))?saved:state.servers[0].id}renderServerList();renderFleet();renderFleetStats();populateCloneSources();renderOnboarding();if(initial)$('#top-context').textContent=selectedSummary()?.serverName||''}catch(e){if(initial)toast(e.message,true)}}
 function renderFleetStats(){const online=state.servers.filter(s=>s.running).length;$('#fleet-online').textContent=online;$('#fleet-total').textContent=state.servers.length;const installed=state.servers.filter(s=>s.installed).length;$('#fleet-summary').innerHTML=`<div><strong>${state.servers.length}</strong><span>Instances</span></div><div><strong>${online}</strong><span>Online</span></div><div><strong>${installed}</strong><span>Installed</span></div><div><strong>${state.servers.length-online}</strong><span>Stopped</span></div>`}
-function renderServerList(){const el=$('#server-list');el.innerHTML=state.servers.map(s=>`<button class="server-list-item ${s.id===state.serverId?'active':''}" data-select-server="${esc(s.id)}" aria-pressed="${s.id===state.serverId?'true':'false'}"><span class="game-icon game-icon-${esc(s.gameType)}" aria-hidden="true">${gameLogo(s.gameType)}</span><span class="server-list-copy"><b>${esc(s.serverName)}</b><small>${esc(gameLabel(s.gameType))} · ${statusLabel(s)} · UDP ${s.port}</small></span></button>`).join('');$$('[data-select-server]').forEach(b=>b.addEventListener('click',()=>selectServer(b.dataset.selectServer)))}
+function renderServerList(){
+  const el=$('#server-list');
+  const groups=new Map();
+  for(const server of state.servers){
+    const game=server.gameType||'unknown';
+    if(!groups.has(game))groups.set(game,[]);
+    groups.get(game).push(server);
+  }
+  const preferred=['hytale','minecraft-java','terraria','runescape-dragonwilds'];
+  const order=[...preferred.filter(game=>groups.has(game)),...Array.from(groups.keys()).filter(game=>!preferred.includes(game)).sort((a,b)=>gameLabel(a).localeCompare(gameLabel(b)))];
+  el.innerHTML=order.map(game=>{
+    const servers=groups.get(game);
+    return `<section class="server-group" aria-label="${esc(gameLabel(game))} servers">
+      <div class="server-group-heading"><span>${esc(gameLabel(game))}</span><span class="server-group-count">${servers.length}</span></div>
+      <div class="server-group-items">${servers.map(s=>`<button class="server-list-item ${s.id===state.serverId?'active':''}" data-select-server="${esc(s.id)}" aria-pressed="${s.id===state.serverId?'true':'false'}">
+        <span class="server-list-mark"><span class="game-icon game-icon-${esc(s.gameType)}" aria-hidden="true">${gameLogo(s.gameType)}</span><span class="server-list-dot ${statusDotClass(s)}" aria-label="${esc(statusLabel(s))}"></span></span>
+        <span class="server-list-copy"><b>${esc(s.serverName)}</b><small>${esc(statusLabel(s))} · UDP ${s.port}</small></span>
+      </button>`).join('')}</div>
+    </section>`;
+  }).join('');
+  el.querySelectorAll('[data-select-server]').forEach(button=>button.addEventListener('click',()=>selectServer(button.dataset.selectServer)));
+}
 
 async function loadAppUpdate(){const check=$('#app-update-check');if(check)check.disabled=true;$('#app-update-message').textContent='Checking GitHub for the latest stable release…';try{const info=await api('/api/app-update');state.appUpdate=info;renderAppUpdate(info)}catch(e){$('#app-update-badge').textContent='Check failed';$('#app-update-message').textContent=e.message;$('#app-update-apply').disabled=true}finally{if(check)check.disabled=false}}
 function renderAppUpdate(info){$('#app-update-current').textContent='v'+(info.currentVersion||'unknown');$('#app-update-latest').textContent='v'+(info.latestVersion||info.currentVersion||'unknown');$('#app-update-date').textContent=info.publishedAt?fmtDate(info.publishedAt):'—';const badge=$('#app-update-badge');badge.textContent=info.updateAvailable?'Update available':(info.status==='updating'?'Updating…':(info.message?.includes('No stable release')?'No release yet':'Up to date'));badge.className='update-badge'+(info.updateAvailable?' available':'');$('#app-update-message').textContent=info.message||(info.updateAvailable?'A newer stable version is ready to install.':'You are running the latest release.');$('#app-update-apply').disabled=!info.updateAvailable||!info.updaterReady||info.status==='updating'||info.status==='starting';$('#app-update-apply').textContent=info.status==='updating'?'Updating…':'Update and restart';const link=$('#app-update-release-link');if(info.releaseUrl&&info.releaseUrl.startsWith('https://github.com/SrFarsquatch/Hytale-Server-Manager/releases/')){link.href=info.releaseUrl;link.classList.remove('hidden')}else link.classList.add('hidden');const notes=$('#app-update-notes');if(info.releaseNotes?.trim()){notes.textContent=info.releaseNotes;notes.classList.remove('hidden')}else{notes.textContent='';notes.classList.add('hidden')}}
