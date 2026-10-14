@@ -13,3 +13,5 @@ data/
 Thumbs.db
 .vscode/
 .idea/
+/hsm
+/cmd/hsm/hsm
