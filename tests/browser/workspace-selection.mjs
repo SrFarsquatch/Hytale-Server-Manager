@@ -88,6 +88,8 @@ function fakeHytaleInstall(id) {
     'echo "fake server ready"',
     'while read -r line; do',
     '  echo "received: $line"',
+    // Real Hytale /who output: one line per world.
+    '  if [ "$line" = "/who" ]; then echo "GrandMine (1): : Clarkonalark (Clarkonalark)"; fi',
     '  if [ "$line" = "/stop" ]; then echo "fake server stopping"; exit 0; fi',
     'done',
   ].join('\n'), { mode: 0o755 });
@@ -257,6 +259,9 @@ try {
     await waitForName('Alpha Hytale');
     await page.click('#start-btn');
     await page.waitForFunction(() => /Online|Starting/.test(document.querySelector('#top-status').textContent), null, { timeout: 5000 });
+    await page.click('#players-refresh');
+    await page.waitForFunction(() => document.querySelector('#players-list').textContent.includes('Clarkonalark'), null, { timeout: 5000 });
+    assert.match(await text('#metric-players'), /^1 \/ 20$/, 'Hytale player count from /who');
     await page.click('[data-view-tab="console"]');
     await page.waitForFunction(() => document.querySelector('#console-output').textContent.includes('fake server ready'), null, { timeout: 5000 });
     await page.fill('#console-command', 'hello-alpha');
