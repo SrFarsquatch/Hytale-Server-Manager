@@ -4,6 +4,7 @@ data/
 
 # Local builds
 /hsm
+/cmd/hsm/hsm
 /orbis
 /hytale-server-manager
 /dist/
@@ -13,5 +14,3 @@ data/
 Thumbs.db
 .vscode/
 .idea/
-/hsm
-/cmd/hsm/hsm
