@@ -16,6 +16,18 @@ A self-hosted web panel for running multiple Hytale dedicated servers from one L
 - Per-server JVM memory and autostart settings
 - Linux amd64 and arm64 builds
 
+### Other games
+
+- **Minecraft Java (vanilla):**
+  - official server download from Mojang, with EULA acceptance
+  - console and player list (`list`)
+  - full snapshots, including while the server is running (autosave is paused for the copy)
+  - a game rules form for common `server.properties` settings
+  - a Java version check before start
+- **RuneScape: Dragonwilds:** SteamCMD install, dedicated-server settings and console output.
+
+Restoring a snapshot first saves a safety copy, then replaces the world and settings with the snapshot's contents. Files created after the snapshot are removed rather than mixed in.
+
 ## Run with Docker Compose
 
 ```bash
@@ -103,4 +115,4 @@ node --check cmd/hsm/web/app.js
 go build -o /tmp/hsm ./cmd/hsm && node tests/browser/workspace-selection.mjs /tmp/hsm
 ```
 
-The browser test starts its own HSM instance against a temporary data directory and uses a fake Hytale `start.sh`, so it never downloads games or touches real server data. See `docs/audit-2026-10-workspace-selection.md` for the current audit and backlog.
+CI runs the same browser test as a separate `browser` job. The browser test starts its own HSM instance against a temporary data directory and uses a fake Hytale `start.sh`, so it never downloads games or touches real server data. See `docs/audit-2026-10-workspace-selection.md` for the current audit and backlog.

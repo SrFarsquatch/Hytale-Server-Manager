@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#151a24">
   <title>HSM · Game Server Control Panel</title>
-  <link rel="stylesheet" href="/app.css?v=20261015-panel-ui4">
+  <link rel="stylesheet" href="/app.css?v=20261015-minecraft2">
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -262,17 +262,17 @@
         </section>
 
         <section id="view-backups" class="view">
-          <section class="card">
-            <div class="card-head"><div><h3>Schedule &amp; retention</h3><p class="muted small">How often Hytale makes automatic backups and how many copies to keep. Oldest automatic backups are removed first.</p></div><button type="button" class="btn primary small" id="save-backup-settings">Save</button></div>
+          <section class="card" id="backup-schedule-card">
+            <div class="card-head"><div><h3>Schedule &amp; retention</h3><p class="muted small" id="backup-schedule-help">How often Hytale makes automatic backups and how many copies to keep. Oldest automatic backups are removed first.</p></div><button type="button" class="btn primary small" id="save-backup-settings">Save</button></div>
             <div class="form-grid three">
-              <label>Automatic backup interval<select id="backup-frequency"><option value="5">Every 5 minutes</option><option value="10">Every 10 minutes</option><option value="15">Every 15 minutes</option><option value="30">Every 30 minutes</option><option value="60">Every hour</option><option value="120">Every 2 hours</option><option value="360">Every 6 hours</option><option value="720">Every 12 hours</option><option value="1440">Daily</option><option value="10080">Weekly</option></select><small>Applies when Hytale next starts.</small></label>
-              <label>Keep automatic backups<input id="backup-retention" type="number" min="1" max="100" value="10" required><small>Newest 1–100 native backups.</small></label>
+              <label class="native-only">Automatic backup interval<select id="backup-frequency"><option value="5">Every 5 minutes</option><option value="10">Every 10 minutes</option><option value="15">Every 15 minutes</option><option value="30">Every 30 minutes</option><option value="60">Every hour</option><option value="120">Every 2 hours</option><option value="360">Every 6 hours</option><option value="720">Every 12 hours</option><option value="1440">Daily</option><option value="10080">Weekly</option></select><small>Applies when Hytale next starts.</small></label>
+              <label class="native-only">Keep automatic backups<input id="backup-retention" type="number" min="1" max="100" value="10" required><small>Newest 1–100 native backups.</small></label>
               <label>Keep full snapshots<input id="snapshot-retention" type="number" min="1" max="100" value="5" required><small>Newest 1–100 snapshots. Restore safety copies are kept separately.</small></label>
             </div>
           </section>
-          <div class="two-col">
-            <section class="card"><div class="card-head"><div><h3>Native backups</h3><p class="muted small">Hytale's automatic and on-demand backups.</p></div><button type="button" class="btn primary small" id="native-backup">Back up now</button></div><div id="native-backups" class="file-list empty-state">No native backups found.</div></section>
-            <section class="card"><div class="card-head"><div><h3>Full snapshots</h3><p class="muted small">World, configuration, permissions and mods. Server must be stopped.</p></div><button type="button" class="btn small" id="snapshot-backup">Create snapshot</button></div><div id="snapshots" class="file-list empty-state">No snapshots found.</div></section>
+          <div class="two-col" id="backup-columns">
+            <section class="card" id="native-backups-card"><div class="card-head"><div><h3>Native backups</h3><p class="muted small">Hytale's automatic and on-demand backups.</p></div><button type="button" class="btn primary small" id="native-backup">Back up now</button></div><div id="native-backups" class="file-list empty-state">No native backups found.</div></section>
+            <section class="card"><div class="card-head"><div><h3>Full snapshots</h3><p class="muted small" id="snapshot-help">World, configuration, permissions and mods. Server must be stopped.</p></div><button type="button" class="btn small" id="snapshot-backup">Create snapshot</button></div><div id="snapshots" class="file-list empty-state">No snapshots found.</div></section>
           </div>
         </section>
 
@@ -316,7 +316,7 @@
               <label class="hytale-settings-only">Game mode<select id="set-mode"><option value="Survival">Survival</option><option value="Adventure">Adventure</option><option value="Creative">Creative</option><option value="Spectator">Spectator</option></select><small>Default mode for newly created worlds.</small></label>
               <label id="set-players-label" class="hytale-settings-only">Maximum players<input id="set-players" type="number" min="1" max="1000" required></label>
               <label class="hytale-settings-only">Server message<input id="set-motd" maxlength="160" placeholder="Welcome to your server"></label>
-              <label class="hytale-settings-only">Server password (optional)<input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label>
+              <label class="hytale-settings-only">Server password (optional)<input id="set-password" type="password" autocomplete="new-password" placeholder="Leave blank for no password"></label><label id="set-password-clear-row" class="check hidden"><input id="set-password-clear" type="checkbox"> Remove the current server password</label>
               <label class="toggle-row hytale-settings-only"><span><b>Require whitelist permission</b><small>Restrict joining to players granted join access.</small></span><input id="set-whitelist" type="checkbox"></label>
               <label class="hytale-settings-only">Minimum JVM memory<input id="set-xms" placeholder="2G" required></label>
               <label class="hytale-settings-only">Maximum JVM memory<input id="set-xmx" placeholder="4G" required></label>
@@ -329,7 +329,7 @@
                 <label class="span-two">Owner ID (required)<input id="set-dragonwilds-owner" maxlength="128" autocomplete="off" placeholder="Your in-game Player ID"></label>
                 <label>Default world name (required)<input id="set-dragonwilds-world" maxlength="32"></label>
                 <label>Admin password (required)<input id="set-dragonwilds-admin" type="password" maxlength="128" autocomplete="new-password"></label>
-                <label class="span-two">World password (optional)<input id="set-dragonwilds-password" type="password" maxlength="128" autocomplete="new-password" placeholder="Leave empty to allow anyone to join"></label>
+                <label class="span-two">World password (optional)<input id="set-dragonwilds-password" type="password" maxlength="128" autocomplete="new-password" placeholder="Leave empty to allow anyone to join"></label><label id="set-dragonwilds-password-clear-row" class="check span-two hidden"><input id="set-dragonwilds-password-clear" type="checkbox"> Remove the current world password</label>
               </div>
               <p class="muted small">Find your Owner ID at the bottom of the in-game Settings menu. Players find the server under Worlds → Public by searching for the exact world name, including capitalization. World saves are stored under <code>RSDragonwilds/Saved/Savegames</code>.</p>
               <p class="muted small">Network: forward the server's UDP port (7777 by default). The official RAM baseline is 2 GB plus about 1 GB per player (up to 6 players).</p>
@@ -337,6 +337,10 @@
             <div id="hytale-settings-note" class="notice"><span><b>Networking.</b> The container publishes a port range. Each server needs a different port in that range.</span></div>
             <p id="dragonwilds-player-limit" class="muted small hidden">RuneScape: Dragonwilds currently supports up to 6 players. The game-managed player limit is not changed by this panel.</p>
           </form>
+          <section id="mc-properties-card" class="card hidden">
+            <div class="card-head"><div><h3>Game rules</h3><p class="muted small" id="mc-properties-note">Saved to server.properties. Changes apply the next time the server starts.</p></div><button type="button" class="btn small primary" id="mc-properties-save">Save game rules</button></div>
+            <div id="mc-properties-fields" class="form-grid"></div>
+          </section>
         </section>
 
         <section id="view-app-settings" class="view">
@@ -426,6 +430,6 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/app.js?v=20261015-panel-ui4"></script>
+  <script src="/app.js?v=20261015-minecraft2"></script>
 </body>
 </html>

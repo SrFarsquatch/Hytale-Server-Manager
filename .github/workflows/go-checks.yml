@@ -42,3 +42,25 @@ jobs:
           docker compose -f docker-compose.casaos.yml config -q
       - name: Build Docker image
         run: docker build --build-arg APP_VERSION=0.6.0 -t hytale-server-manager:ci .
+  browser:
+    # Drives the real binary in Chromium: server switching, stale responses,
+    # console streaming, capability-gated tabs, mobile drawer and secrets.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build application
+        run: go build -trimpath -o /tmp/hsm ./cmd/hsm
+      - name: Install Playwright and Chromium
+        run: |
+          npm install --no-save --prefix /tmp/pw playwright@1.56.1
+          /tmp/pw/node_modules/.bin/playwright install --with-deps chromium
+      - name: Run browser regression test
+        env:
+          PLAYWRIGHT_MODULE: /tmp/pw/node_modules/playwright/index.mjs
+        run: node tests/browser/workspace-selection.mjs /tmp/hsm

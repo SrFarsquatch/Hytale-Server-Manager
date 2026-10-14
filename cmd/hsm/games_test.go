@@ -34,7 +34,7 @@ func TestSupportedGameCatalogListsGamesAndEnablesImplementedAdapters(t *testing.
 func TestGameCatalogCapabilitiesDoNotOverstatePlannedGameSupport(t *testing.T) {
 	for _, game := range supportedGameCatalog() {
 		if game.ID == "hytale" {
-			if !game.Capabilities.Console || !game.Capabilities.Backups || !game.Capabilities.FileManagement {
+			if !game.Capabilities.Console || !game.Capabilities.Backups || !game.Capabilities.NativeBackups || !game.Capabilities.FileManagement {
 				t.Fatalf("Hytale capabilities unexpectedly missing: %#v", game.Capabilities)
 			}
 			continue
@@ -48,7 +48,11 @@ func TestGameCatalogCapabilitiesDoNotOverstatePlannedGameSupport(t *testing.T) {
 			continue
 		}
 		if game.ID == "minecraft-java" {
-			if !game.Capabilities.Console || !game.Capabilities.FileManagement || !game.Capabilities.Configuration || game.Capabilities.Mods || game.Capabilities.Backups || game.Capabilities.PlayerList {
+			// Vanilla Minecraft: snapshots (including live ones), player list and
+			// server.properties; no mods, Hytale-native backups, auth or updater.
+			c := game.Capabilities
+			if !c.Console || !c.FileManagement || !c.Configuration || !c.Backups || !c.LiveSnapshots || !c.PlayerList || !c.ServerProperties ||
+				c.Mods || c.NativeBackups || c.DeviceAuth || c.GameUpdates {
 				t.Errorf("Minecraft Java vanilla capabilities unexpected: %#v", game.Capabilities)
 			}
 			if len(game.Capabilities.Variants) != 1 || game.Capabilities.Variants[0] != "vanilla" { t.Errorf("Minecraft variants = %#v, want vanilla only", game.Capabilities.Variants) }

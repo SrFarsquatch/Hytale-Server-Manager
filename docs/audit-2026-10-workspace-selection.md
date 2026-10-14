@@ -70,13 +70,13 @@ installers and lifecycles. All of these are backed by real endpoints and unit te
 
 | Pri | Task | Depends on | Acceptance criteria |
 |-----|------|-----------|---------------------|
-| P1 | Run `tests/browser` in CI (install Playwright in the workflow) | — | Regression suite blocks merges |
-| P1 | Stop escalation timer bound to the specific `exec.Cmd` | — | Unit test: restart within the timeout never signals the new process |
-| P1 | Stop sending `/who` on selection; query only on demand or when the Overview is visible | — | No `/who` lines from passive browsing |
+| P1 | ✅ Done: Run `tests/browser` in CI (install Playwright in the workflow) | — | Regression suite blocks merges |
+| P1 | ✅ Done: Stop escalation timer bound to the specific `exec.Cmd` | — | Unit test: restart within the timeout never signals the new process |
+| P1 | ✅ Done: Stop sending `/who` on selection; query only on demand or when the Overview is visible | — | No `/who` lines from passive browsing |
 | P2 | Split `main.go` into `registry`, `supervisor`, `handlers` files (same package) and `gofmt` in a separate no-logic commit | — | No behaviour change; tests green |
 | P2 | Move remaining `GameType ==` branches (install status, players, settings validation) behind adapter methods | Split | No game-ID string comparisons in handlers |
-| P2 | Redact passwords from `GET /api/settings` (write-only fields) | — | Settings round-trip preserves secrets without exposing them |
-| P3 | Minecraft: generic snapshot backups, structured `server.properties` editor, `list` player query | Adapter capabilities | Phase 4 exit criteria in the product manifest |
+| P2 | ✅ Done: Redact passwords from `GET /api/settings` (write-only fields) | — | Settings round-trip preserves secrets without exposing them |
+| P3 | ✅ Done: Minecraft: generic snapshot backups, structured `server.properties` editor, `list` player query (plus live snapshots and a Java version check) | Adapter capabilities | Phase 4 exit criteria in the product manifest |
 | P3 | Terraria adapter (vanilla) | Adapter cleanup | Phase 5 exit criteria |
 
 ## 7. Milestone 1 test plan and results

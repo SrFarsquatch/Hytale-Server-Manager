@@ -100,10 +100,10 @@ func TestHytaleOnlyEndpointsRejectOtherGames(t *testing.T) {
 	}{
 		{"GET", "/api/mods", "mc", ""},
 		{"DELETE", "/api/mods/example.jar", "mc", ""},
-		{"GET", "/api/backups", "mc", ""},
+		{"GET", "/api/backups", "dw", ""},
 		{"POST", "/api/backups/native", "mc", ""},
 		{"POST", "/api/backups/snapshot", "dw", ""},
-		{"POST", "/api/backups/snapshot-1.tar.gz/restore", "mc", ""},
+		{"POST", "/api/backups/snapshot-1.tar.gz/restore", "dw", ""},
 		{"POST", "/api/auth/device", "mc", ""},
 		{"POST", "/api/update/apply", "dw", ""},
 		{"GET", "/api/server/file/config.json", "mc", ""},
@@ -142,11 +142,11 @@ func TestHytaleInstallersRejectOtherGames(t *testing.T) {
 	}
 }
 
-func TestPlayersDoesNotSendHytaleCommandToOtherGames(t *testing.T) {
-	app := newCapabilityTestApp(t, testServer("mc", "minecraft-java"))
+func TestPlayersIsUnknownForGamesWithoutPlayerList(t *testing.T) {
+	app := newCapabilityTestApp(t, testServer("dw", "runescape-dragonwilds"))
 	mux := newTestMux(app)
 	req := httptest.NewRequest("GET", "/api/players", nil)
-	req.Header.Set("X-HSM-Server", "mc")
+	req.Header.Set("X-HSM-Server", "dw")
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != 200 {
@@ -178,7 +178,7 @@ func TestServersListIncludesCatalogCapabilities(t *testing.T) {
 	if hy := byID["hy"]; !hy.Capabilities.Mods || hy.Protocol != "udp" || len(hy.Capabilities.ConfigFiles) == 0 {
 		t.Errorf("Hytale summary = %#v", hy)
 	}
-	if mc := byID["mc"]; mc.Capabilities.Mods || !mc.Capabilities.ConsoleCommands || mc.Protocol != "tcp" {
+	if mc := byID["mc"]; mc.Capabilities.Mods || mc.Capabilities.NativeBackups || !mc.Capabilities.Backups || !mc.Capabilities.ConsoleCommands || mc.Protocol != "tcp" {
 		t.Errorf("Minecraft summary = %#v", mc)
 	}
 }
