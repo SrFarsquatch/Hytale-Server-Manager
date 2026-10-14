@@ -8,6 +8,15 @@ function fmtDate(v){try{return new Date(v).toLocaleString()}catch{return v}}func
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function selectedSummary(){return state.servers.find(s=>s.id===state.serverId)}
 function statusLabel(s){if(s?.state==='crashed')return `Crashed (exit ${s.exitCode})`;if(s?.state==='starting')return'Starting';if(s?.state==='stopping')return'Stopping';if(s?.installBusy||s?.state==='installing')return'Installing';if(s?.state==='not-installed'||s?.installed===false)return'Not installed';if(s?.running)return'Online';return'Stopped'}
+// Keep game-specific workspace controls in one explicit capability map. A missing
+// capability is treated as unsupported so planned games never inherit Hytale-only UI.
+const GAME_CAPABILITIES={
+  hytale:{console:true,players:true,mods:true,backups:true,auth:true,update:true,serverFiles:true},
+  'runescape-dragonwilds':{console:false,players:false,mods:false,backups:false,auth:false,update:false,serverFiles:true}
+};
+function gameCapabilities(gameType){
+  return GAME_CAPABILITIES[gameType]||{console:false,players:false,mods:false,backups:false,auth:false,update:false,serverFiles:false};
+}
 function gameLabel(id){return ({hytale:'Hytale','minecraft-java':'Minecraft Java','terraria':'Terraria','runescape-dragonwilds':'RuneScape: Dragonwilds'})[id]||'Unknown game'}
 function gameLogo(id){const files={'hytale':'hytale.svg','minecraft-java':'minecraft-java.svg','terraria':'terraria.svg','runescape-dragonwilds':'runescape-dragonwilds.svg'};const file=files[id]||files.hytale;return '<img src="/assets/games/'+file+'" alt="" loading="eager" decoding="async">'}
 function statusDotClass(s){if(s?.state==='crashed')return'crashed';if(s?.state==='starting'||s?.state==='stopping'||s?.installBusy||s?.state==='installing')return'busy';if(s?.running)return'online';return''}
@@ -16,7 +25,52 @@ function showAuth(setup){$('#app').classList.add('hidden');$('#auth').classList.
 async function showApp(){$('#auth').classList.add('hidden');$('#app').classList.remove('hidden');await loadServers(true);if(state.serverId)await loadSelected();clearInterval(state.poll);state.poll=setInterval(async()=>{await loadServers(false);if(state.serverId){await refreshStatus();await loadLogs()}await refreshResources()},2000);clearInterval(state.playerPoll);state.playerPoll=setInterval(()=>{if(state.serverId)refreshPlayers()},30000);switchView(state.current);renderOnboarding()}
 $('#auth-form').addEventListener('submit',async e=>{e.preventDefault();$('#auth-error').textContent='';const body={username:$('#auth-user').value.trim(),password:$('#auth-pass').value};try{await api($('#auth-form').dataset.mode==='setup'?'/api/bootstrap':'/api/login',{method:'POST',body:JSON.stringify(body)});showApp()}catch(err){$('#auth-error').textContent=err.message}});$('#logout').addEventListener('click',async()=>{try{await api('/api/logout',{method:'POST'})}catch{}location.reload()});
 $$('#nav button').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));$$('[data-view-tab]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.viewTab)));$$('[data-view-link]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.viewLink)));
-function switchView(v){const dragon=selectedSummary()?.gameType==='runescape-dragonwilds';if(dragon&&['mods','backups'].includes(v))v='dashboard';state.current=v;$$('[data-view-tab="mods"],[data-view-tab="backups"]').forEach(el=>el.classList.toggle('hidden',dragon));$('#console-form')?.classList.toggle('hidden',dragon);$('.players-panel')?.classList.toggle('hidden',dragon);$$('[data-action="auth"],[data-action="backup"]').forEach(el=>el.classList.toggle('hidden',dragon));$$('[data-update]').forEach(el=>el.closest('.panel')?.classList.toggle('hidden',dragon));$$('.view').forEach(x=>x.classList.remove('active'));const target=document.getElementById('view-'+v);if(target)target.classList.add('active');$$('#nav button').forEach(x=>{const active=x.dataset.view===v;x.classList.toggle('active',active);if(active)x.setAttribute('aria-current','page');else x.removeAttribute('aria-current')});$$('[data-view-tab]').forEach(x=>{const active=x.dataset.viewTab===v;x.classList.toggle('active',active);if(active)x.setAttribute('aria-current','page');else x.removeAttribute('aria-current')});const showTabs=!!state.serverId&&!['servers','app-settings'].includes(v);$('#server-tabs').classList.toggle('hidden',!showTabs);const titles={servers:'Servers',dashboard:'Overview',console:'Console',config:'Files',mods:'Mods',backups:'Backups',setup:'Install',settings:'Server settings','app-settings':'Application settings'};$('#view-title').textContent=titles[v]||'Servers';const global=v==='servers'||v==='app-settings';$('#top-status').classList.toggle('hidden',global||!state.serverId);$('#top-start').classList.toggle('hidden',global||!state.serverId);$('#top-context').textContent=global?'':(selectedSummary()?.serverName||'');loadCurrent()}
+function switchView(v){
+  const game=selectedSummary()?.gameType||'hytale';
+  const caps=gameCapabilities(game);
+  const viewCapability={console:'console',mods:'mods',backups:'backups',config:'serverFiles',setup:'serverFiles'};
+  if(viewCapability[v]&&!caps[viewCapability[v]])v='dashboard';
+  state.current=v;
+  $$('[data-view-tab]').forEach(el=>{
+    const capability=viewCapability[el.dataset.viewTab];
+    el.classList.toggle('hidden',!!capability&&!caps[capability]);
+  });
+  $('#console-form')?.classList.toggle('hidden',!caps.console);
+  $('.players-panel')?.classList.toggle('hidden',!caps.players);
+  $$('[data-action="auth"]').forEach(el=>el.classList.toggle('hidden',!caps.auth));
+  $$('[data-action="backup"]').forEach(el=>el.classList.toggle('hidden',!caps.backups));
+  $$('[data-update]').forEach(el=>el.closest('.panel')?.classList.toggle('hidden',!caps.update));
+  const note=$('#game-capability-note');
+  if(note){
+    const hasLimitedControls=Object.values(caps).some(value=>!value);
+    note.classList.toggle('hidden',!state.serverId||!hasLimitedControls||['servers','app-settings'].includes(v));
+    note.textContent=game==='runescape-dragonwilds'
+      ?'Dragonwilds has its own server controls. Console commands, player queries, mods, and Hytale-specific backups are not available for this game.'
+      :'Some workspace tools are hidden until this game has a supported server adapter.';
+  }
+  $$('.view').forEach(x=>x.classList.remove('active'));
+  const target=document.getElementById('view-'+v);
+  if(target)target.classList.add('active');
+  $$('#nav button').forEach(x=>{
+    const active=x.dataset.view===v;
+    x.classList.toggle('active',active);
+    if(active)x.setAttribute('aria-current','page');else x.removeAttribute('aria-current');
+  });
+  $$('[data-view-tab]').forEach(x=>{
+    const active=x.dataset.viewTab===v;
+    x.classList.toggle('active',active);
+    if(active)x.setAttribute('aria-current','page');else x.removeAttribute('aria-current');
+  });
+  const showTabs=!!state.serverId&&!['servers','app-settings'].includes(v);
+  $('#server-tabs').classList.toggle('hidden',!showTabs);
+  const titles={servers:'Servers',dashboard:'Overview',console:'Console',config:'Files',mods:'Mods',backups:'Backups',setup:'Install',settings:'Server settings','app-settings':'Application settings'};
+  $('#view-title').textContent=titles[v]||'Servers';
+  const global=v==='servers'||v==='app-settings';
+  $('#top-status').classList.toggle('hidden',global||!state.serverId);
+  $('#top-start').classList.toggle('hidden',global||!state.serverId);
+  $('#top-context').textContent=global?'':(selectedSummary()?.serverName||'');
+  loadCurrent();
+}
 
 let managedPath='.', managedOpenPath='', managedDirty=false;
 function filePathJoin(base,name){return base==='.'?name:base+'/'+name}

@@ -1227,3 +1227,15 @@ body {
   .server-group-heading { padding-inline: 6px; }
   .server-list-item { min-height: 43px; }
 }
+
+/* A concise explanation when workspace tools vary by game. */
+.game-capability-note {
+  margin: 0 0 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-3);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
