@@ -570,8 +570,15 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "server name must be between 2 and 64 characters")
 		return
 	}
-	if body.GameMode == "" { body.GameMode = "Adventure" }
-	if body.GameMode != "Adventure" && body.GameMode != "Creative" {
+	if body.GameMode == "" {
+		if game == "minecraft-java" { body.GameMode = "Survival" } else { body.GameMode = "Adventure" }
+	}
+	if game == "minecraft-java" {
+		if body.GameMode != "Survival" && body.GameMode != "Adventure" && body.GameMode != "Creative" && body.GameMode != "Spectator" {
+			jsonError(w, 400, "Minecraft game mode must be Survival, Adventure, Creative, or Spectator")
+			return
+		}
+	} else if body.GameMode != "Adventure" && body.GameMode != "Creative" {
 		jsonError(w, 400, "game mode must be Adventure or Creative")
 		return
 	}
@@ -990,11 +997,11 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.Port < min || in.Port > max {
-		jsonError(w, 400, fmt.Sprintf("port must be within the Docker/CasaOS UDP range %d-%d", min, max))
+		jsonError(w, 400, fmt.Sprintf("port must be within the Docker/CasaOS %s range %d-%d", map[bool]string{true:"TCP", false:"UDP"}[current.GameType == "minecraft-java"], min, max))
 		return
 	}
 	if a.portInUse(in.Port, current.ID) {
-		jsonError(w, 409, "that UDP port is already assigned to another server")
+		jsonError(w, 409, "that game port is already assigned to another server")
 		return
 	}
 	if !validMemory(in.MemoryMin) || !validMemory(in.MemoryMax) {
@@ -1002,7 +1009,12 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.GameMode == "" { in.GameMode = current.GameMode }
-	if in.GameMode != "Adventure" && in.GameMode != "Creative" {
+	if current.GameType == "minecraft-java" {
+		if in.GameMode != "Survival" && in.GameMode != "Adventure" && in.GameMode != "Creative" && in.GameMode != "Spectator" {
+			jsonError(w, 400, "Minecraft game mode must be Survival, Adventure, Creative, or Spectator")
+			return
+		}
+	} else if in.GameMode != "Adventure" && in.GameMode != "Creative" {
 		jsonError(w, 400, "game mode must be Adventure or Creative")
 		return
 	}
