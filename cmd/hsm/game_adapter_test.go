@@ -59,6 +59,12 @@ func TestHytaleAdapterBuildProcessUsesSharedSupervisorEntry(t *testing.T) {
 	if err := os.MkdirAll(gameDir, 0755); err != nil { t.Fatal(err) }
 	startScript := filepath.Join(gameDir, "start.sh")
 	if err := os.WriteFile(startScript, []byte("#!/bin/sh\n"), 0644); err != nil { t.Fatal(err) }
+	serverDir := filepath.Join(gameDir, "Server")
+	if err := os.MkdirAll(serverDir, 0755); err != nil { t.Fatal(err) }
+	for _, name := range []string{"HytaleServer.jar", "Assets.zip"} {
+		if err := os.WriteFile(filepath.Join(gameDir, name), []byte("test"), 0644); err != nil { t.Fatal(err) }
+	}
+	if err := os.WriteFile(filepath.Join(serverDir, "HytaleServer.jar"), []byte("test"), 0644); err != nil { t.Fatal(err) }
 
 	spec, err := (HytaleAdapter{}).BuildProcess(root, []string{"--bind", "0.0.0.0:5520"})
 	if err != nil { t.Fatalf("BuildProcess() error = %v", err) }
