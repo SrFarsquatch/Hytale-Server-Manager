@@ -181,7 +181,8 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
 .side-link:hover { background: var(--card); color: var(--text); }
 .side-link.active { background: var(--accent-soft); color: var(--accent-hover); }
 .side-link.compact { padding: 8px 10px; font-size: 13px; }
-.side-servers { flex: 1; min-height: 0; }
+/* The server list scrolls in its own area so a long list never runs under the footer. */
+.side-servers { flex: 1; min-height: 120px; overflow-y: auto; }
 .sidebar-foot { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
 .fleet-state { display: flex; align-items: center; gap: 10px; padding: 4px 10px; color: var(--muted); font-size: 12.5px; }
 .fleet-state b { color: var(--text); }

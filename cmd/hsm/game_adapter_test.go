@@ -28,7 +28,7 @@ func TestGameAdapterForResolvesHytaleCaseInsensitively(t *testing.T) {
 }
 
 func TestGameAdapterForRejectsPlannedGamesUntilImplemented(t *testing.T) {
-	for _, gameType := range []string{"terraria"} {
+	for _, gameType := range []string{"terraria-tmodloader", "not-a-game"} {
 		t.Run(gameType, func(t *testing.T) {
 			adapter, err := gameAdapterFor(gameType)
 			if err == nil {

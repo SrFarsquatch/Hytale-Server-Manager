@@ -147,6 +147,7 @@ func (a *App) routes(mux *http.ServeMux) {
 	mux.Handle("POST /api/install/run-downloader", a.auth(http.HandlerFunc(a.handleDownloaderRun)))
 	mux.Handle("POST /api/install/dragonwilds", a.auth(http.HandlerFunc(a.handleDragonwildsInstall)))
 	mux.Handle("POST /api/install/minecraft", a.auth(http.HandlerFunc(a.handleMinecraftInstall)))
+	mux.Handle("POST /api/install/terraria", a.auth(http.HandlerFunc(a.handleTerrariaInstall)))
 	mux.Handle("GET /api/schedules", a.auth(http.HandlerFunc(a.handleSchedulesGet)))
 	mux.Handle("PUT /api/schedules", a.auth(http.HandlerFunc(a.handleSchedulesPut)))
 	mux.Handle("GET /api/minecraft/properties", a.auth(http.HandlerFunc(a.handleMinecraftPropertiesGet)))

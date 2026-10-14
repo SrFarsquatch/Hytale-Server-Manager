@@ -25,11 +25,8 @@ func TestSupportedGameCatalogListsGamesAndEnablesImplementedAdapters(t *testing.
 	if !available["minecraft-java"] {
 		t.Error("Minecraft Java vanilla should be available after its installer and lifecycle were implemented")
 	}
-	if available["terraria"] {
-		t.Error("Terraria should not be available before its installer and lifecycle are implemented")
-	}
-	if _, ok := available["terraria"]; !ok {
-		t.Error("catalog is missing planned game terraria")
+	if !available["terraria"] {
+		t.Error("Terraria vanilla should be available after its installer and lifecycle were implemented")
 	}
 }
 
@@ -59,6 +56,18 @@ func TestGameCatalogCapabilitiesDoNotOverstatePlannedGameSupport(t *testing.T) {
 			}
 			if len(game.Capabilities.Variants) != 1 || game.Capabilities.Variants[0] != "vanilla" {
 				t.Errorf("Minecraft variants = %#v, want vanilla only", game.Capabilities.Variants)
+			}
+			continue
+		}
+		if game.ID == "terraria" {
+			// Vanilla Terraria: snapshots while stopped, player list, commands.
+			c := game.Capabilities
+			if !c.Console || !c.ConsoleCommands || !c.FileManagement || !c.Configuration || !c.Backups || !c.PlayerList ||
+				c.LiveSnapshots || c.Mods || c.NativeBackups || c.ServerProperties || c.DeviceAuth || c.GameUpdates || len(c.ConfigFiles) != 0 {
+				t.Errorf("Terraria vanilla capabilities unexpected: %#v", c)
+			}
+			if len(c.Variants) != 1 || c.Variants[0] != "vanilla" {
+				t.Errorf("Terraria variants = %#v, want vanilla only", c.Variants)
 			}
 			continue
 		}

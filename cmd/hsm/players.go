@@ -26,6 +26,8 @@ func playerQueryFor(gameType string) (playerQuery, bool) {
 		return playerQuery{command: "/who", settle: 400 * time.Millisecond, parse: parseHytaleWho}, true
 	case "minecraft-java":
 		return playerQuery{command: "list", parse: parseMinecraftList}, true
+	case "terraria":
+		return playerQuery{command: "playing", parse: parseTerrariaPlaying}, true
 	}
 	return playerQuery{}, false
 }

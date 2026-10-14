@@ -24,12 +24,19 @@ A self-hosted web panel for running multiple Hytale dedicated servers from one L
   - full snapshots, including while the server is running (autosave is paused for the copy)
   - a game rules form for common `server.properties` settings
   - a Java version check before start
+- **Terraria (vanilla):**
+  - official server download from terraria.org (`latest` or a chosen release); the Linux server runs only on x86-64 (amd64) hosts
+  - world name, size and difficulty chosen at creation; the world is generated on first start
+  - `serverconfig.txt` written before each start, keeping any extra lines you add
+  - console, player list (`playing`), graceful stop (`exit` saves the world)
+  - snapshots of `Worlds`, `serverconfig.txt` and `banlist.txt` while the server is stopped
+  - uses TCP in the published `5520`–`5525` range
 - **RuneScape: Dragonwilds:** SteamCMD install, dedicated-server settings and console output.
 
 ### Schedules and crash recovery
 
 - **Schedules (per server):** restart, start, stop, back up or run a console command, either daily at a set time (optionally on chosen weekdays) or repeating every N minutes or hours.
-  - Restarts and stops can warn players in game first, through the game's broadcast command (Minecraft `say`, Hytale `/say`).
+  - Restarts and stops can warn players in game first, through the game's broadcast command (Minecraft and Terraria `say`, Hytale `/say`).
   - Times use the container's time zone (set `TZ` in Compose).
   - Runs missed while the manager is offline are skipped, not replayed.
 - **Auto-restart on crash** (opt-in, in Settings): a server that exits with an error without being asked to stop is started again after 5, 15 and 45 seconds. It is left stopped after 3 crashes in 10 minutes.
@@ -98,7 +105,7 @@ If the error persists, the DNS servers may be unreachable or outbound HTTPS may 
 
 The web panel uses TCP `8008` on the host and container. The Compose and CasaOS definitions publish:
 
-- `5520`–`5525` over UDP and TCP, for Hytale (UDP/QUIC) and Minecraft Java (TCP) servers. `HSM_GAME_PORT_START` and `HSM_GAME_PORT_END` must match this range.
+- `5520`–`5525` over UDP and TCP, for Hytale (UDP/QUIC), Minecraft Java (TCP) and Terraria (TCP) servers. `HSM_GAME_PORT_START` and `HSM_GAME_PORT_END` must match this range.
 - `7777`–`7782` over UDP, for RuneScape: Dragonwilds servers.
 
 The manager only assigns ports from these ranges; it never changes the container's published ports. If you widen a range, add the matching `ports:` entries in Compose or the CasaOS app settings too. When the manager can read its own container through the Docker socket, a server's Overview warns if its port is not published.

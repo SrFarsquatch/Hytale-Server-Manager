@@ -95,6 +95,26 @@ function fakeHytaleInstall(id) {
   ].join('\n'), { mode: 0o755 });
 }
 
+// A stand-in Terraria server: answers playing and exit, and prints the ": "
+// prompt without a newline like the real console.
+function fakeTerrariaInstall(id) {
+  const game = join(dataDir, 'servers', id, 'game');
+  mkdirSync(game, { recursive: true });
+  writeFileSync(join(game, 'TerrariaServer.bin.x86_64'), [
+    '#!/bin/bash',
+    'echo "Server started"',
+    'while true; do',
+    '  printf ": "',
+    '  read -r line || exit 0',
+    '  case "$line" in',
+    '    playing) echo "Bob (10.0.0.2:51234)"; echo "Ann (10.0.0.3:51235)"; echo "2 players connected." ;;',
+    '    exit) echo "Saving world..."; exit 0 ;;',
+    '    *) echo "received: $line" ;;',
+    '  esac',
+    'done',
+  ].join('\n'), { mode: 0o755 });
+}
+
 const results = [];
 async function check(name, fn) {
   try {
@@ -112,7 +132,9 @@ try {
   await call('POST', '/api/servers', { game: 'hytale', name: 'Alpha Hytale', memoryMin: '1G', memoryMax: '2G', backupFrequency: 30, maxPlayers: 20, gameMode: 'Adventure', password: 'join-secret-123' });
   await call('POST', '/api/servers', { game: 'minecraft-java', minecraftVariant: 'vanilla', minecraftVersion: 'latest', minecraftEulaAccepted: true, name: 'Bravo Minecraft', memoryMin: '1G', memoryMax: '2G', maxPlayers: 20, gameMode: 'Survival' });
   await call('POST', '/api/servers', { game: 'runescape-dragonwilds', name: 'Charlie Dragonwilds', maxPlayers: 6, dragonwildsOwnerId: 'owner-1', dragonwildsWorldName: 'World', dragonwildsAdminPassword: 'adminpass' });
+  await call('POST', '/api/servers', { game: 'terraria', name: 'Delta Terraria', terrariaWorldName: 'Sky Island', terrariaWorldSize: 'large', gameMode: 'Expert' });
   fakeHytaleInstall('alpha-hytale');
+  fakeTerrariaInstall('delta-terraria');
   fakeMinecraftInstall('bravo-minecraft');
 
   browser = await chromium.launch();
@@ -130,7 +152,7 @@ try {
   const unscoped = [];
   page.on('request', req => {
     const url = new URL(req.url());
-    const serverScoped = /^\/api\/(status|players|resources|settings|server\/|console|logs|files|mods|backups|install\/(status|run-downloader|import-local|minecraft|dragonwilds)|auth|update)/.test(url.pathname);
+    const serverScoped = /^\/api\/(status|players|resources|settings|server\/|console|logs|files|mods|backups|install\/(status|run-downloader|import-local|minecraft|dragonwilds|terraria)|auth|update)/.test(url.pathname);
     if (serverScoped && !req.headers()['x-hsm-server']) unscoped.push(req.method() + ' ' + url.pathname);
   });
 
@@ -318,6 +340,58 @@ try {
     await page.waitForFunction(() => /Stopped/.test(document.querySelector('#top-status').textContent), null, { timeout: 8000 });
   });
 
+  await check('Terraria: fixed world settings, players and install state', async () => {
+    await select('delta-terraria');
+    await waitForName('Delta Terraria');
+    await page.click('[data-view-tab="settings"]');
+    assert.equal(await text('#set-mode-label'), 'Difficulty');
+    assert.equal(await value('#set-mode'), 'Expert');
+    assert.ok(await page.isDisabled('#set-mode'), 'difficulty is fixed after the world is created');
+    assert.ok(!(await visible('#set-xms-row')) && !(await visible('#set-whitelist-row')), 'JVM memory and whitelist do not apply to Terraria');
+    assert.match(await text('#terraria-settings-note'), /Sky Island/);
+    assert.equal(await page.getAttribute('#set-players', 'max'), '255');
+
+    await page.click('[data-view-tab="dashboard"]');
+    await page.click('#start-btn');
+    await page.waitForFunction(() => /Online|Starting/.test(document.querySelector('#top-status').textContent), null, { timeout: 8000 });
+    await page.click('#players-refresh');
+    await page.waitForFunction(() => document.querySelector('#players-list').textContent.includes('Bob'), null, { timeout: 5000 });
+    assert.match(await text('#metric-players'), /2 \/ 8/);
+    const cfg = await (await fetch(base + '/api/files/content?path=' + encodeURIComponent('game/serverconfig.txt'), { headers: { Cookie: cookie, 'X-HSM-Server': 'delta-terraria' } })).json();
+    assert.match(cfg.content, /^worldname=Sky Island$/m);
+    assert.match(cfg.content, /^difficulty=1$/m);
+    await fetch(base + '/api/servers/delta-terraria/stop', { method: 'POST', headers: { Cookie: cookie } });
+    await page.waitForFunction(() => /Stopped/.test(document.querySelector('#top-status').textContent), null, { timeout: 8000 });
+
+    await page.click('[data-view-tab="setup"]');
+    await page.waitForSelector('#terraria-install-controls:not(.hidden)', { timeout: 5000 });
+    assert.ok(!(await visible('#hytale-install-controls')), 'Hytale installer is hidden for Terraria');
+    assert.match(await text('#install-state'), /Terraria server installed/);
+  });
+
+  await check('the wizard applies each game\'s rules', async () => {
+    await page.click('#add-server-side');
+    await page.click('[data-game-choice="terraria"]');
+    await page.click('#wizard-next');
+    await page.click('#wizard-next');
+    assert.ok(await visible('#terraria-fields'), 'Terraria world fields are shown');
+    assert.equal(await text('#new-mode-label'), 'Difficulty');
+    assert.deepEqual(await page.$$eval('#new-server-mode option', o => o.map(x => x.value)), ['Classic', 'Expert', 'Master', 'Journey']);
+    assert.equal(await value('#new-server-players'), '8');
+    assert.ok(!(await visible('#new-whitelist-row')), 'no whitelist for Terraria');
+    await page.click('#wizard-next');
+    assert.ok(!(await visible('#new-xms-row')) && !(await visible('#new-backup-row')), 'no JVM memory or Hytale backups for Terraria');
+    await page.click('#wizard-back');
+    await page.click('#wizard-back');
+    await page.click('#wizard-back');
+    await page.click('[data-game-choice="minecraft-java"]');
+    await page.click('#wizard-next');
+    await page.click('#wizard-next');
+    assert.equal(await value('#new-server-mode'), 'Survival');
+    assert.ok(!(await visible('#terraria-fields')), 'Terraria fields are hidden for Minecraft');
+    await page.click('#cancel-server-dialog');
+  });
+
   await check('a selected server deleted elsewhere moves the workspace to a valid server', async () => {
     await select('bravo-minecraft');
     await waitForName('Bravo Minecraft');
@@ -352,6 +426,17 @@ try {
       assert.equal(await visible('#port-warning'), false, 'a published port shows no warning');
     } finally {
       await page.unroute('**/api/servers');
+    }
+  });
+
+  await check('every sidebar server can be clicked on a short window', async () => {
+    await page.setViewportSize({ width: 1280, height: 520 });
+    try {
+      for (const id of await page.$$eval('[data-select-server]', els => els.map(e => e.dataset.selectServer))) {
+        await page.click(`[data-select-server="${id}"]`, { timeout: 3000 });
+      }
+    } finally {
+      await page.setViewportSize({ width: 1280, height: 720 });
     }
   });
 

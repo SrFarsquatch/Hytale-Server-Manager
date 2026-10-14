@@ -44,7 +44,7 @@ func TestEveryAvailableGameHasAnAdapterAndProtocol(t *testing.T) {
 }
 
 func TestGameCapabilitiesFailClosedForPlannedAndUnknownGames(t *testing.T) {
-	for _, game := range []string{"terraria", "not-a-game"} {
+	for _, game := range []string{"terraria-tmodloader", "not-a-game"} {
 		if _, ok := gameCatalogEntryFor(game); ok {
 			t.Errorf("%q resolved as an available game", game)
 		}

@@ -34,6 +34,8 @@ func snapshotSpecFor(root string, s ServerSettings) (snapshotSpec, bool) {
 			level, level + "_nether", level + "_the_end",
 			"server.properties", "whitelist.json", "ops.json", "banned-players.json", "banned-ips.json",
 		}}, true
+	case "terraria":
+		return snapshotSpec{Base: filepath.Join(root, "game"), Include: []string{"Worlds", "serverconfig.txt", "banlist.txt"}}, true
 	}
 	return snapshotSpec{}, false
 }
