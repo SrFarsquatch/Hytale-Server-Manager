@@ -51,6 +51,9 @@ type ServerSettings struct {
 	DragonwildsAdminPassword string `json:"dragonwildsAdminPassword,omitempty"`
 	DragonwildsWorldPassword string `json:"dragonwildsWorldPassword,omitempty"`
 	DragonwildsPublic bool `json:"dragonwildsPublic,omitempty"`
+	MinecraftVersion string `json:"minecraftVersion,omitempty"`
+	MinecraftVariant string `json:"minecraftVariant,omitempty"`
+	MinecraftEulaAccepted bool `json:"minecraftEulaAccepted,omitempty"`
 	ServerName      string `json:"serverName"`
 	Port            int    `json:"port"`
 	GameMode        string `json:"gameMode"`
@@ -272,6 +275,7 @@ func (a *App) routes(mux *http.ServeMux) {
 	mux.Handle("POST /api/install/downloader", a.auth(http.HandlerFunc(a.handleDownloaderUpload)))
 	mux.Handle("POST /api/install/run-downloader", a.auth(http.HandlerFunc(a.handleDownloaderRun)))
 	mux.Handle("POST /api/install/dragonwilds", a.auth(http.HandlerFunc(a.handleDragonwildsInstall)))
+	mux.Handle("POST /api/install/minecraft", a.auth(http.HandlerFunc(a.handleMinecraftInstall)))
 	mux.Handle("POST /api/install/import-local", a.auth(http.HandlerFunc(a.handleImportLocal)))
 
 	for _, x := range []struct{ path, cmd string }{
@@ -517,6 +521,9 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		BackupFrequency int    `json:"backupFrequency"`
 		AutoStart       bool   `json:"autoStart"`
 		SourceServerID  string `json:"sourceServerId"`
+		MinecraftVersion string `json:"minecraftVersion"`
+		MinecraftVariant string `json:"minecraftVariant"`
+		MinecraftEulaAccepted bool `json:"minecraftEulaAccepted"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		jsonError(w, 400, err.Error())
@@ -524,9 +531,16 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	game := strings.ToLower(strings.TrimSpace(body.Game))
 	if game == "" { game = "hytale" }
-	if game != "hytale" && game != "runescape-dragonwilds" {
-		jsonError(w, 400, "this release supports Hytale and RuneScape: Dragonwilds only; see GET /api/games for supported games")
+	if game != "hytale" && game != "runescape-dragonwilds" && game != "minecraft-java" {
+		jsonError(w, 400, "this release supports Hytale, Minecraft Java vanilla, and RuneScape: Dragonwilds; see GET /api/games for supported games")
 		return
+	}
+	if game == "minecraft-java" {
+		if body.MinecraftVariant == "" { body.MinecraftVariant = "vanilla" }
+		if body.MinecraftVariant != "vanilla" { jsonError(w, 400, "only vanilla Minecraft Java servers are currently supported"); return }
+		if !body.MinecraftEulaAccepted { jsonError(w, 400, "you must accept the Minecraft EULA before creating this server"); return }
+		if body.MinecraftVersion == "" { body.MinecraftVersion = "latest" }
+		if len(body.MinecraftVersion) > 32 || strings.ContainsAny(body.MinecraftVersion, "\\r\\n\\x00") { jsonError(w, 400, "invalid Minecraft version"); return }
 	}
 	if game == "runescape-dragonwilds" {
 		if strings.TrimSpace(body.DragonwildsOwnerID) == "" {
@@ -600,6 +614,9 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	s := defaultServerSettings(id, name, port, filepath.Join("servers", id))
 	s.GameType = game
+	s.MinecraftVersion = body.MinecraftVersion
+	s.MinecraftVariant = body.MinecraftVariant
+	s.MinecraftEulaAccepted = body.MinecraftEulaAccepted
 	s.DragonwildsOwnerID = strings.TrimSpace(body.DragonwildsOwnerID)
 	s.DragonwildsWorldName = strings.TrimSpace(body.DragonwildsWorldName)
 	s.DragonwildsAdminPassword = body.DragonwildsAdminPassword
@@ -922,6 +939,11 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	in.ID = current.ID
 	in.GameType = current.GameType // game identity is immutable through generic settings updates
 	in.StorageDir = current.StorageDir
+	if current.GameType == "minecraft-java" {
+		in.MinecraftEulaAccepted = current.MinecraftEulaAccepted
+		in.MinecraftVersion = current.MinecraftVersion
+		in.MinecraftVariant = current.MinecraftVariant
+	}
 	if current.GameType == "runescape-dragonwilds" {
 		in.DragonwildsOwnerID = strings.TrimSpace(in.DragonwildsOwnerID)
 		in.DragonwildsWorldName = strings.TrimSpace(in.DragonwildsWorldName)
