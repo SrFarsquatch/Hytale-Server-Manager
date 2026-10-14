@@ -20,13 +20,14 @@ func TestSupportedGameCatalogListsGamesAndEnablesImplementedAdapters(t *testing.
 		t.Fatal("Hytale should remain available")
 	}
 	if !available["runescape-dragonwilds"] { t.Fatal("Dragonwilds should be available after its dedicated-server adapter was added") }
-	for _, id := range []string{"minecraft-java", "terraria"} {
-		if available[id] {
-			t.Errorf("%s should not be marked available before its installer and lifecycle are implemented", id)
-		}
-		if _, ok := available[id]; !ok {
-			t.Errorf("catalog is missing planned game %q", id)
-		}
+	if !available["minecraft-java"] {
+		t.Error("Minecraft Java vanilla should be available after its installer and lifecycle were implemented")
+	}
+	if available["terraria"] {
+		t.Error("Terraria should not be available before its installer and lifecycle are implemented")
+	}
+	if _, ok := available["terraria"]; !ok {
+		t.Error("catalog is missing planned game terraria")
 	}
 }
 
@@ -40,6 +41,13 @@ func TestGameCatalogCapabilitiesDoNotOverstatePlannedGameSupport(t *testing.T) {
 		}
 		if game.ID == "runescape-dragonwilds" {
 			if game.Capabilities.Backups || game.Capabilities.FileManagement || game.Capabilities.Mods || game.Capabilities.PlayerList { t.Errorf("Dragonwilds exposes unimplemented capabilities: %#v", game.Capabilities) }
+			continue
+		}
+		if game.ID == "minecraft-java" {
+			if !game.Capabilities.Console || !game.Capabilities.FileManagement || !game.Capabilities.Configuration || game.Capabilities.Mods || game.Capabilities.Backups || game.Capabilities.PlayerList {
+				t.Errorf("Minecraft Java vanilla capabilities unexpected: %#v", game.Capabilities)
+			}
+			if len(game.Capabilities.Variants) != 1 || game.Capabilities.Variants[0] != "vanilla" { t.Errorf("Minecraft variants = %#v, want vanilla only", game.Capabilities.Variants) }
 			continue
 		}
 		if game.Capabilities.Console || game.Capabilities.Backups || game.Capabilities.FileManagement || game.Capabilities.Mods || game.Capabilities.PlayerList {
