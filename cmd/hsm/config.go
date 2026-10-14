@@ -244,8 +244,8 @@ func (a *App) serverIDExists(id string) bool {
 	return false
 }
 
-func (a *App) nextAvailablePort() int {
-	min, max, _ := deploymentPortRange()
+// firstFreePort returns the lowest port in the range no server uses, or 0.
+func (a *App) firstFreePort(min, max int) int {
 	for p := min; p <= max; p++ {
 		if !a.portInUse(p, "") {
 			return p

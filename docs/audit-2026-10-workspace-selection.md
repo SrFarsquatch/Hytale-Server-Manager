@@ -49,7 +49,7 @@ installers and lifecycles. All of these are backed by real endpoints and unit te
 
 ## 4. Architectural risks (not addressed in this milestone)
 
-- `main.go` mixes routing, registry, supervisor and Hytale logic. Many files are not `gofmt`-clean, so formatting them would create noisy diffs.
+- ~~`main.go` mixes routing, registry, supervisor and Hytale logic. Many files are not `gofmt`-clean.~~ (resolved: the package is `gofmt`-clean and `main.go` holds only startup and routing).
 - The player query writes `/who` into the Hytale console on every selection and every 30 s, which adds console noise.
 - `ServerManager.Stop`'s 75 s escalation timer does not check that the process is still the one it was asked to stop. If PIDs are reused after a fast restart, it could signal an unrelated process group.
 - `GET /api/settings` returns server and Dragonwilds admin passwords to the browser.
@@ -73,8 +73,8 @@ installers and lifecycles. All of these are backed by real endpoints and unit te
 | P1 | ✅ Done: Run `tests/browser` in CI (install Playwright in the workflow) | — | Regression suite blocks merges |
 | P1 | ✅ Done: Stop escalation timer bound to the specific `exec.Cmd` | — | Unit test: restart within the timeout never signals the new process |
 | P1 | ✅ Done: Stop sending `/who` on selection; query only on demand or when the Overview is visible | — | No `/who` lines from passive browsing |
-| P2 | Split `main.go` into `registry`, `supervisor`, `handlers` files (same package) and `gofmt` in a separate no-logic commit | — | No behaviour change; tests green |
-| P2 | Move remaining `GameType ==` branches (install status, players, settings validation) behind adapter methods | Split | No game-ID string comparisons in handlers |
+| P2 | ✅ Done: Split `main.go` into files by responsibility (same package) and `gofmt` in a separate no-logic commit | — | No behaviour change; tests green |
+| P2 | ✅ Done: Move remaining `GameType ==` branches (install status, players, settings validation) behind adapter methods (`Rules`, `ValidateNew`, `MergeSettings`, `ApplySettings`, `InstallStatus`) | Split | No game-ID string comparisons in generic handlers |
 | P2 | ✅ Done: Redact passwords from `GET /api/settings` (write-only fields) | — | Settings round-trip preserves secrets without exposing them |
 | P3 | ✅ Done: Minecraft: generic snapshot backups, structured `server.properties` editor, `list` player query (plus live snapshots and a Java version check) | Adapter capabilities | Phase 4 exit criteria in the product manifest |
 | P3 | ✅ Done: Schedules (restart/start/stop/backup/command, daily or repeating, player warnings) and opt-in crash auto-restart with backoff | — | Phase 7 operations |

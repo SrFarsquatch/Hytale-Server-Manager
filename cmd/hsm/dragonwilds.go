@@ -21,14 +21,6 @@ import (
 const dragonwildsSteamAppID = "4019830"
 const steamCMDArchiveURL = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz"
 
-func portRangeForGame(gameType string) (int, int) {
-	if strings.EqualFold(strings.TrimSpace(gameType), "runescape-dragonwilds") {
-		return 7777, 7782
-	}
-	minPort, maxPort, _ := deploymentPortRange()
-	return minPort, maxPort
-}
-
 func nameSafeDefault(s string) string {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -51,27 +43,81 @@ func nameSafeDefault(s string) string {
 	return out
 }
 
-func (a *App) nextAvailablePortForRange(minPort, maxPort int) int {
-	a.cfgMu.RLock()
-	defer a.cfgMu.RUnlock()
-	for port := minPort; port <= maxPort; port++ {
-		used := false
-		for _, server := range a.cfg.Servers {
-			if server.Port == port {
-				used = true
-				break
-			}
-		}
-		if !used {
-			return port
-		}
-	}
-	return minPort
-}
-
 type DragonwildsAdapter struct{}
 
 func (DragonwildsAdapter) GameType() string { return "runescape-dragonwilds" }
+
+func (DragonwildsAdapter) Rules() GameRules {
+	return GameRules{GameModes: hytaleGameModes, DefaultMOTD: "Welcome to your Hytale server!", DefaultMaxPlayers: 6, PlayerLimit: 6, PortMin: 7777, PortMax: 7782}
+}
+
+func (DragonwildsAdapter) ValidateNew(req *newServerRequest) error {
+	if strings.TrimSpace(req.DragonwildsOwnerID) == "" {
+		return errors.New("RuneScape: Dragonwilds requires your in-game Player ID as the server Owner ID")
+	}
+	if len(strings.TrimSpace(req.DragonwildsOwnerID)) > 128 || strings.ContainsAny(req.DragonwildsOwnerID, "\r\n\x00") {
+		return errors.New("invalid Dragonwilds Owner ID")
+	}
+	if strings.TrimSpace(req.DragonwildsWorldName) == "" {
+		req.DragonwildsWorldName = nameSafeDefault(req.Name)
+	}
+	if len(req.DragonwildsWorldName) > 32 || strings.ContainsAny(req.DragonwildsWorldName, "\r\n\x00") {
+		return errors.New("Dragonwilds world name must be 1–32 characters")
+	}
+	if strings.TrimSpace(req.DragonwildsAdminPassword) == "" {
+		return errors.New("Dragonwilds requires an admin password")
+	}
+	if len(req.DragonwildsAdminPassword) > 128 || len(req.DragonwildsWorldPassword) > 128 || strings.ContainsAny(req.DragonwildsAdminPassword, "\r\n\x00") || strings.ContainsAny(req.DragonwildsWorldPassword, "\r\n\x00") {
+		return errors.New("invalid Dragonwilds password")
+	}
+	return nil
+}
+
+// MergeSettings validates the Dragonwilds fields and keeps the generic fields
+// the game does not use (players, MOTD, memory, backups) unchanged.
+func (DragonwildsAdapter) MergeSettings(in *ServerSettings, current ServerSettings) error {
+	keepMinecraftFields(in, current)
+	in.DragonwildsOwnerID = strings.TrimSpace(in.DragonwildsOwnerID)
+	in.DragonwildsWorldName = strings.TrimSpace(in.DragonwildsWorldName)
+	if in.DragonwildsOwnerID == "" || len(in.DragonwildsOwnerID) > 128 || strings.ContainsAny(in.DragonwildsOwnerID, "\r\n\x00") {
+		return errors.New("Dragonwilds Owner ID is required and must be valid")
+	}
+	if in.DragonwildsWorldName == "" || len(in.DragonwildsWorldName) > 32 || strings.ContainsAny(in.DragonwildsWorldName, "\r\n\x00") {
+		return errors.New("Dragonwilds default world name is required and must be 1–32 characters")
+	}
+	if in.DragonwildsAdminPassword == "" || len(in.DragonwildsAdminPassword) > 128 || len(in.DragonwildsWorldPassword) > 128 || strings.ContainsAny(in.DragonwildsAdminPassword, "\r\n\x00") || strings.ContainsAny(in.DragonwildsWorldPassword, "\r\n\x00") {
+		return errors.New("Dragonwilds admin password is required; passwords must be 128 characters or fewer")
+	}
+	in.GameMode = current.GameMode
+	in.MaxPlayers = current.MaxPlayers
+	in.MOTD = current.MOTD
+	in.Password = current.Password
+	in.WhitelistEnabled = current.WhitelistEnabled
+	in.MemoryMin = current.MemoryMin
+	in.MemoryMax = current.MemoryMax
+	in.ExtraArgs = current.ExtraArgs
+	in.BackupFrequency = current.BackupFrequency
+	in.BackupRetention = current.BackupRetention
+	in.SnapshotRetention = current.SnapshotRetention
+	return nil
+}
+
+// ApplySettings never edits DedicatedServer.ini while the game is running: the
+// game may discard live edits. PrepareLaunch writes the saved values before
+// the next start; when stopped and installed, the file is kept in sync now.
+func (DragonwildsAdapter) ApplySettings(app *App, m *ServerManager, s ServerSettings) error {
+	if m.IsRunning() || !m.Installed() {
+		return nil
+	}
+	if err := writeDragonwildsConfig(app.serverRoot(s), s); err != nil {
+		return fmt.Errorf("settings saved, but Dragonwilds config could not be updated: %w", err)
+	}
+	return nil
+}
+
+func (DragonwildsAdapter) InstallStatus(app *App, s ServerSettings) map[string]any {
+	return map[string]any{"game": s.GameType, "paths": map[string]string{"game": filepath.Join(app.serverRoot(s), "game"), "steamcmd": filepath.Join(app.dataDir, "tools", "steamcmd", "steamcmd.sh")}}
+}
 
 func (DragonwildsAdapter) Installed(rootDir string) bool {
 	return fileExists(filepath.Join(rootDir, "game", "RSDragonwildsServer.sh")) ||

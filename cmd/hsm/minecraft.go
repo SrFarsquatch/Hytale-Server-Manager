@@ -24,6 +24,45 @@ type MinecraftAdapter struct{}
 
 func (MinecraftAdapter) GameType() string { return "minecraft-java" }
 
+func (MinecraftAdapter) Rules() GameRules {
+	return GameRules{GameModes: []string{"Survival", "Adventure", "Creative", "Spectator"}, DefaultMOTD: "A Minecraft Server", DefaultMaxPlayers: 20, PlayerLimit: 1000}
+}
+
+func (MinecraftAdapter) ValidateNew(req *newServerRequest) error {
+	if req.MinecraftVariant == "" {
+		req.MinecraftVariant = "vanilla"
+	}
+	if req.MinecraftVariant != "vanilla" {
+		return errors.New("only vanilla Minecraft Java servers are currently supported")
+	}
+	if !req.MinecraftEulaAccepted {
+		return errors.New("you must accept the Minecraft EULA before creating this server")
+	}
+	if req.MinecraftVersion == "" {
+		req.MinecraftVersion = "latest"
+	}
+	if len(req.MinecraftVersion) > 32 || strings.ContainsAny(req.MinecraftVersion, "\r\n\x00") {
+		return errors.New("invalid Minecraft version")
+	}
+	return nil
+}
+
+// MergeSettings keeps the version, variant and EULA consent fixed: they
+// describe the installed files and change only through a reinstall.
+func (MinecraftAdapter) MergeSettings(in *ServerSettings, current ServerSettings) error {
+	keepMinecraftFields(in, current)
+	keepDragonwildsFields(in, current)
+	return nil
+}
+
+// ApplySettings has nothing to write: PrepareLaunch passes memory on the java
+// command line and writes server.properties before each start.
+func (MinecraftAdapter) ApplySettings(*App, *ServerManager, ServerSettings) error { return nil }
+
+func (MinecraftAdapter) InstallStatus(app *App, s ServerSettings) map[string]any {
+	return map[string]any{"game": s.GameType, "version": s.MinecraftVersion, "variant": s.MinecraftVariant, "eulaAccepted": s.MinecraftEulaAccepted, "paths": map[string]string{"game": filepath.Join(app.serverRoot(s), "game")}}
+}
+
 func (MinecraftAdapter) Installed(rootDir string) bool {
 	b, err := os.ReadFile(filepath.Join(rootDir, "game", "eula.txt"))
 	if err != nil || !fileExists(filepath.Join(rootDir, "game", "server.jar")) {

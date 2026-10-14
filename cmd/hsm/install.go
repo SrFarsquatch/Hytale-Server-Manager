@@ -20,18 +20,15 @@ func (a *App) handleInstallStatus(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 404, err.Error())
 		return
 	}
-	root := a.serverRoot(s)
-	if s.GameType == "runescape-dragonwilds" {
-		jsonOut(w, 200, map[string]any{"installed": m.Installed(), "busy": m.InstallBusy(), "game": s.GameType, "paths": map[string]string{"game": filepath.Join(root, "game"), "steamcmd": filepath.Join(a.dataDir, "tools", "steamcmd", "steamcmd.sh")}})
+	adapter, err := gameAdapterFor(s.GameType)
+	if err != nil {
+		jsonError(w, 409, err.Error())
 		return
 	}
-	if s.GameType == "minecraft-java" {
-		jsonOut(w, 200, map[string]any{"installed": m.Installed(), "busy": m.InstallBusy(), "game": s.GameType, "version": s.MinecraftVersion, "variant": s.MinecraftVariant, "eulaAccepted": s.MinecraftEulaAccepted, "paths": map[string]string{"game": filepath.Join(root, "game")}})
-		return
-	}
-	downloader := filepath.Join(a.dataDir, "tools", "hytale-downloader")
-	bundle := filepath.Join(root, "imports", "game.zip")
-	jsonOut(w, 200, map[string]any{"installed": m.Installed(), "downloaderPresent": fileExists(downloader), "bundlePresent": fileExists(bundle), "busy": m.InstallBusy(), "paths": map[string]string{"downloader": downloader, "bundle": bundle, "game": filepath.Join(root, "game")}})
+	out := adapter.InstallStatus(a, s)
+	out["installed"] = m.Installed()
+	out["busy"] = m.InstallBusy()
+	jsonOut(w, 200, out)
 }
 
 func (a *App) handleDownloaderUpload(w http.ResponseWriter, r *http.Request) {

@@ -49,130 +49,71 @@ func (a *App) handleServersList(w http.ResponseWriter, r *http.Request) {
 	jsonOut(w, 200, out)
 }
 
+// newServerRequest is the body of POST /api/servers.
+type newServerRequest struct {
+	Game                     string `json:"game"`
+	DragonwildsOwnerID       string `json:"dragonwildsOwnerId"`
+	DragonwildsWorldName     string `json:"dragonwildsWorldName"`
+	DragonwildsAdminPassword string `json:"dragonwildsAdminPassword"`
+	DragonwildsWorldPassword string `json:"dragonwildsWorldPassword"`
+	DragonwildsPublic        bool   `json:"dragonwildsPublic"`
+	Name                     string `json:"name"`
+	Port                     int    `json:"port"`
+	GameMode                 string `json:"gameMode"`
+	MaxPlayers               int    `json:"maxPlayers"`
+	MOTD                     string `json:"motd"`
+	Password                 string `json:"password"`
+	WhitelistEnabled         bool   `json:"whitelistEnabled"`
+	PublicHost               string `json:"publicHost"`
+	MemoryMin                string `json:"memoryMin"`
+	MemoryMax                string `json:"memoryMax"`
+	BackupFrequency          int    `json:"backupFrequency"`
+	AutoStart                bool   `json:"autoStart"`
+	SourceServerID           string `json:"sourceServerId"`
+	MinecraftVersion         string `json:"minecraftVersion"`
+	MinecraftVariant         string `json:"minecraftVariant"`
+	MinecraftEulaAccepted    bool   `json:"minecraftEulaAccepted"`
+}
+
 func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Game                     string `json:"game"`
-		DragonwildsOwnerID       string `json:"dragonwildsOwnerId"`
-		DragonwildsWorldName     string `json:"dragonwildsWorldName"`
-		DragonwildsAdminPassword string `json:"dragonwildsAdminPassword"`
-		DragonwildsWorldPassword string `json:"dragonwildsWorldPassword"`
-		DragonwildsPublic        bool   `json:"dragonwildsPublic"`
-		Name                     string `json:"name"`
-		Port                     int    `json:"port"`
-		GameMode                 string `json:"gameMode"`
-		MaxPlayers               int    `json:"maxPlayers"`
-		MOTD                     string `json:"motd"`
-		Password                 string `json:"password"`
-		WhitelistEnabled         bool   `json:"whitelistEnabled"`
-		PublicHost               string `json:"publicHost"`
-		MemoryMin                string `json:"memoryMin"`
-		MemoryMax                string `json:"memoryMax"`
-		BackupFrequency          int    `json:"backupFrequency"`
-		AutoStart                bool   `json:"autoStart"`
-		SourceServerID           string `json:"sourceServerId"`
-		MinecraftVersion         string `json:"minecraftVersion"`
-		MinecraftVariant         string `json:"minecraftVariant"`
-		MinecraftEulaAccepted    bool   `json:"minecraftEulaAccepted"`
-	}
+	var body newServerRequest
 	if err := decodeJSON(r, &body); err != nil {
 		jsonError(w, 400, err.Error())
 		return
 	}
-	game := strings.ToLower(strings.TrimSpace(body.Game))
-	if game == "" {
-		game = "hytale"
-	}
-	if game != "hytale" && game != "runescape-dragonwilds" && game != "minecraft-java" {
-		jsonError(w, 400, "this release supports Hytale, Minecraft Java vanilla, and RuneScape: Dragonwilds; see GET /api/games for supported games")
+	game := normalizeGameType(body.Game)
+	adapter, adapterErr := gameAdapterFor(game)
+	entry, available := gameCatalogEntryFor(game)
+	if adapterErr != nil || !available {
+		jsonError(w, 400, fmt.Sprintf("%q is not supported by this release; see GET /api/games for supported games", game))
 		return
 	}
-	if game == "minecraft-java" {
-		if body.MinecraftVariant == "" {
-			body.MinecraftVariant = "vanilla"
-		}
-		if body.MinecraftVariant != "vanilla" {
-			jsonError(w, 400, "only vanilla Minecraft Java servers are currently supported")
-			return
-		}
-		if !body.MinecraftEulaAccepted {
-			jsonError(w, 400, "you must accept the Minecraft EULA before creating this server")
-			return
-		}
-		if body.MinecraftVersion == "" {
-			body.MinecraftVersion = "latest"
-		}
-		if len(body.MinecraftVersion) > 32 || strings.ContainsAny(body.MinecraftVersion, "\r\n\x00") {
-			jsonError(w, 400, "invalid Minecraft version")
-			return
-		}
+	if err := adapter.ValidateNew(&body); err != nil {
+		jsonError(w, 400, err.Error())
+		return
 	}
-	if game == "runescape-dragonwilds" {
-		if strings.TrimSpace(body.DragonwildsOwnerID) == "" {
-			jsonError(w, 400, "RuneScape: Dragonwilds requires your in-game Player ID as the server Owner ID")
-			return
-		}
-		if len(strings.TrimSpace(body.DragonwildsOwnerID)) > 128 || strings.ContainsAny(body.DragonwildsOwnerID, "\r\n\x00") {
-			jsonError(w, 400, "invalid Dragonwilds Owner ID")
-			return
-		}
-		if strings.TrimSpace(body.DragonwildsWorldName) == "" {
-			body.DragonwildsWorldName = nameSafeDefault(body.Name)
-		}
-		if len(body.DragonwildsWorldName) > 32 || strings.ContainsAny(body.DragonwildsWorldName, "\r\n\x00") {
-			jsonError(w, 400, "Dragonwilds world name must be 1–32 characters")
-			return
-		}
-		if strings.TrimSpace(body.DragonwildsAdminPassword) == "" {
-			jsonError(w, 400, "Dragonwilds requires an admin password")
-			return
-		}
-		if len(body.DragonwildsAdminPassword) > 128 || len(body.DragonwildsWorldPassword) > 128 || strings.ContainsAny(body.DragonwildsAdminPassword, "\r\n\x00") || strings.ContainsAny(body.DragonwildsWorldPassword, "\r\n\x00") {
-			jsonError(w, 400, "invalid Dragonwilds password")
-			return
-		}
-	}
+	rules := adapter.Rules()
 	name := strings.TrimSpace(body.Name)
 	if len(name) < 2 || len(name) > 64 {
 		jsonError(w, 400, "server name must be between 2 and 64 characters")
 		return
 	}
 	if body.GameMode == "" {
-		if game == "minecraft-java" {
-			body.GameMode = "Survival"
-		} else {
-			body.GameMode = "Adventure"
-		}
+		body.GameMode = rules.GameModes[0]
 	}
-	if game == "minecraft-java" {
-		if body.GameMode != "Survival" && body.GameMode != "Adventure" && body.GameMode != "Creative" && body.GameMode != "Spectator" {
-			jsonError(w, 400, "Minecraft game mode must be Survival, Adventure, Creative, or Spectator")
-			return
-		}
-	} else if body.GameMode != "Adventure" && body.GameMode != "Creative" {
-		jsonError(w, 400, "game mode must be Adventure or Creative")
+	if err := rules.checkGameMode(body.GameMode); err != nil {
+		jsonError(w, 400, err.Error())
 		return
 	}
 	if body.MaxPlayers == 0 {
-		if game == "runescape-dragonwilds" {
-			body.MaxPlayers = 6
-		} else {
-			body.MaxPlayers = 20
-		}
+		body.MaxPlayers = rules.DefaultMaxPlayers
 	}
-	if game == "runescape-dragonwilds" && body.MaxPlayers > 6 {
-		jsonError(w, 400, "RuneScape: Dragonwilds supports up to 6 players")
-		return
-	}
-	if body.MaxPlayers < 1 || body.MaxPlayers > 1000 {
-		jsonError(w, 400, "maximum players must be between 1 and 1000")
+	if err := rules.checkMaxPlayers(body.MaxPlayers, entry.Name); err != nil {
+		jsonError(w, 400, err.Error())
 		return
 	}
 	if body.MOTD == "" {
-		if game == "minecraft-java" {
-			body.MOTD = "A Minecraft Server"
-		} else {
-			body.MOTD = "Welcome to your Hytale server!"
-		}
+		body.MOTD = rules.DefaultMOTD
 	}
 	if body.MemoryMin == "" {
 		body.MemoryMin = "2G"
@@ -196,24 +137,17 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 500, "could not generate server id")
 		return
 	}
+	min, max := rules.portRange()
 	port := body.Port
 	if port == 0 {
-		if game == "runescape-dragonwilds" {
-			port = a.nextAvailablePortForRange(7777, 7782)
-		} else {
-			port = a.nextAvailablePort()
+		port = a.firstFreePort(min, max)
+		if port == 0 {
+			jsonError(w, 409, fmt.Sprintf("every game port in the published range %d-%d is already assigned", min, max))
+			return
 		}
-	}
-	min, max, _ := deploymentPortRange()
-	if game == "runescape-dragonwilds" {
-		min, max = 7777, 7782
 	}
 	if port < min || port > max {
-		protocol := "UDP"
-		if game == "minecraft-java" {
-			protocol = "TCP"
-		}
-		jsonError(w, 400, fmt.Sprintf("port must be within the published %s range %d-%d", protocol, min, max))
+		jsonError(w, 400, fmt.Sprintf("port must be within the published %s range %d-%d", strings.ToUpper(entry.Protocol), min, max))
 		return
 	}
 	if a.portInUse(port, "") {
@@ -230,9 +164,6 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	s.DragonwildsAdminPassword = body.DragonwildsAdminPassword
 	s.DragonwildsWorldPassword = body.DragonwildsWorldPassword
 	s.DragonwildsPublic = body.DragonwildsPublic
-	if game == "runescape-dragonwilds" {
-		s.MaxPlayers = 6
-	}
 	s.GameMode = body.GameMode
 	s.MaxPlayers = body.MaxPlayers
 	s.MOTD = body.MOTD
@@ -296,12 +227,13 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 500, err.Error())
 		return
 	}
+	m := a.newServerManager(s)
 	a.managersMu.Lock()
-	a.managers[id] = a.newServerManager(s)
+	a.managers[id] = m
 	a.managersMu.Unlock()
-	if s.GameType == "hytale" {
-		_ = a.writeJVMOptionsFor(s)
-	}
+	// The server is saved; a game file that cannot be written yet is written
+	// again before the first start.
+	_ = adapter.ApplySettings(a, m, s)
 	jsonOut(w, 201, settingsView(s))
 }
 
@@ -547,45 +479,18 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	in.ID = current.ID
 	in.GameType = current.GameType // game identity is immutable through generic settings updates
 	in.StorageDir = current.StorageDir
-	if current.GameType == "minecraft-java" {
-		in.MinecraftEulaAccepted = current.MinecraftEulaAccepted
-		in.MinecraftVersion = current.MinecraftVersion
-		in.MinecraftVariant = current.MinecraftVariant
+	adapter, err := gameAdapterFor(current.GameType)
+	if err != nil {
+		jsonError(w, 409, err.Error())
+		return
 	}
-	if current.GameType == "runescape-dragonwilds" {
-		in.DragonwildsOwnerID = strings.TrimSpace(in.DragonwildsOwnerID)
-		in.DragonwildsWorldName = strings.TrimSpace(in.DragonwildsWorldName)
-		if in.DragonwildsOwnerID == "" || len(in.DragonwildsOwnerID) > 128 || strings.ContainsAny(in.DragonwildsOwnerID, "\r\n\x00") {
-			jsonError(w, 400, "Dragonwilds Owner ID is required and must be valid")
-			return
-		}
-		if in.DragonwildsWorldName == "" || len(in.DragonwildsWorldName) > 32 || strings.ContainsAny(in.DragonwildsWorldName, "\r\n\x00") {
-			jsonError(w, 400, "Dragonwilds default world name is required and must be 1–32 characters")
-			return
-		}
-		if in.DragonwildsAdminPassword == "" || len(in.DragonwildsAdminPassword) > 128 || len(in.DragonwildsWorldPassword) > 128 || strings.ContainsAny(in.DragonwildsAdminPassword, "\r\n\x00") || strings.ContainsAny(in.DragonwildsWorldPassword, "\r\n\x00") {
-			jsonError(w, 400, "Dragonwilds admin password is required; passwords must be 128 characters or fewer")
-			return
-		}
-		in.GameMode = current.GameMode
-		in.MaxPlayers = current.MaxPlayers
-		in.MOTD = current.MOTD
-		in.Password = current.Password
-		in.WhitelistEnabled = current.WhitelistEnabled
-		in.MemoryMin = current.MemoryMin
-		in.MemoryMax = current.MemoryMax
-		in.ExtraArgs = current.ExtraArgs
-		in.BackupFrequency = current.BackupFrequency
-		in.BackupRetention = current.BackupRetention
-		in.SnapshotRetention = current.SnapshotRetention
-	} else {
-		in.DragonwildsOwnerID = current.DragonwildsOwnerID
-		in.DragonwildsWorldName = current.DragonwildsWorldName
-		in.DragonwildsAdminPassword = current.DragonwildsAdminPassword
-		in.DragonwildsWorldPassword = current.DragonwildsWorldPassword
-		in.DragonwildsPublic = current.DragonwildsPublic
+	entry, _ := gameCatalogEntryFor(current.GameType)
+	rules := adapter.Rules()
+	if err := adapter.MergeSettings(&in, current); err != nil {
+		jsonError(w, 400, err.Error())
+		return
 	}
-	min, max := portRangeForGame(current.GameType)
+	min, max := rules.portRange()
 	in.PortMin = min
 	in.PortMax = max
 	in.ServerName = strings.TrimSpace(in.ServerName)
@@ -594,7 +499,7 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.Port < min || in.Port > max {
-		jsonError(w, 400, fmt.Sprintf("port must be within the Docker/CasaOS %s range %d-%d", map[bool]string{true: "TCP", false: "UDP"}[current.GameType == "minecraft-java"], min, max))
+		jsonError(w, 400, fmt.Sprintf("port must be within the Docker/CasaOS %s range %d-%d", strings.ToUpper(entry.Protocol), min, max))
 		return
 	}
 	if a.portInUse(in.Port, current.ID) {
@@ -608,24 +513,15 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	if in.GameMode == "" {
 		in.GameMode = current.GameMode
 	}
-	if current.GameType == "minecraft-java" {
-		if in.GameMode != "Survival" && in.GameMode != "Adventure" && in.GameMode != "Creative" && in.GameMode != "Spectator" {
-			jsonError(w, 400, "Minecraft game mode must be Survival, Adventure, Creative, or Spectator")
-			return
-		}
-	} else if in.GameMode != "Adventure" && in.GameMode != "Creative" {
-		jsonError(w, 400, "game mode must be Adventure or Creative")
+	if err := rules.checkGameMode(in.GameMode); err != nil {
+		jsonError(w, 400, err.Error())
 		return
 	}
 	if in.MaxPlayers == 0 {
 		in.MaxPlayers = current.MaxPlayers
 	}
-	if in.MaxPlayers < 1 || in.MaxPlayers > 1000 {
-		jsonError(w, 400, "maximum players must be between 1 and 1000")
-		return
-	}
-	if current.GameType == "runescape-dragonwilds" && in.MaxPlayers > 6 {
-		jsonError(w, 400, "RuneScape: Dragonwilds currently supports up to 6 players")
+	if err := rules.checkMaxPlayers(in.MaxPlayers, entry.Name); err != nil {
+		jsonError(w, 400, err.Error())
 		return
 	}
 	if in.MOTD == "" {
@@ -669,27 +565,9 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 500, err.Error())
 		return
 	}
-	if current.GameType == "runescape-dragonwilds" {
-		// Never edit DedicatedServer.ini while the game is running: the game may
-		// discard live edits. PrepareLaunch writes the persisted values before the
-		// next start; when stopped and installed, also keep the file in sync now.
-		if !m.IsRunning() && m.Installed() {
-			if err := writeDragonwildsConfig(a.serverRoot(in), in); err != nil {
-				jsonError(w, 500, "settings saved, but Dragonwilds config could not be updated: "+err.Error())
-				return
-			}
-		}
-	} else {
-		if err := a.writeJVMOptionsFor(in); err != nil {
-			jsonError(w, 500, err.Error())
-			return
-		}
-		if !m.IsRunning() {
-			if err := a.applyHytaleConfig(in); err != nil {
-				jsonError(w, 500, "settings saved, but Hytale config could not be updated: "+err.Error())
-				return
-			}
-		}
+	if err := adapter.ApplySettings(a, m, in); err != nil {
+		jsonError(w, 500, err.Error())
+		return
 	}
 	jsonOut(w, 200, settingsView(in))
 }
