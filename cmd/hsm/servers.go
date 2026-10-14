@@ -49,7 +49,7 @@ func (a *App) handleServersList(w http.ResponseWriter, r *http.Request) {
 		}
 		st := m.Status()
 		game, _ := gameCatalogEntryFor(s.GameType)
-		out = append(out, ServerSummary{ID: s.ID, GameType: s.GameType, ServerName: s.ServerName, Port: s.Port, PublicHost: s.PublicHost, Running: st.Running, Installed: st.Installed, InstallBusy: st.InstallBusy, State: st.State, ExitCode: st.ExitCode, LastExitAt: st.LastExitAt, UptimeSeconds: st.UptimeSeconds, StorageDir: s.StorageDir, Primary: i == 0, Protocol: game.Protocol, Capabilities: game.Capabilities, Art: game.Art, Rules: game.Rules})
+		out = append(out, ServerSummary{ID: s.ID, GameType: s.GameType, ServerName: s.ServerName, Port: s.Port, PublicHost: s.PublicHost, Running: st.Running, Installed: st.Installed, InstallBusy: st.InstallBusy, State: st.State, ExitCode: st.ExitCode, LastExitAt: st.LastExitAt, UptimeSeconds: st.UptimeSeconds, StorageDir: s.StorageDir, Primary: i == 0, Protocol: game.Protocol, Capabilities: serverCapabilities(s), Art: game.Art, Rules: game.Rules})
 		if published, ok := a.ports.published(s.Port, game.Protocol); ok {
 			out[len(out)-1].PortPublished = &published
 		}

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -110,7 +111,8 @@ func (a *App) handleModsList(w http.ResponseWriter, r *http.Request) {
 	if !requireCapability(w, s, "Mods", func(c GameCapability) bool { return c.Mods }) {
 		return
 	}
-	dir := filepath.Join(a.serverRoot(s), "game", "Server", "mods")
+	folder, _ := modFolderFor(s)
+	dir := filepath.Join(a.serverRoot(s), folder.Dir)
 	_ = os.MkdirAll(dir, 0755)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -151,19 +153,20 @@ func (a *App) handleModUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
+	folder, _ := modFolderFor(s)
 	ext := strings.ToLower(filepath.Ext(header.Filename))
-	if ext != ".jar" && ext != ".zip" {
-		jsonError(w, 400, "Hytale mods must be .jar or .zip files")
+	if !slices.Contains(folder.Exts, ext) {
+		jsonError(w, 400, "upload a "+strings.Join(folder.Exts, " or ")+" file")
 		return
 	}
 	name := filepath.Base(header.Filename)
-	dir := filepath.Join(a.serverRoot(s), "game", "Server", "mods")
+	dir := filepath.Join(a.serverRoot(s), folder.Dir)
 	_ = os.MkdirAll(dir, 0755)
 	if err := streamToFile(file, filepath.Join(dir, name), 0644); err != nil {
 		jsonError(w, 500, err.Error())
 		return
 	}
-	m.appendLog("controller", "Installed mod: "+name)
+	m.appendLog("controller", "Installed "+strings.TrimSuffix(folder.Kind, "s")+": "+name)
 	jsonOut(w, 201, map[string]any{"ok": true, "name": name})
 }
 
@@ -181,7 +184,8 @@ func (a *App) handleModDelete(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "invalid mod name")
 		return
 	}
-	if err := os.Remove(filepath.Join(a.serverRoot(s), "game", "Server", "mods", name)); err != nil {
+	folder, _ := modFolderFor(s)
+	if err := os.Remove(filepath.Join(a.serverRoot(s), folder.Dir, name)); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			jsonError(w, 404, "mod not found")
 		} else {

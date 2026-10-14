@@ -18,10 +18,14 @@ A self-hosted web panel for running multiple Hytale dedicated servers from one L
 
 ### Other games
 
-- **Minecraft Java (vanilla):**
-  - official server download from Mojang, with EULA acceptance
+- **Minecraft Java (vanilla, Paper or Fabric):**
+  - choose the server type when creating the server:
+    - **Vanilla:** Mojang's official server.
+    - **Paper:** the newest stable PaperMC build, checked against its published SHA-256. Plugins (`.jar`) go in `plugins/`, managed from the Plugins tab.
+    - **Fabric:** the Fabric server launcher with the newest stable loader. Mods (`.jar`) go in `mods/`, managed from the Mods tab. Most mods also need Fabric API.
+  - EULA acceptance required
   - console and player list (`list`)
-  - full snapshots, including while the server is running (autosave is paused for the copy)
+  - full snapshots, including while the server is running (autosave is paused for the copy); snapshots also include `plugins/`, `mods/` and `config/`
   - a game rules form for common `server.properties` settings
   - a Java version check before start
 - **Terraria (vanilla):**

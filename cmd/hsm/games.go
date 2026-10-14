@@ -3,6 +3,7 @@ package main
 import (
 	"io/fs"
 	"net/http"
+	"path/filepath"
 	"strings"
 )
 
@@ -30,6 +31,8 @@ type GameCapability struct {
 	// ConfigFiles lists the structured files the in-app config editor may open.
 	ConfigFiles []string `json:"configFiles"`
 	Mods        bool     `json:"mods"`
+	// ModsKind names what the Mods tab manages: "mods" or "plugins".
+	ModsKind    string   `json:"modsKind,omitempty"`
 	PlayerList  bool     `json:"playerList"`
 	DeviceAuth  bool     `json:"deviceAuth"`
 	GameUpdates bool     `json:"gameUpdates"`
@@ -102,7 +105,7 @@ func supportedGameCatalog() []GameCatalogEntry {
 			Capabilities: GameCapability{
 				Console: true, ConsoleCommands: true, FileManagement: true, Configuration: true,
 				Backups: true, LiveSnapshots: true, PlayerList: true, ServerProperties: true,
-				ConfigFiles: []string{}, Variants: []string{"vanilla"},
+				ConfigFiles: []string{}, Variants: minecraftVariants,
 			},
 		},
 		{
@@ -152,6 +155,38 @@ func gameCapabilitiesFor(gameType string) GameCapability {
 	return entry.Capabilities
 }
 
+// modFolder is where a server's add-ons live and which files it accepts.
+type modFolder struct {
+	Dir  string // relative to the server root
+	Exts []string
+	Kind string // "mods" or "plugins"
+}
+
+// modFolderFor depends on the variant as well as the game: vanilla Minecraft
+// has no add-ons, Paper has plugins and Fabric has mods.
+func modFolderFor(s ServerSettings) (modFolder, bool) {
+	switch normalizeGameType(s.GameType) {
+	case "hytale":
+		return modFolder{Dir: filepath.Join("game", "Server", "mods"), Exts: []string{".jar", ".zip"}, Kind: "mods"}, true
+	case "minecraft-java":
+		switch s.MinecraftVariant {
+		case "paper":
+			return modFolder{Dir: filepath.Join("game", "plugins"), Exts: []string{".jar"}, Kind: "plugins"}, true
+		case "fabric":
+			return modFolder{Dir: filepath.Join("game", "mods"), Exts: []string{".jar"}, Kind: "mods"}, true
+		}
+	}
+	return modFolder{}, false
+}
+
+// serverCapabilities is a server's game capabilities adjusted for its variant.
+func serverCapabilities(s ServerSettings) GameCapability {
+	c := gameCapabilitiesFor(s.GameType)
+	f, ok := modFolderFor(s)
+	c.Mods, c.ModsKind = ok, f.Kind
+	return c
+}
+
 func (c GameCapability) allowsConfigFile(name string) bool {
 	for _, allowed := range c.ConfigFiles {
 		if allowed == name {
@@ -166,7 +201,7 @@ func (c GameCapability) allowsConfigFile(name string) bool {
 // so, for example, Hytale console commands are never written to another game.
 func requireCapability(w http.ResponseWriter, s ServerSettings, feature string, supported func(GameCapability) bool) bool {
 	entry, _ := gameCatalogEntryFor(s.GameType)
-	if supported(entry.Capabilities) {
+	if supported(serverCapabilities(s)) {
 		return true
 	}
 	jsonError(w, http.StatusConflict, feature+" is not supported for "+entry.Name+" servers")
