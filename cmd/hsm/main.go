@@ -202,6 +202,13 @@ func main() {
 	}
 	app.ensureManagers()
 	go app.backupMaintenanceLoop()
+	// Remove finished self-update helper containers. The helper is usually
+	// still exiting when the new manager starts, so check again shortly after.
+	go func() {
+		cleanupUpdateHelpers()
+		time.Sleep(2 * time.Minute)
+		cleanupUpdateHelpers()
+	}()
 
 	mux := http.NewServeMux()
 	app.routes(mux)
