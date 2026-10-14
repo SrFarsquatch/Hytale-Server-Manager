@@ -12,8 +12,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"strconv"
+	"strings"
+	"syscall"
 	"time"
 )
 
@@ -56,6 +57,34 @@ func (a *App) nextAvailablePortForRange(minPort, maxPort int) int {
 type DragonwildsAdapter struct{}
 
 func (DragonwildsAdapter) GameType() string { return "runescape-dragonwilds" }
+
+func (DragonwildsAdapter) Installed(rootDir string) bool {
+	return fileExists(filepath.Join(rootDir, "game", "RSDragonwildsServer.sh")) ||
+		fileExists(filepath.Join(rootDir, "game", "RSDragonwilds", "Binaries", "Linux", "RSDragonwildsServer-Linux-Shipping"))
+}
+
+func (DragonwildsAdapter) BuildProcess(rootDir string, args []string) (ProcessLaunch, error) {
+	gameDir := filepath.Join(rootDir, "game")
+	launcher := filepath.Join(gameDir, "RSDragonwildsServer.sh")
+	if fileExists(launcher) {
+		if err := os.Chmod(launcher, 0755); err != nil {
+			return ProcessLaunch{}, fmt.Errorf("make Dragonwilds launcher executable: %w", err)
+		}
+		return ProcessLaunch{Path: launcher, Args: append([]string(nil), args...), Dir: gameDir}, nil
+	}
+	binary := filepath.Join(gameDir, "RSDragonwilds", "Binaries", "Linux", "RSDragonwildsServer-Linux-Shipping")
+	if !fileExists(binary) {
+		return ProcessLaunch{}, errors.New("Dragonwilds launcher or Linux server binary is missing")
+	}
+	if err := os.Chmod(binary, 0755); err != nil {
+		return ProcessLaunch{}, fmt.Errorf("make Dragonwilds server binary executable: %w", err)
+	}
+	return ProcessLaunch{Path: binary, Args: append([]string(nil), args...), Dir: gameDir}, nil
+}
+
+func (DragonwildsAdapter) RequestStop(pid int, _ io.WriteCloser) error {
+	return syscall.Kill(-pid, syscall.SIGINT)
+}
 
 func (DragonwildsAdapter) PrepareLaunch(app *App, settings ServerSettings) ([]string, error) {
 	if strings.TrimSpace(settings.DragonwildsOwnerID) == "" {
