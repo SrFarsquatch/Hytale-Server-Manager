@@ -114,7 +114,7 @@ func supportedGameCatalog() []GameCatalogEntry {
 			ID: "terraria", Name: "Terraria", Available: true, Protocol: "tcp",
 			Capabilities: GameCapability{
 				Console: true, ConsoleCommands: true, FileManagement: true, Configuration: true,
-				Backups: true, PlayerList: true, ConfigFiles: []string{}, Variants: []string{"vanilla"},
+				Backups: true, PlayerList: true, ConfigFiles: []string{}, Variants: []string{"vanilla", "tmodloader"},
 			},
 		},
 		{
@@ -160,6 +160,9 @@ type modFolder struct {
 	Dir  string // relative to the server root
 	Exts []string
 	Kind string // "mods" or "plugins"
+	// EnabledList means the folder's enabled.json must list a mod for it to
+	// load (tModLoader).
+	EnabledList bool
 }
 
 // modFolderFor depends on the variant as well as the game: vanilla Minecraft
@@ -174,6 +177,10 @@ func modFolderFor(s ServerSettings) (modFolder, bool) {
 			return modFolder{Dir: filepath.Join("game", "plugins"), Exts: []string{".jar"}, Kind: "plugins"}, true
 		case "fabric":
 			return modFolder{Dir: filepath.Join("game", "mods"), Exts: []string{".jar"}, Kind: "mods"}, true
+		}
+	case "terraria":
+		if terrariaVariant(s) == "tmodloader" {
+			return modFolder{Dir: filepath.Join("game", "Mods"), Exts: []string{".tmod"}, Kind: "mods", EnabledList: true}, true
 		}
 	}
 	return modFolder{}, false

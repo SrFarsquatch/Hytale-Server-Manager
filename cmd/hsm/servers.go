@@ -81,6 +81,7 @@ type newServerRequest struct {
 	MinecraftVersion         string `json:"minecraftVersion"`
 	MinecraftVariant         string `json:"minecraftVariant"`
 	MinecraftEulaAccepted    bool   `json:"minecraftEulaAccepted"`
+	TerrariaVariant          string `json:"terrariaVariant"`
 	TerrariaVersion          string `json:"terrariaVersion"`
 	TerrariaWorldName        string `json:"terrariaWorldName"`
 	TerrariaWorldSize        string `json:"terrariaWorldSize"`
@@ -175,6 +176,7 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 	s.DragonwildsAdminPassword = body.DragonwildsAdminPassword
 	s.DragonwildsWorldPassword = body.DragonwildsWorldPassword
 	s.DragonwildsPublic = body.DragonwildsPublic
+	s.TerrariaVariant = body.TerrariaVariant
 	s.TerrariaVersion = body.TerrariaVersion
 	s.TerrariaWorldName = body.TerrariaWorldName
 	s.TerrariaWorldSize = body.TerrariaWorldSize

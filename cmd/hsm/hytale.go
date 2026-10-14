@@ -121,7 +121,7 @@ func (a *App) handleModsList(w http.ResponseWriter, r *http.Request) {
 	}
 	var out []FileInfoDTO
 	for _, e := range entries {
-		if e.IsDir() {
+		if e.IsDir() || !slices.Contains(folder.Exts, strings.ToLower(filepath.Ext(e.Name()))) {
 			continue
 		}
 		info, err := e.Info()
@@ -166,6 +166,12 @@ func (a *App) handleModUpload(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 500, err.Error())
 		return
 	}
+	if folder.EnabledList {
+		if err := setModEnabled(dir, name, true); err != nil {
+			jsonError(w, 500, "mod saved, but it could not be enabled: "+err.Error())
+			return
+		}
+	}
 	m.appendLog("controller", "Installed "+strings.TrimSuffix(folder.Kind, "s")+": "+name)
 	jsonOut(w, 201, map[string]any{"ok": true, "name": name})
 }
@@ -185,13 +191,24 @@ func (a *App) handleModDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	folder, _ := modFolderFor(s)
-	if err := os.Remove(filepath.Join(a.serverRoot(s), folder.Dir, name)); err != nil {
+	dir := filepath.Join(a.serverRoot(s), folder.Dir)
+	if name == "enabled.json" {
+		jsonError(w, 400, "enabled.json is managed by HSM")
+		return
+	}
+	if err := os.Remove(filepath.Join(dir, name)); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			jsonError(w, 404, "mod not found")
 		} else {
 			jsonError(w, 500, err.Error())
 		}
 		return
+	}
+	if folder.EnabledList {
+		if err := setModEnabled(dir, name, false); err != nil {
+			jsonError(w, 500, "mod removed, but enabled.json could not be updated: "+err.Error())
+			return
+		}
 	}
 	jsonOut(w, 200, map[string]any{"ok": true})
 }

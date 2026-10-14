@@ -49,12 +49,24 @@ func (TerrariaAdapter) Rules() GameRules {
 }
 
 func (TerrariaAdapter) ValidateNew(req *newServerRequest) error {
+	if req.TerrariaVariant == "" {
+		req.TerrariaVariant = "vanilla"
+	}
 	version := strings.TrimSpace(req.TerrariaVersion)
 	if version == "" {
 		version = "latest"
 	}
-	if !terrariaVersionText.MatchString(version) {
-		return errors.New("Terraria version must be latest or a release number such as 1.4.4.9")
+	switch req.TerrariaVariant {
+	case "vanilla":
+		if !terrariaVersionText.MatchString(version) {
+			return errors.New("Terraria version must be latest or a release number such as 1.4.4.9")
+		}
+	case "tmodloader":
+		if !tmodloaderVersionText.MatchString(version) {
+			return errors.New("tModLoader version must be latest or a release tag such as v2025.08.3.0")
+		}
+	default:
+		return errors.New("Terraria server type must be vanilla or tmodloader")
 	}
 	req.TerrariaVersion = version
 	if req.TerrariaWorldSize == "" {
@@ -95,28 +107,40 @@ func (TerrariaAdapter) InstallStatus(app *App, s ServerSettings) map[string]any 
 	return map[string]any{
 		"game": s.GameType, "version": s.TerrariaVersion, "installedVersion": info.Version,
 		"worldName": s.TerrariaWorldName, "worldSize": s.TerrariaWorldSize,
-		"platformSupported": terrariaPlatformSupported,
-		"paths":             map[string]string{"game": gameDir, "world": filepath.Join(gameDir, "Worlds", terrariaWorldFile(s.TerrariaWorldName))},
+		"variant": terrariaVariant(s), "platformSupported": terrariaPlatformSupported || terrariaVariant(s) == "tmodloader",
+		"paths": map[string]string{"game": gameDir, "world": filepath.Join(gameDir, "Worlds", terrariaWorldFile(s.TerrariaWorldName))},
 	}
 }
 
 func (TerrariaAdapter) Installed(rootDir string) bool {
-	return fileExists(filepath.Join(rootDir, "game", terrariaBinary))
+	return fileExists(filepath.Join(rootDir, "game", terrariaBinary)) || tmodloaderInstalled(filepath.Join(rootDir, "game"))
 }
 
 func (TerrariaAdapter) PrepareLaunch(app *App, s ServerSettings) ([]string, error) {
-	if !terrariaPlatformSupported {
+	tml := terrariaVariant(s) == "tmodloader"
+	if !tml && !terrariaPlatformSupported {
 		return nil, errors.New("the official Terraria server runs only on x86-64 (amd64) hosts")
 	}
 	path, err := writeTerrariaConfig(app.serverRoot(s), s)
 	if err != nil {
 		return nil, err
 	}
-	return append([]string{"-config", path}, splitArgs(s.ExtraArgs)...), nil
+	args := []string{"-config", path}
+	if tml {
+		// -nosteam skips the start script's interactive Steam prompt. The save
+		// directory keeps worlds, mods and mod configs inside the server folder.
+		gameDir := filepath.Join(app.serverRoot(s), "game")
+		args = append([]string{"-nosteam"}, append(args, "-tmlsavedirectory", gameDir)...)
+	}
+	return append(args, splitArgs(s.ExtraArgs)...), nil
 }
 
 func (TerrariaAdapter) BuildProcess(rootDir string, args []string) (ProcessLaunch, error) {
 	gameDir := filepath.Join(rootDir, "game")
+	if tmodloaderInstalled(gameDir) {
+		script := filepath.Join(gameDir, tmodloaderStartScript)
+		return ProcessLaunch{Path: "bash", Args: append([]string{script}, args...), Dir: gameDir}, nil
+	}
 	bin := filepath.Join(gameDir, terrariaBinary)
 	if !fileExists(bin) {
 		return ProcessLaunch{}, errors.New("the Terraria server is not installed; install it from the Install tab first")
@@ -137,6 +161,7 @@ func (TerrariaAdapter) RequestStop(_ int, stdin io.WriteCloser) error {
 }
 
 func keepTerrariaFields(in *ServerSettings, current ServerSettings) {
+	in.TerrariaVariant = current.TerrariaVariant
 	in.TerrariaVersion = current.TerrariaVersion
 	in.TerrariaWorldName = current.TerrariaWorldName
 	in.TerrariaWorldSize = current.TerrariaWorldSize
@@ -282,8 +307,14 @@ func resolveTerrariaZip(ctx context.Context, client *http.Client, version string
 	return "", fmt.Errorf("Terraria server version %q is not in the official server list", version)
 }
 
-func (m *ServerManager) RunTerrariaInstaller(version string) error {
-	if !terrariaPlatformSupported {
+func (m *ServerManager) RunTerrariaInstaller(version, variant string) error {
+	if variant == "" {
+		variant = "vanilla"
+	}
+	if variant != "vanilla" && variant != "tmodloader" {
+		return fmt.Errorf("unknown Terraria server type %q", variant)
+	}
+	if variant == "vanilla" && !terrariaPlatformSupported {
 		return errors.New("the official Terraria server runs only on x86-64 (amd64) hosts")
 	}
 	m.mu.Lock()
@@ -301,7 +332,11 @@ func (m *ServerManager) RunTerrariaInstaller(version string) error {
 	m.installBusy = true
 	go func() {
 		defer func() { m.mu.Lock(); m.installBusy = false; m.mu.Unlock() }()
-		if err := m.installTerraria(version); err != nil {
+		install := m.installTerraria
+		if variant == "tmodloader" {
+			install = m.installTModLoader
+		}
+		if err := install(version); err != nil {
 			m.appendLog("installer", "Terraria installation failed: "+err.Error())
 		} else {
 			m.appendLog("installer", "Terraria server files installed successfully")
@@ -318,57 +353,9 @@ func (m *ServerManager) installTerraria(version string) error {
 	if err != nil {
 		return err
 	}
-	zipPath := filepath.Join(m.rootDir, ".terraria-download.zip")
-	staging := filepath.Join(m.rootDir, ".terraria-extract")
-	defer os.Remove(zipPath)
-	defer os.RemoveAll(staging)
-	_ = os.RemoveAll(staging)
-	if err := os.MkdirAll(m.rootDir, 0755); err != nil {
-		return err
-	}
-
 	m.appendLog("installer", "Downloading the official Terraria server ("+name+")…")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, terrariaDownloadBaseURL+name, nil)
+	gameDir, err := m.installServerZip(ctx, client, terrariaDownloadBaseURL+name, terrariaBinary, "the Linux server ("+terrariaBinary+")")
 	if err != nil {
-		return err
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("download %s: %w", name, err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("the Terraria download returned HTTP %d", resp.StatusCode)
-	}
-	out, err := os.OpenFile(zipPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	const limit = 512 << 20
-	written, copyErr := io.Copy(out, io.LimitReader(resp.Body, limit+1))
-	if err := out.Close(); copyErr == nil {
-		copyErr = err
-	}
-	if copyErr != nil {
-		return copyErr
-	}
-	if written > limit {
-		return errors.New("the Terraria download exceeded the 512 MiB safety limit")
-	}
-
-	m.appendLog("installer", "Extracting the Linux server…")
-	if err := extractZip(zipPath, staging); err != nil {
-		return fmt.Errorf("extract %s: %w", name, err)
-	}
-	linuxDir, err := locateTerrariaLinuxDir(staging)
-	if err != nil {
-		return err
-	}
-	gameDir := filepath.Join(m.rootDir, "game")
-	if err := os.MkdirAll(filepath.Join(gameDir, "Worlds"), 0755); err != nil {
-		return err
-	}
-	if err := copyDir(linuxDir, gameDir); err != nil {
 		return err
 	}
 	entries, _ := os.ReadDir(gameDir)
@@ -382,27 +369,53 @@ func (m *ServerManager) installTerraria(version string) error {
 	return atomicWrite(filepath.Join(gameDir, terrariaInstallInfo), info, 0644)
 }
 
-// locateTerrariaLinuxDir finds the folder holding the Linux server binary,
-// normally <version>/Linux inside the official zip.
-func locateTerrariaLinuxDir(root string) (string, error) {
+// installServerZip downloads a server zip, extracts it to a staging folder and
+// copies the folder holding marker into game/. It returns the game folder.
+func (m *ServerManager) installServerZip(ctx context.Context, client *http.Client, zipURL, marker, what string) (string, error) {
+	zipPath := filepath.Join(m.rootDir, ".server-download.zip")
+	staging := filepath.Join(m.rootDir, ".server-extract")
+	defer os.Remove(zipPath)
+	defer os.RemoveAll(staging)
+	_ = os.RemoveAll(staging)
+	if err := os.MkdirAll(m.rootDir, 0755); err != nil {
+		return "", err
+	}
+	if err := downloadVerified(ctx, client, zipURL, zipPath, 512<<20, ""); err != nil {
+		return "", fmt.Errorf("download: %w", err)
+	}
+	m.appendLog("installer", "Extracting the server files…")
+	if err := extractZip(zipPath, staging); err != nil {
+		return "", fmt.Errorf("extract: %w", err)
+	}
+	dir, err := locateFileDir(staging, marker)
+	if err != nil {
+		return "", err
+	}
+	if dir == "" {
+		return "", errors.New("the download does not contain " + what)
+	}
+	gameDir := filepath.Join(m.rootDir, "game")
+	if err := os.MkdirAll(filepath.Join(gameDir, "Worlds"), 0755); err != nil {
+		return "", err
+	}
+	return gameDir, copyDir(dir, gameDir)
+}
+
+// locateFileDir returns the folder under root that holds a file called name,
+// or "" when there is none.
+func locateFileDir(root, name string) (string, error) {
 	var found string
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if !d.IsDir() && d.Name() == terrariaBinary {
+		if !d.IsDir() && d.Name() == name {
 			found = filepath.Dir(path)
 			return filepath.SkipAll
 		}
 		return nil
 	})
-	if err != nil {
-		return "", err
-	}
-	if found == "" {
-		return "", errors.New("the Terraria download does not contain the Linux server (" + terrariaBinary + ")")
-	}
-	return found, nil
+	return found, err
 }
 
 func (a *App) handleTerrariaInstall(w http.ResponseWriter, r *http.Request) {
@@ -415,7 +428,7 @@ func (a *App) handleTerrariaInstall(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "select a Terraria server before installing Terraria files")
 		return
 	}
-	if err := m.RunTerrariaInstaller(s.TerrariaVersion); err != nil {
+	if err := m.RunTerrariaInstaller(s.TerrariaVersion, s.TerrariaVariant); err != nil {
 		jsonError(w, 409, err.Error())
 		return
 	}

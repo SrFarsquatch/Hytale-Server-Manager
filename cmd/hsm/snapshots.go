@@ -37,7 +37,12 @@ func snapshotSpecFor(root string, s ServerSettings) (snapshotSpec, bool) {
 			"plugins", "bukkit.yml", "spigot.yml", "mods", "config",
 		}}, true
 	case "terraria":
-		return snapshotSpec{Base: filepath.Join(root, "game"), Include: []string{"Worlds", "serverconfig.txt", "banlist.txt"}}, true
+		include := []string{"Worlds", "serverconfig.txt", "banlist.txt"}
+		if terrariaVariant(s) == "tmodloader" {
+			// Modded worlds need the same mods and their settings.
+			include = append(include, "Mods", "ModConfigs")
+		}
+		return snapshotSpec{Base: filepath.Join(root, "game"), Include: include}, true
 	}
 	return snapshotSpec{}, false
 }

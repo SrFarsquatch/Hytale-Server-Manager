@@ -69,8 +69,8 @@ func TestGameCatalogCapabilitiesDoNotOverstatePlannedGameSupport(t *testing.T) {
 				c.LiveSnapshots || c.Mods || c.NativeBackups || c.ServerProperties || c.DeviceAuth || c.GameUpdates || len(c.ConfigFiles) != 0 {
 				t.Errorf("Terraria vanilla capabilities unexpected: %#v", c)
 			}
-			if len(c.Variants) != 1 || c.Variants[0] != "vanilla" {
-				t.Errorf("Terraria variants = %#v, want vanilla only", c.Variants)
+			if strings.Join(c.Variants, ",") != "vanilla,tmodloader" {
+				t.Errorf("Terraria variants = %#v, want vanilla and tmodloader", c.Variants)
 			}
 			continue
 		}

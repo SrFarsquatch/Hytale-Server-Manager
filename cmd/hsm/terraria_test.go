@@ -197,7 +197,7 @@ func TestTerrariaInstallerExtractsTheLinuxServer(t *testing.T) {
 	fakeTerrariaDownloads(t, true)
 	app := newCapabilityTestApp(t, terrariaSettings("tr"))
 	m := app.managers["tr"]
-	if err := m.RunTerrariaInstaller("latest"); err != nil {
+	if err := m.RunTerrariaInstaller("latest", "vanilla"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, "install to finish", func() bool { return !m.InstallBusy() })
@@ -218,7 +218,7 @@ func TestTerrariaInstallerExtractsTheLinuxServer(t *testing.T) {
 	if !m.Installed() {
 		t.Error("server does not report installed")
 	}
-	if err := m.RunTerrariaInstaller("latest"); err == nil || !strings.Contains(err.Error(), "already installed") {
+	if err := m.RunTerrariaInstaller("latest", "vanilla"); err == nil || !strings.Contains(err.Error(), "already installed") {
 		t.Errorf("second install = %v, want already installed", err)
 	}
 }
@@ -230,7 +230,7 @@ func TestTerrariaInstallerFailsWithoutLinuxServer(t *testing.T) {
 	fakeTerrariaDownloads(t, false)
 	app := newCapabilityTestApp(t, terrariaSettings("tr"))
 	m := app.managers["tr"]
-	if err := m.RunTerrariaInstaller("latest"); err != nil {
+	if err := m.RunTerrariaInstaller("latest", "vanilla"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, "install to finish", func() bool { return !m.InstallBusy() })
