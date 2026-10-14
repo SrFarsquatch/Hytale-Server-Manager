@@ -24,7 +24,11 @@ func (MinecraftAdapter) GameType() string { return "minecraft-java" }
 
 func (MinecraftAdapter) Installed(rootDir string) bool {
 	b, err := os.ReadFile(filepath.Join(rootDir, "game", "eula.txt"))
-	return fileExists(filepath.Join(rootDir, "game", "server.jar")) && err == nil && strings.Contains(strings.ToLower(string(b)), "eula=true")
+	if err != nil || !fileExists(filepath.Join(rootDir, "game", "server.jar")) { return false }
+	for _, line := range strings.Split(string(b), "\n") {
+		if strings.EqualFold(strings.TrimSpace(line), "eula=true") { return true }
+	}
+	return false
 }
 
 func (MinecraftAdapter) PrepareLaunch(app *App, settings ServerSettings) ([]string, error) {
@@ -130,7 +134,7 @@ func (m *ServerManager) RunMinecraftInstaller(version string) error {
 func (m *ServerManager) installMinecraft(version string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	client := &http.Client{Timeout: 2*time.Minute}
+	client := &http.Client{Timeout: 8*time.Minute}
 	resolvedVersion, downloadURL, err := resolveMinecraftServerURL(ctx, client, version)
 	if err != nil { return err }
 	gameDir := filepath.Join(m.rootDir, "game")
@@ -147,9 +151,10 @@ func (m *ServerManager) installMinecraft(version string) error {
 	if resp.StatusCode != http.StatusOK { return fmt.Errorf("Minecraft server download returned HTTP %d", resp.StatusCode) }
 	out, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil { return err }
-	_, copyErr := io.Copy(out, io.LimitReader(resp.Body, 512<<20))
+	written, copyErr := io.Copy(out, io.LimitReader(resp.Body, (512<<20)+1))
 	closeErr := out.Close()
 	if copyErr != nil { _ = os.Remove(tmpPath); return copyErr }
+	if written > 512<<20 { _ = os.Remove(tmpPath); return errors.New("Minecraft server download exceeded the 512 MiB safety limit") }
 	if closeErr != nil { _ = os.Remove(tmpPath); return closeErr }
 	if err := validateMinecraftJar(tmpPath); err != nil { _ = os.Remove(tmpPath); return err }
 	if err := os.Rename(tmpPath, finalPath); err != nil { _ = os.Remove(tmpPath); return err }
