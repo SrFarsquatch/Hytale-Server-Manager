@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -26,19 +25,16 @@ func (MinecraftAdapter) Installed(rootDir string) bool {
 	return fileExists(filepath.Join(rootDir, "game", "server.jar")) && err == nil && strings.Contains(strings.ToLower(string(b)), "eula=true")
 }
 
-func (MinecraftAdapter) PrepareLaunch(_ *App, settings ServerSettings) ([]string, error) {
+func (MinecraftAdapter) PrepareLaunch(app *App, settings ServerSettings) ([]string, error) {
 	if !settings.MinecraftEulaAccepted {
 		return nil, errors.New("Minecraft EULA must be accepted before starting this server")
 	}
 	if !validMemory(settings.MemoryMin) || !validMemory(settings.MemoryMax) {
 		return nil, errors.New("invalid Minecraft JVM memory settings")
 	}
-	gameDir := filepath.Join(settings.StorageDir)
-	_ = gameDir
-	root := settings.StorageDir
-	_ = root
-	// ServerManager supplies the per-instance root to BuildProcess; properties
-	// are written there by prepareMinecraftFiles before process creation.
+	if err := writeMinecraftProperties(app.serverRoot(settings), settings); err != nil {
+		return nil, err
+	}
 	return []string{"-Xms" + settings.MemoryMin, "-Xmx" + settings.MemoryMax, "-jar", "server.jar", "nogui"}, nil
 }
 
@@ -118,7 +114,6 @@ func (m *ServerManager) RunMinecraftInstaller(version string) error {
 }
 
 func (m *ServerManager) installMinecraft(version string) error {
-	if runtimeGOOS != "linux" { /* intentionally checked below through the available Java runtime */ }
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	client := &http.Client{Timeout: 2*time.Minute}
@@ -168,4 +163,3 @@ func writeMinecraftProperties(root string, s ServerSettings) error {
 	return os.WriteFile(filepath.Join(gameDir, "server.properties"), []byte(strings.Join(props, "\n")+"\n"), 0644)
 }
 
-var _ = syscall.SIGINT
