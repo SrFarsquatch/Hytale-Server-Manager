@@ -1528,6 +1528,10 @@ func (a *App) handleInstallStatus(w http.ResponseWriter, r *http.Request) {
 		jsonOut(w, 200, map[string]any{"installed": m.Installed(), "busy": m.InstallBusy(), "game": s.GameType, "paths": map[string]string{"game": filepath.Join(root, "game"), "steamcmd": filepath.Join(a.dataDir, "tools", "steamcmd", "steamcmd.sh")}})
 		return
 	}
+	if s.GameType == "minecraft-java" {
+		jsonOut(w, 200, map[string]any{"installed": m.Installed(), "busy": m.InstallBusy(), "game": s.GameType, "version": s.MinecraftVersion, "variant": s.MinecraftVariant, "eulaAccepted": s.MinecraftEulaAccepted, "paths": map[string]string{"game": filepath.Join(root, "game")}})
+		return
+	}
 	downloader := filepath.Join(a.dataDir, "tools", "hytale-downloader")
 	bundle := filepath.Join(root, "imports", "game.zip")
 	jsonOut(w, 200, map[string]any{"installed": m.Installed(), "downloaderPresent": fileExists(downloader), "bundlePresent": fileExists(bundle), "busy": m.InstallBusy(), "paths": map[string]string{"downloader": downloader, "bundle": bundle, "game": filepath.Join(root, "game")}})
