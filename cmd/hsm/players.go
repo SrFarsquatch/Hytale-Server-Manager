@@ -11,6 +11,9 @@ import (
 // command and a parser for the lines the server prints in response.
 type playerQuery struct {
 	command string
+	// settle is how long to keep collecting after the first recognised line,
+	// for games that answer with one line per world.
+	settle time.Duration
 	// parse returns the player names, the server-reported maximum (0 when the
 	// game does not say), and whether a complete answer was recognised.
 	parse func(lines []LogLine) (players []string, max int, known bool)
@@ -19,14 +22,71 @@ type playerQuery struct {
 func playerQueryFor(gameType string) (playerQuery, bool) {
 	switch normalizeGameType(gameType) {
 	case "hytale":
-		return playerQuery{command: "/who", parse: func(lines []LogLine) ([]string, int, bool) {
-			players, known := parseWhoOutput(lines)
-			return players, 0, known
-		}}, true
+		return playerQuery{command: "/who", settle: 400 * time.Millisecond, parse: parseHytaleWho}, true
 	case "minecraft-java":
 		return playerQuery{command: "list", parse: parseMinecraftList}, true
 	}
 	return playerQuery{}, false
+}
+
+// Hytale answers /who with one line per world:
+//
+//	GrandMine (1): : Clarkonalark (Clarkonalark)
+//
+// that is "<world> (<count>):", a separator, then "Name (username)" entries.
+var hytaleWhoWorld = regexp.MustCompile(`^(?:\[[^\]]*\]\s*)*(\S.*?) \((\d+)\):(.*)$`)
+var hytaleWhoEntry = regexp.MustCompile(`^(.*?)\s*\(([^()]*)\)$`)
+
+func parseHytaleWho(lines []LogLine) ([]string, int, bool) {
+	var players []string
+	seen := map[string]bool{}
+	worlds, total := 0, 0
+	for _, l := range lines {
+		line := strings.TrimSpace(stripANSI(l.Line))
+		m := hytaleWhoWorld.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		count, err := strconv.Atoi(m[2])
+		if err != nil || count < 0 || count > 100000 {
+			continue
+		}
+		worlds++
+		total += count
+		rest := strings.TrimSpace(m[3])
+		for strings.HasPrefix(rest, ":") {
+			rest = strings.TrimSpace(strings.TrimPrefix(rest, ":"))
+		}
+		if rest == "" {
+			continue
+		}
+		for _, entry := range strings.Split(rest, ",") {
+			entry = strings.TrimSpace(entry)
+			name := entry
+			if e := hytaleWhoEntry.FindStringSubmatch(entry); e != nil {
+				name = strings.TrimSpace(e[1])
+				if name == "" {
+					name = strings.TrimSpace(e[2])
+				}
+			}
+			if name != "" && !seen[name] {
+				seen[name] = true
+				players = append(players, name)
+			}
+		}
+	}
+	if worlds == 0 {
+		// Not the per-world format; fall back to the generic patterns.
+		legacy, known := parseWhoOutput(lines)
+		return legacy, 0, known
+	}
+	if total == 0 {
+		return []string{}, 0, true
+	}
+	if len(players) == 0 {
+		return nil, 0, false
+	}
+	return players, 0, true
 }
 
 var (
@@ -85,6 +145,12 @@ func (m *ServerManager) queryPlayers(q playerQuery, timeout time.Duration) ([]st
 			}
 		}
 		players, max, known := q.parse(lines)
+		if known && q.settle > 0 {
+			// More worlds may still be printing; collect them before answering.
+			time.Sleep(q.settle)
+			q.settle = 0
+			continue
+		}
 		if known || time.Now().After(deadline) {
 			return players, max, known, nil
 		}
