@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 )
 
 // ProcessLaunch is the game-specific part of process creation. ServerManager
@@ -73,54 +71,6 @@ func (HytaleAdapter) RequestStop(_ int, stdin io.WriteCloser) error {
 		return errors.New("server stdin is unavailable")
 	}
 	return writeStopCommand(stdin)
-}
-
-type DragonwildsAdapter struct{}
-
-func (DragonwildsAdapter) GameType() string { return "runescape-dragonwilds" }
-
-func (DragonwildsAdapter) Installed(rootDir string) bool {
-	return fileExists(filepath.Join(rootDir, "game", "RSDragonwildsServer.sh")) ||
-		fileExists(filepath.Join(rootDir, "game", "RSDragonwilds", "Binaries", "Linux", "RSDragonwildsServer-Linux-Shipping"))
-}
-
-func (DragonwildsAdapter) PrepareLaunch(app *App, settings ServerSettings) ([]string, error) {
-	if strings.TrimSpace(settings.DragonwildsOwnerID) == "" {
-		return nil, errors.New("Dragonwilds Owner ID is required; enter your in-game Player ID in server settings")
-	}
-	if strings.TrimSpace(settings.DragonwildsAdminPassword) == "" {
-		return nil, errors.New("Dragonwilds admin password is required")
-	}
-	if settings.Port < 1 || settings.Port > 65535 {
-		return nil, errors.New("Dragonwilds UDP port is invalid")
-	}
-	if err := writeDragonwildsConfig(app.serverRoot(settings), settings); err != nil {
-		return nil, err
-	}
-	return []string{"-log", "-NewConsole", "-port=" + strconv.Itoa(settings.Port)}, nil
-}
-
-func (DragonwildsAdapter) BuildProcess(rootDir string, args []string) (ProcessLaunch, error) {
-	gameDir := filepath.Join(rootDir, "game")
-	launcher := filepath.Join(gameDir, "RSDragonwildsServer.sh")
-	if fileExists(launcher) {
-		if err := os.Chmod(launcher, 0755); err != nil {
-			return ProcessLaunch{}, fmt.Errorf("make Dragonwilds launcher executable: %w", err)
-		}
-		return ProcessLaunch{Path: launcher, Args: append([]string(nil), args...), Dir: gameDir}, nil
-	}
-	binary := filepath.Join(gameDir, "RSDragonwilds", "Binaries", "Linux", "RSDragonwildsServer-Linux-Shipping")
-	if !fileExists(binary) {
-		return ProcessLaunch{}, errors.New("Dragonwilds launcher or Linux server binary is missing")
-	}
-	if err := os.Chmod(binary, 0755); err != nil {
-		return ProcessLaunch{}, fmt.Errorf("make Dragonwilds server binary executable: %w", err)
-	}
-	return ProcessLaunch{Path: binary, Args: append([]string(nil), args...), Dir: gameDir}, nil
-}
-
-func (DragonwildsAdapter) RequestStop(pid int, _ io.WriteCloser) error {
-	return syscall.Kill(-pid, syscall.SIGINT)
 }
 
 func writeStopCommand(stdin io.WriteCloser) error {
