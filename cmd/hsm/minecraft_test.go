@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -47,6 +48,24 @@ func TestWriteMinecraftPropertiesRequiresEULAAcceptance(t *testing.T) {
 	eula, err := os.ReadFile(filepath.Join(root, "game", "eula.txt"))
 	if err != nil { t.Fatal(err) }
 	if !strings.Contains(string(eula), "eula=true") { t.Fatalf("eula.txt = %q, want accepted EULA", eula) }
+}
+
+func TestValidateMinecraftJarRequiresZipManifest(t *testing.T) {
+	root := t.TempDir()
+	bad := filepath.Join(root, "bad.jar")
+	if err := os.WriteFile(bad, []byte("not a jar"), 0644); err != nil { t.Fatal(err) }
+	if err := validateMinecraftJar(bad); err == nil { t.Fatal("invalid jar passed validation") }
+
+	good := filepath.Join(root, "good.jar")
+	file, err := os.Create(good)
+	if err != nil { t.Fatal(err) }
+	zw := zip.NewWriter(file)
+	entry, err := zw.Create("META-INF/MANIFEST.MF")
+	if err != nil { t.Fatal(err) }
+	if _, err := entry.Write([]byte("Manifest-Version: 1.0\n")); err != nil { t.Fatal(err) }
+	if err := zw.Close(); err != nil { t.Fatal(err) }
+	if err := file.Close(); err != nil { t.Fatal(err) }
+	if err := validateMinecraftJar(good); err != nil { t.Fatalf("valid JAR rejected: %v", err) }
 }
 
 func TestMinecraftPropertiesPreserveGameManagedAndCustomSettings(t *testing.T) {
