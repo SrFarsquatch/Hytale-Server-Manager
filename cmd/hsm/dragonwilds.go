@@ -375,7 +375,38 @@ func (m *ServerManager) installDragonwilds() error {
 		return err
 	}
 	m.appendLog("installer", "Installing RuneScape: Dragonwilds dedicated server via SteamCMD (App ID "+dragonwildsSteamAppID+")…")
-	cmd := exec.Command(steamCMD, "+force_install_dir", gameDir, "+login", "anonymous", "+app_update", dragonwildsSteamAppID, "validate", "+quit")
+	// app_info_update fetches the app's details before installing. Without
+	// it, SteamCMD in a fresh Steam home often fails with "Missing
+	// configuration"; that failure is usually transient, so retry too.
+	args := []string{"+force_install_dir", gameDir, "+login", "anonymous", "+app_info_update", "1", "+app_update", dragonwildsSteamAppID, "validate", "+quit"}
+	var err error
+	for attempt := 1; attempt <= steamCMDAttempts; attempt++ {
+		if attempt > 1 {
+			m.appendLog("installer", fmt.Sprintf("SteamCMD failed (%v); retrying, attempt %d of %d…", err, attempt, steamCMDAttempts))
+			time.Sleep(steamCMDRetryDelay)
+		}
+		if err = m.runSteamCMD(steamCMD, steamDir, args); err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("SteamCMD failed %d times; check Console output. If it keeps reporting \"Missing configuration\", Steam may not be serving the dedicated-server tool anonymously right now; try again later: %w", steamCMDAttempts, err)
+	}
+	if !m.Installed() {
+		return errors.New("SteamCMD finished but the Dragonwilds launcher was not found in the install directory")
+	}
+	return nil
+}
+
+// SteamCMD attempts per install, and the pause between them.
+var (
+	steamCMDAttempts   = 3
+	steamCMDRetryDelay = 5 * time.Second
+)
+
+// runSteamCMD runs SteamCMD with its output in the server console.
+func (m *ServerManager) runSteamCMD(steamCMD, steamDir string, args []string) error {
+	cmd := exec.Command(steamCMD, args...)
 	cmd.Dir = steamDir
 	cmd.Env = append(os.Environ(), "HOME="+filepath.Join(m.rootDir, "home"))
 	stdout, err := cmd.StdoutPipe()
@@ -395,13 +426,7 @@ func (m *ServerManager) installDragonwilds() error {
 	err = cmd.Wait()
 	<-done
 	<-done
-	if err != nil {
-		return fmt.Errorf("SteamCMD exited with an error; check Console output. Some Steam tools may require a Steam account that has claimed the free dedicated-server tool: %w", err)
-	}
-	if !m.Installed() {
-		return errors.New("SteamCMD finished but the Dragonwilds launcher was not found in the install directory")
-	}
-	return nil
+	return err
 }
 
 func extractSteamCMDArchive(src, dst string) error {
