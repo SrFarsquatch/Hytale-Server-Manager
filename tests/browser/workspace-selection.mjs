@@ -209,7 +209,7 @@ try {
   });
 
   await check('server list labels each game with its own protocol', async () => {
-    assert.match(await text('[data-select-server="bravo-minecraft"]'), /TCP 552\d/);
+    assert.match(await text('[data-select-server="bravo-minecraft"]'), /TCP 2556\d/);
     assert.match(await text('[data-select-server="alpha-hytale"]'), /UDP 552\d/);
   });
 

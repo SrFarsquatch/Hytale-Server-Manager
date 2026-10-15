@@ -31,6 +31,13 @@ services:
       - "7780:7780/udp"
       - "7781:7781/udp"
       - "7782:7782/udp"
+      # Minecraft Java servers use TCP 25565-25570, starting at the game's default port.
+      - "25565:25565/tcp"
+      - "25566:25566/tcp"
+      - "25567:25567/tcp"
+      - "25568:25568/tcp"
+      - "25569:25569/tcp"
+      - "25570:25570/tcp"
     volumes:
       - type: bind
         source: /DATA/AppData/hytale-server-manager
@@ -43,6 +50,8 @@ services:
       HSM_LISTEN: ":8008"
       HSM_GAME_PORT_START: "5520"
       HSM_GAME_PORT_END: "5525"
+      HSM_MINECRAFT_PORT_START: "25565"
+      HSM_MINECRAFT_PORT_END: "25570"
       TZ: America/Vancouver
     stop_grace_period: 100s
 x-casaos:

@@ -36,7 +36,7 @@ A self-hosted web panel for running multiple Hytale dedicated servers from one L
   - `serverconfig.txt` written before each start, keeping any extra lines you add
   - console, player list (`playing`), graceful stop (`exit` saves the world)
   - snapshots of `Worlds`, `serverconfig.txt` and `banlist.txt` (plus `Mods` and `ModConfigs` for tModLoader) while the server is stopped
-  - uses TCP in the published `5520`–`5525` range
+  - uses TCP in the published `5520`–`5525` range (shared with Hytale)
 - **RuneScape: Dragonwilds:** SteamCMD install, dedicated-server settings and console output.
 
 ### Schedules and crash recovery
@@ -111,8 +111,11 @@ If the error persists, the DNS servers may be unreachable or outbound HTTPS may 
 
 The web panel uses TCP `8008` on the host and container. The Compose and CasaOS definitions publish:
 
-- `5520`–`5525` over UDP and TCP, for Hytale (UDP/QUIC), Minecraft Java (TCP) and Terraria (TCP) servers. `HSM_GAME_PORT_START` and `HSM_GAME_PORT_END` must match this range.
+- `5520`–`5525` over UDP and TCP, for Hytale (UDP/QUIC) and Terraria (TCP) servers. `HSM_GAME_PORT_START` and `HSM_GAME_PORT_END` must match this range.
+- `25565`–`25570` over TCP, for Minecraft Java servers. It starts at Minecraft's default port, so players can join the first server with just the address. `HSM_MINECRAFT_PORT_START` and `HSM_MINECRAFT_PORT_END` must match this range.
 - `7777`–`7782` over UDP, for RuneScape: Dragonwilds servers.
+
+Minecraft servers created before the 25565 range keep their port; change it in the server's Settings to move one onto the new range.
 
 The manager only assigns ports from these ranges; it never changes the container's published ports. If you widen a range, add the matching `ports:` entries in Compose or the CasaOS app settings too. When the manager can read its own container through the Docker socket, a server's Overview warns if its port is not published.
 

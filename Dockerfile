@@ -21,7 +21,7 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 WORKDIR /data
 VOLUME ["/data"]
-EXPOSE 8008/tcp 5520-5525/tcp 5520-5525/udp 7777-7782/udp
+EXPOSE 8008/tcp 5520-5525/tcp 5520-5525/udp 7777-7782/udp 25565-25570/tcp
 ENV HSM_DATA_DIR=/data \
     HSM_LISTEN=:8008
 ENTRYPOINT ["/usr/bin/tini","--","/usr/local/bin/entrypoint.sh"]
