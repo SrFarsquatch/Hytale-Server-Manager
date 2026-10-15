@@ -38,6 +38,8 @@ writeFileSync(join(fakeBin, 'java'), [
   '  echo "[Server thread/INFO]: got $line"',
   '  if [ "$line" = "save-all flush" ]; then echo "[Server thread/INFO]: Saved the game"; fi',
   '  if [ "$line" = "list" ]; then echo "[Server thread/INFO]: There are 2 of a max of 20 players online: Alex, Steve"; fi',
+  // Like the real server, op writes ops.json in the working directory.
+  '  if [ "${line%% *}" = "op" ]; then echo "[{\\"uuid\\":\\"u\\",\\"name\\":\\"${line#op }\\",\\"level\\":4}]" > ops.json; fi',
   '  if [ "$line" = "stop" ]; then exit 0; fi',
   'done',
 ].join('\n'), { mode: 0o755 });
@@ -148,11 +150,13 @@ try {
     if (body.includes('join-secret-123')) leakedSecrets.push(new URL(res.url()).pathname);
   });
   page.on('pageerror', e => pageErrors.push(e.message));
+  // The browser never reaches the real Modrinth; checks fake what they need.
+  await page.route('**/api/modrinth/**', route => route.fulfill({ json: { hits: [], total: 0, offset: 0, gameVersion: '', loaders: [], updates: [], checked: 0 } }));
   // Requests that reach the backend without naming a server would be ambiguous.
   const unscoped = [];
   page.on('request', req => {
     const url = new URL(req.url());
-    const serverScoped = /^\/api\/(status|players|resources|settings|server\/|console|logs|files|mods|backups|install\/(status|run-downloader|import-local|minecraft|dragonwilds|terraria)|auth|update)/.test(url.pathname);
+    const serverScoped = /^\/api\/(status|players|resources|settings|server\/|console|logs|files|mods|backups|install\/(status|run-downloader|import-local|minecraft|dragonwilds|terraria)|auth|update|minecraft\/|modrinth\/)/.test(url.pathname);
     if (serverScoped && !req.headers()['x-hsm-server']) unscoped.push(req.method() + ' ' + url.pathname);
   });
 
@@ -183,10 +187,12 @@ try {
     await waitForName('Alpha Hytale');
     assert.ok(await visible('[data-view-tab="mods"]'), 'Hytale shows Mods');
     assert.ok(await visible('[data-view-tab="backups"]'), 'Hytale shows Backups');
+    assert.ok(!(await visible('[data-view-tab="players"]')), 'Hytale hides the Minecraft Players tab');
     assert.ok(await visible('.players-panel'), 'Hytale shows players');
     await select('bravo-minecraft');
     await waitForName('Bravo Minecraft');
     assert.ok(!(await visible('[data-view-tab="mods"]')), 'Minecraft hides Mods');
+    assert.ok(await visible('[data-view-tab="players"]'), 'Minecraft shows Players');
     assert.ok(await visible('[data-view-tab="backups"]'), 'Minecraft shows Backups (snapshots)');
     assert.ok(await visible('.players-panel'), 'Minecraft shows players');
     assert.match(await text('#game-capability-note'), /Minecraft Java servers do not support/);
@@ -340,6 +346,34 @@ try {
     await page.waitForFunction(() => /Stopped/.test(document.querySelector('#top-status').textContent), null, { timeout: 8000 });
   });
 
+  await check('Minecraft players: operators from the console, bans while stopped', async () => {
+    await select('bravo-minecraft');
+    await waitForName('Bravo Minecraft');
+    await page.click('#start-btn');
+    await page.waitForFunction(() => /Online|Starting/.test(document.querySelector('#top-status').textContent), null, { timeout: 8000 });
+    await page.click('[data-view-tab="players"]');
+    await page.waitForFunction(() => document.querySelector('#pm-online').textContent.includes('Steve'), null, { timeout: 5000 });
+    assert.match(await text('#pm-mode-text'), /running/);
+    await page.click('#pm-online [data-pm-action="op"][data-pm-name="Steve"]');
+    await page.waitForFunction(() => document.querySelector('#pm-ops').textContent.includes('Steve'), null, { timeout: 6000 });
+    assert.ok(await visible('#pm-online [data-pm-action="deop"][data-pm-name="Steve"]'), 'Steve is shown as an operator');
+    await fetch(base + '/api/servers/bravo-minecraft/stop', { method: 'POST', headers: { Cookie: cookie } });
+    await page.waitForFunction(() => /Stopped/.test(document.querySelector('#top-status').textContent), null, { timeout: 8000 });
+
+    await page.click('[data-view-tab="dashboard"]');
+    await page.click('[data-view-tab="players"]');
+    await page.waitForFunction(() => /stopped/.test(document.querySelector('#pm-mode-text').textContent), null, { timeout: 5000 });
+    await page.fill('#pm-ip', '203.0.113.9');
+    page.once('dialog', d => d.accept('spam'));
+    await page.click('#pm-ban-ip');
+    await page.waitForFunction(() => document.querySelector('#pm-bans').textContent.includes('203.0.113.9'), null, { timeout: 5000 });
+    assert.match(await text('#pm-bans'), /spam/);
+    const bans = await (await fetch(base + '/api/files/content?path=' + encodeURIComponent('game/banned-ips.json'), { headers: { Cookie: cookie, 'X-HSM-Server': 'bravo-minecraft' } })).json();
+    assert.match(bans.content, /"ip": "203\.0\.113\.9"/);
+    await page.click('#pm-bans [data-pm-action="pardon-ip"]');
+    await page.waitForFunction(() => !document.querySelector('#pm-bans').textContent.includes('203.0.113.9'), null, { timeout: 5000 });
+  });
+
   await check('Terraria: fixed world settings, players and install state', async () => {
     await select('delta-terraria');
     await waitForName('Delta Terraria');
@@ -387,6 +421,45 @@ try {
       assert.ok(!(await visible('[data-view-tab="mods"]')), 'vanilla Minecraft has no Mods tab');
     } finally {
       await call('DELETE', '/api/servers/echo-paper').catch(() => {});
+    }
+  });
+
+  await check('NeoForge servers manage mods and install with the loader', async () => {
+    await call('POST', '/api/servers', { game: 'minecraft-java', minecraftVariant: 'neoforge', minecraftVersion: 'latest', minecraftEulaAccepted: true, name: 'Golf NeoForge', memoryMin: '1G', memoryMax: '2G' });
+    try {
+      await page.waitForSelector('[data-select-server="golf-neoforge"]', { timeout: 10000 });
+      await select('golf-neoforge');
+      await waitForName('Golf NeoForge');
+      assert.equal(await text('#mods-tab-label'), 'Mods');
+      await page.click('[data-view-tab="setup"]');
+      await page.waitForFunction(() => document.querySelector('#minecraft-install').textContent === 'Install NeoForge server', null, { timeout: 5000 });
+      assert.match(await text('#minecraft-install-help'), /NeoForge/);
+
+      // The Modrinth browser, with the app's Modrinth endpoints faked.
+      let installBody = null;
+      const isSearch = url => url.pathname === '/api/modrinth/search';
+      await page.route(isSearch, route => route.fulfill({ json: { hits: [{ project_id: 'jei1', slug: 'jei', title: 'Just Enough Items', author: 'mezz', downloads: 123456, description: 'Item viewer', icon_url: '', installed: false }], total: 1, offset: 0, gameVersion: '', loaders: ['neoforge'] } }));
+      await page.route('**/api/modrinth/projects/jei1/versions', route => route.fulfill({ json: { versions: [{ id: 'v19', versionNumber: '19.0', versionType: 'release', published: '2026-09-01T00:00:00Z' }, { id: 'v20', versionNumber: '20.0', versionType: 'beta', published: '2026-09-20T00:00:00Z' }] } }));
+      await page.route('**/api/modrinth/install', route => { installBody = route.request().postDataJSON(); route.fulfill({ json: { installed: [{ projectId: 'jei1', title: 'Just Enough Items', versionNumber: '19.0' }], message: 'Installed Just Enough Items 19.0' } }); });
+      try {
+        await page.click('[data-view-tab="mods"]');
+        await page.waitForFunction(() => document.querySelector('#modrinth-results').textContent.includes('Just Enough Items'), null, { timeout: 5000 });
+        assert.ok(await visible('#modrinth-card'), 'the Modrinth browser is shown for NeoForge');
+        assert.match(await text('#modrinth-help'), /neoforge/);
+        assert.match(await text('#modrinth-results'), /123k downloads/);
+        await page.click('#modrinth-results [data-mr-versions]');
+        await page.waitForSelector('#modrinth-results select');
+        await page.selectOption('#modrinth-results select', 'v19');
+        await page.click('#modrinth-results [data-mr-install]');
+        await page.waitForFunction(() => document.querySelector('#modrinth-results').textContent.includes('Installed'), null, { timeout: 5000 });
+        assert.deepEqual(installBody, { projectId: 'jei1', versionId: 'v19' });
+      } finally {
+        await page.unroute(isSearch);
+        await page.unroute('**/api/modrinth/projects/jei1/versions');
+        await page.unroute('**/api/modrinth/install');
+      }
+    } finally {
+      await call('DELETE', '/api/servers/golf-neoforge').catch(() => {});
     }
   });
 
@@ -477,7 +550,7 @@ try {
     await page.click('#wizard-next');
     await page.click('#wizard-next');
     assert.equal(await value('#new-server-mode'), 'Survival');
-    assert.ok(await visible('#new-minecraft-variant'), 'Minecraft offers vanilla, Paper and Fabric');
+    assert.deepEqual(await page.$$eval('#new-minecraft-variant option', o => o.map(x => x.value)), ['vanilla', 'paper', 'fabric', 'quilt', 'forge', 'neoforge']);
     await page.click('#wizard-back');
     await page.click('#wizard-back');
     await page.click('[data-game-choice="runescape-dragonwilds"]');
@@ -491,6 +564,10 @@ try {
     await page.click('#wizard-next');
     await page.selectOption('#new-minecraft-variant', 'fabric');
     assert.match(await text('#new-minecraft-variant-help'), /Fabric/);
+    for (const loader of ['Quilt', 'Forge', 'NeoForge']) {
+      await page.selectOption('#new-minecraft-variant', loader.toLowerCase());
+      assert.match(await text('#new-minecraft-variant-help'), new RegExp(loader));
+    }
     assert.ok(!(await visible('#terraria-fields')), 'Terraria fields are hidden for Minecraft');
     await page.click('#cancel-server-dialog');
   });

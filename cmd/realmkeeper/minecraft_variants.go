@@ -15,10 +15,11 @@ import (
 	"strings"
 )
 
-// Minecraft Java servers come in three variants: Mojang's vanilla server,
-// Paper (Bukkit-style plugins in plugins/) and Fabric (mods in mods/). The
-// variant is chosen when the server is created and fixed afterwards.
-var minecraftVariants = []string{"vanilla", "paper", "fabric"}
+// Minecraft Java servers come in these variants: Mojang's vanilla server,
+// Paper (Bukkit-style plugins in plugins/), and the Fabric, Quilt, Forge and
+// NeoForge mod loaders (mods in mods/). The variant is chosen when the server
+// is created and fixed afterwards.
+var minecraftVariants = []string{"vanilla", "paper", "fabric", "quilt", "forge", "neoforge"}
 
 var (
 	paperProjectURL = "https://fill.papermc.io/v3/projects/paper"
@@ -42,8 +43,11 @@ func validMinecraftVariant(v string) bool {
 
 // minecraftLaunchJar is the jar `java -jar` runs for a variant.
 func minecraftLaunchJar(variant string) string {
-	if variant == "fabric" {
+	switch variant {
+	case "fabric":
 		return fabricLauncherJar
+	case "quilt":
+		return quiltLauncherJar
 	}
 	return "server.jar"
 }

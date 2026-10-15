@@ -279,8 +279,8 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
 .tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
 .tabs button {
-  display: inline-flex; align-items: center; gap: 8px; flex: none;
-  padding: 9px 16px; border: 0; border-radius: 10px; background: none;
+  display: inline-flex; align-items: center; gap: 7px; flex: none;
+  padding: 9px 13px; border: 0; border-radius: 10px; background: none;
   color: var(--text-2); font-weight: 600; font-size: 13.5px;
 }
 .tabs button .icon { width: 16px; height: 16px; color: var(--muted); }
@@ -324,26 +324,35 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); m
 
 /* Schedules */
 .schedule-list { display: grid; gap: 10px; }
-.schedule-row, .world-row {
+.schedule-row, .world-row, .player-row, .mod-row {
   display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 220px) auto; align-items: center; gap: 16px;
   padding: 14px 16px; border: 1px solid var(--line); border-radius: 11px; background: var(--card-2);
 }
 .schedule-row.disabled { opacity: .6; }
-.schedule-row .schedule-icon, .world-row .schedule-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; background: var(--accent-soft); color: var(--accent-hover); }
-.schedule-row strong, .world-row strong { display: block; }
-.schedule-row .when, .schedule-row .result, .world-row .when { color: var(--muted); font-size: 12.5px; }
+.schedule-row .schedule-icon, .world-row .schedule-icon, .player-row .schedule-icon, .mod-row .schedule-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; background: var(--accent-soft); color: var(--accent-hover); }
+.schedule-row strong, .world-row strong, .player-row strong, .mod-row strong { display: block; }
+.schedule-row .when, .schedule-row .result, .world-row .when, .player-row .when, .mod-row .when { color: var(--muted); font-size: 12.5px; }
 .schedule-row .result.failed { color: #ff8a87; }
-.schedule-row .actions, .world-row .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.schedule-row .actions, .world-row .actions, .player-row .actions, .mod-row .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .inline-fields { display: flex; gap: 8px; }
 .inline-fields input { flex: 1; min-width: 0; }
 .inline-fields select { width: auto; }
+.inline-fields.wrap { flex-wrap: wrap; margin-top: 12px; }
+.inline-fields.wrap input { min-width: 180px; }
+#view-players .toggle-row { margin-bottom: 12px; }
+.mod-row .schedule-icon img { width: 38px; height: 38px; border-radius: 10px; object-fit: cover; }
+.mod-row .desc { display: block; margin-top: 2px; color: var(--text-2); font-size: 13px; }
+.mod-row .actions select { width: auto; max-width: 220px; }
+#modrinth-search { margin-bottom: 12px; }
+#modrinth-card > .toolbar { margin-top: 12px; }
+#modrinth-updates-list:not(:empty), .modrinth-only.toolbar { margin-top: 12px; }
 .day-picker { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; border: 0; }
 .day-picker legend { width: 100%; margin-bottom: 7px; padding: 0; color: var(--text-2); font-size: 12.5px; font-weight: 600; }
 .day-picker label { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--card-2); font-weight: 600; cursor: pointer; }
 .day-picker label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-hover); }
 @media (max-width: 900px) {
-  .schedule-row, .world-row { grid-template-columns: auto minmax(0, 1fr); }
-  .schedule-row .next, .schedule-row .actions, .world-row .actions { grid-column: 1 / -1; }
+  .schedule-row, .world-row, .player-row, .mod-row { grid-template-columns: auto minmax(0, 1fr); }
+  .schedule-row .next, .schedule-row .actions, .world-row .actions, .player-row .actions, .mod-row .actions { grid-column: 1 / -1; }
 }
 .world-badge { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-hover); font-size: 11px; font-weight: 700; vertical-align: middle; }
 .world-tips { display: grid; gap: 8px; margin: 0; padding-left: 18px; }

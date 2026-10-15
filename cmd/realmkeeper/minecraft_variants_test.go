@@ -162,7 +162,7 @@ func TestMinecraftInstallerInstallsEachVariant(t *testing.T) {
 			}
 		})
 	}
-	if err := (&ServerManager{gameType: "minecraft-java"}).RunMinecraftInstaller("latest", "forge"); err == nil {
+	if err := (&ServerManager{gameType: "minecraft-java"}).RunMinecraftInstaller("latest", "spigot"); err == nil {
 		t.Error("an unknown variant was accepted")
 	}
 }
@@ -216,5 +216,18 @@ func TestModsFollowTheMinecraftVariant(t *testing.T) {
 	hy := newCapabilityTestApp(t, testServer("hy", "hytale"))
 	if rec := uploadMod(t, newTestMux(hy), "hy", "mod.zip"); rec.Code != 201 || !fileExists(filepath.Join(hy.serverRoot(testServer("hy", "hytale")), "game", "Server", "mods", "mod.zip")) {
 		t.Errorf("Hytale mod upload = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestEmptyModsFolderListsAsAnEmptyArray(t *testing.T) {
+	s := minecraftSettings("fab")
+	s.MinecraftVariant = "fabric"
+	mux := newTestMux(newCapabilityTestApp(t, s))
+	req := httptest.NewRequest("GET", "/api/mods", nil)
+	req.Header.Set("X-HSM-Server", "fab")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != 200 || strings.TrimSpace(rec.Body.String()) != "[]" {
+		t.Errorf("GET /api/mods = %d %q, want [] (the page reads .length)", rec.Code, rec.Body.String())
 	}
 }

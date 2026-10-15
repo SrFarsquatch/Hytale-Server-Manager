@@ -34,8 +34,13 @@ type GameCapability struct {
 	// Worlds means the Worlds tab manages the server's save files.
 	Worlds bool `json:"worlds,omitempty"`
 	// ModsKind names what the Mods tab manages: "mods" or "plugins".
-	ModsKind    string   `json:"modsKind,omitempty"`
-	PlayerList  bool     `json:"playerList"`
+	ModsKind   string `json:"modsKind,omitempty"`
+	PlayerList bool   `json:"playerList"`
+	// PlayerManagement means the Players tab manages the whitelist,
+	// operators and bans (Minecraft).
+	PlayerManagement bool `json:"playerManagement"`
+	// ModBrowser means mods or plugins can be installed from Modrinth.
+	ModBrowser  bool     `json:"modBrowser"`
 	DeviceAuth  bool     `json:"deviceAuth"`
 	GameUpdates bool     `json:"gameUpdates"`
 	Variants    []string `json:"variants"`
@@ -106,7 +111,7 @@ func supportedGameCatalog() []GameCatalogEntry {
 			ID: "minecraft-java", Name: "Minecraft Java Edition", Available: true, Protocol: "tcp",
 			Capabilities: GameCapability{
 				Console: true, ConsoleCommands: true, FileManagement: true, Configuration: true,
-				Backups: true, LiveSnapshots: true, PlayerList: true, ServerProperties: true,
+				Backups: true, LiveSnapshots: true, PlayerList: true, PlayerManagement: true, ServerProperties: true,
 				ConfigFiles: []string{}, Variants: minecraftVariants,
 			},
 		},
@@ -177,7 +182,7 @@ func modFolderFor(s ServerSettings) (modFolder, bool) {
 		switch s.MinecraftVariant {
 		case "paper":
 			return modFolder{Dir: filepath.Join("game", "plugins"), Exts: []string{".jar"}, Kind: "plugins"}, true
-		case "fabric":
+		case "fabric", "quilt", "forge", "neoforge":
 			return modFolder{Dir: filepath.Join("game", "mods"), Exts: []string{".jar"}, Kind: "mods"}, true
 		}
 	case "terraria":
@@ -193,6 +198,8 @@ func serverCapabilities(s ServerSettings) GameCapability {
 	c := gameCapabilitiesFor(s.GameType)
 	f, ok := modFolderFor(s)
 	c.Mods, c.ModsKind = ok, f.Kind
+	_, c.ModBrowser = modrinthLoaders[s.MinecraftVariant]
+	c.ModBrowser = c.ModBrowser && ok && normalizeGameType(s.GameType) == "minecraft-java"
 	return c
 }
 
