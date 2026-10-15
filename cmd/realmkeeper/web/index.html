@@ -115,6 +115,7 @@
           <div class="tabs">
             <button type="button" data-view-tab="dashboard" class="active"><svg class="icon"><use href="#i-overview"/></svg>Overview</button>
             <button type="button" data-view-tab="console"><svg class="icon"><use href="#i-terminal"/></svg>Console</button>
+            <button type="button" data-view-tab="players"><svg class="icon"><use href="#i-users"/></svg>Players</button>
             <button type="button" data-view-tab="config"><svg class="icon"><use href="#i-folder"/></svg>Files</button>
             <button type="button" data-view-tab="mods"><svg class="icon"><use href="#i-puzzle"/></svg><span id="mods-tab-label">Mods</span></button>
             <button type="button" data-view-tab="worlds"><svg class="icon"><use href="#i-globe"/></svg>Worlds</button>
@@ -264,6 +265,32 @@
 
         <section id="view-mods" class="view">
           <section class="card"><div class="card-head"><div><h3 id="mods-title">Mods</h3><p class="muted small" id="mods-help">Installed for the selected server only.</p></div><label class="btn primary small file-btn"><svg class="icon"><use href="#i-plus"/></svg><span id="mods-add-label">Add mod</span><input type="file" id="mod-file" accept=".jar,.zip"></label></div><div id="mods-list" class="file-list empty-state">No mods installed.</div></section>
+        </section>
+
+        <section id="view-players" class="view">
+          <div id="pm-mode" class="notice"><svg class="icon"><use href="#i-alert"/></svg><span id="pm-mode-text">Loading players…</span></div>
+          <section class="card">
+            <div class="card-head"><div><h3>Online now</h3><p class="muted small" id="pm-online-help">Players connected to the server.</p></div><button type="button" class="btn small" id="pm-online-refresh">Refresh</button></div>
+            <div id="pm-online" class="schedule-list"></div>
+          </section>
+          <section class="card">
+            <div class="card-head"><div><h3>Add a player</h3><p class="muted small">Enter a Minecraft Java username.</p></div></div>
+            <div class="inline-fields wrap"><input id="pm-name" maxlength="16" placeholder="Username" autocomplete="off" spellcheck="false"><button type="button" class="btn" data-pm-add="whitelist-add">Add to whitelist</button><button type="button" class="btn" data-pm-add="op">Make operator</button><button type="button" class="btn danger" data-pm-add="ban">Ban</button></div>
+          </section>
+          <section class="card">
+            <div class="card-head"><div><h3>Whitelist</h3><p class="muted small">When it is on, only players on this list can join. Operators can always join.</p></div></div>
+            <label class="toggle-row"><span><b>Only whitelisted players can join</b><small id="pm-whitelist-state"></small></span><input id="pm-whitelist-on" type="checkbox"></label>
+            <div id="pm-whitelist" class="schedule-list"></div>
+          </section>
+          <section class="card">
+            <div class="card-head"><div><h3>Operators</h3><p class="muted small">Operators can use server commands in game. Level 4 can do everything, including stopping the server.</p></div></div>
+            <div id="pm-ops" class="schedule-list"></div>
+          </section>
+          <section class="card">
+            <div class="card-head"><div><h3>Bans</h3><p class="muted small">Banned players and addresses cannot join.</p></div></div>
+            <div id="pm-bans" class="schedule-list"></div>
+            <div class="inline-fields wrap"><input id="pm-ip" maxlength="45" placeholder="IP address, e.g. 203.0.113.7" autocomplete="off" spellcheck="false"><button type="button" class="btn danger" id="pm-ban-ip">Ban address</button></div>
+          </section>
         </section>
 
         <section id="view-worlds" class="view">

@@ -22,10 +22,10 @@ function setModeOptions(select,modes,value){select.innerHTML=modes.map(m=>'<opti
 function statusLabel(s){if(s?.state==='crashed')return `Crashed (exit ${s.exitCode})`;if(s?.state==='starting')return'Starting';if(s?.state==='stopping')return'Stopping';if(s?.installBusy||s?.state==='installing')return'Installing';if(s?.state==='not-installed'||s?.installed===false)return'Not installed';if(s?.running)return'Online';return'Stopped'}
 // Capabilities are declared per game by the backend catalog and delivered with
 // each server summary. Anything missing is treated as unsupported.
-const NO_CAPABILITIES={worlds:false,console:false,consoleCommands:false,fileManagement:false,backups:false,configuration:false,configFiles:[],mods:false,playerList:false,deviceAuth:false,gameUpdates:false};
+const NO_CAPABILITIES={worlds:false,playerManagement:false,console:false,consoleCommands:false,fileManagement:false,backups:false,configuration:false,configFiles:[],mods:false,playerList:false,deviceAuth:false,gameUpdates:false};
 function serverCapabilities(server=selectedSummary()){return{...NO_CAPABILITIES,...(server?.capabilities||{})}}
 function serverProtocol(server){return String(server?.protocol||'').toUpperCase()||'Port'}
-const VIEW_CAPABILITY={worlds:'worlds',console:'console',config:'fileManagement',mods:'mods',backups:'backups',settings:'configuration'};
+const VIEW_CAPABILITY={worlds:'worlds',players:'playerManagement',console:'console',config:'fileManagement',mods:'mods',backups:'backups',settings:'configuration'};
 const CAPABILITY_LABELS=[['consoleCommands','console commands'],['playerList','the player list'],['mods','mods'],['backups','backups'],['deviceAuth','device login'],['gameUpdates','in-app game updates']];
 function listJoin(items){return items.length<2?items.join(''):items.slice(0,-1).join(', ')+' or '+items[items.length-1]}
 function gameLabel(id){return ({hytale:'Hytale','minecraft-java':'Minecraft Java','terraria':'Terraria','runescape-dragonwilds':'RuneScape: Dragonwilds'})[id]||'Unknown game'}
@@ -158,7 +158,7 @@ $('#file-upload').addEventListener('change',e=>{if(e.target.files&&e.target.file
 $('#file-editor-save').addEventListener('click',saveManagedFile);
 $('#file-editor-close').addEventListener('click',()=>{if(managedDirty&&!confirm('Discard unsaved file changes?'))return;managedDirty=false;managedOpenPath='';$('#file-editor').classList.add('hidden')});
 
-function loadCurrent(){if(state.current==='servers')renderFleet();if(state.current==='app-settings')loadAppUpdate();if(!state.serverId)return;const caps=serverCapabilities();if(state.current==='mods')loadMods();if(state.current==='backups')loadBackups();if(state.current==='config'){loadFiles();if(caps.configFiles.length)loadServerConfig()}if(state.current==='setup')loadInstallStatus();if(state.current==='settings'&&caps.serverProperties)loadMinecraftProperties();if(state.current==='schedules')loadSchedules();if(state.current==='worlds')loadWorlds()}
+function loadCurrent(){if(state.current==='servers')renderFleet();if(state.current==='app-settings')loadAppUpdate();if(!state.serverId)return;const caps=serverCapabilities();if(state.current==='mods')loadMods();if(state.current==='backups')loadBackups();if(state.current==='config'){loadFiles();if(caps.configFiles.length)loadServerConfig()}if(state.current==='setup')loadInstallStatus();if(state.current==='settings'&&caps.serverProperties)loadMinecraftProperties();if(state.current==='schedules')loadSchedules();if(state.current==='worlds')loadWorlds();if(state.current==='players')loadMinecraftPlayers()}
 async function loadServers(initial=false){
   let servers;
   try{servers=await api('/api/servers',{serverId:null})}catch(e){if(initial)toast(e.message,true);return}
@@ -373,7 +373,7 @@ async function loadSelected(){
 }
 async function fleetAction(id,action){if(action==='install'){await selectServer(id);switchView('setup');return}const server=state.servers.find(s=>s.id===id);if(action==='stop'&&!confirm(`Stop ${server?.serverName||'this server'}? Players may be disconnected.`))return;try{await api(`/api/servers/${encodeURIComponent(id)}/${action}`,{method:'POST',serverId:id});toast(`${action==='start'?'Start':'Stop'} requested`);setTimeout(async()=>{await loadServers(false);if(id===state.serverId)await refreshStatus()},450)}catch(e){toast(e.message,true)}}
 async function refreshPlayers(ctx=selectionContext()){if(!ctx.id||!serverCapabilities().playerList)return;const button=$('#players-refresh');if(button)button.disabled=true;try{const players=await scopedApi(ctx,'/api/players');if(!ctx.current())return;state.players=players;renderPlayers()}catch(e){if(!ctx.current())return;state.players={known:false,players:[],message:e.message};renderPlayers()}finally{if(button&&ctx.current())button.disabled=false}}
-function renderPlayers(){const p=state.players;if(!p)return;$('#metric-players').textContent=p.known?(p.count+' / '+p.maxPlayers):'Unknown';$('#meta-players-value').textContent=p.known?(p.count+' / '+p.maxPlayers+' players'):'Players unknown';$('#players-message').textContent=(p.message||(p.known?'Live player list':'Player count could not be verified'))+' · checked '+fmtTime(new Date());$('#players-list').innerHTML=p.known?(p.players&&p.players.length?p.players.map(name=>'<span class="player-chip">'+esc(name)+'</span>').join(''):'<span class="muted">No players online.</span>'):'<span class="muted">The server response was not recognized. Check the Console for the player-list output.</span>'}
+function renderPlayers(){const p=state.players;if(!p)return;$('#metric-players').textContent=p.known?(p.count+' / '+p.maxPlayers):'Unknown';$('#meta-players-value').textContent=p.known?(p.count+' / '+p.maxPlayers+' players'):'Players unknown';$('#players-message').textContent=(p.message||(p.known?'Live player list':'Player count could not be verified'))+' · checked '+fmtTime(new Date());$('#players-list').innerHTML=p.known?(p.players&&p.players.length?p.players.map(name=>'<span class="player-chip">'+esc(name)+'</span>').join(''):'<span class="muted">No players online.</span>'):'<span class="muted">The server response was not recognized. Check the Console for the player-list output.</span>';if(state.current==='players')renderPmOnline()}
 $('#players-refresh').addEventListener('click',()=>refreshPlayers());
 async function refreshStatus(ctx=selectionContext(),quiet=true){if(!ctx.id)return;try{const status=await scopedApi(ctx,'/api/status');if(!ctx.current())return;state.status=status;renderStatus()}catch(e){if(!quiet&&ctx.current())throw e}}
 async function refreshResources(ctx=selectionContext()){if(!ctx.id)return;try{const resources=await scopedApi(ctx,'/api/resources');if(!ctx.current())return;state.resources=resources;renderResources()}catch{}}
@@ -507,6 +507,38 @@ const MINECRAFT_VARIANTS={vanilla:{name:'Vanilla',help:"Mojang's official server
 function modsKind(summary=selectedSummary()){return serverCapabilities(summary).modsKind==='plugins'?'plugins':'mods'}
 const TERRARIA_VARIANTS={vanilla:{name:'vanilla',help:'The official dedicated server, without mods. x86-64 hosts only.',placeholder:'latest or 1.4.4.9',version:/^(latest|\d+(\.\d+){0,4})$/},tmodloader:{name:'tModLoader',help:'Terraria with mods (.tmod) from the Mods tab. Downloads .NET on first start; runs on x86-64 and ARM.',placeholder:'latest or v2025.08.3.0',version:/^(latest|v\d{4}\.\d{1,2}\.\d{1,3}\.\d{1,4})$/}};
 function renderModsLabels(summary){const plugins=modsKind(summary)==='plugins',word=plugins?'Plugins':'Mods',game=summary?.gameType;$('#mods-tab-label').textContent=word;$('#mods-title').textContent=word;$('#mods-add-label').textContent=plugins?'Add plugin':'Add mod';$('#mod-file').accept=game==='hytale'?'.jar,.zip':game==='terraria'?'.tmod':'.jar';$('#mods-help').textContent=game==='terraria'?'Upload .tmod files; Realmkeeper enables them in Mods/enabled.json. Restart the server to load changes.':'Installed for the selected server only. Restart the server to load changes.'}
+// Minecraft players: whitelist, operators and bans. A running server is changed
+// through its console; a stopped server's files are edited and read on start.
+async function loadMinecraftPlayers(ctx=selectionContext()){if(!ctx.id)return;state.pm=null;let d;try{d=await scopedApi(ctx,'/api/minecraft/players')}catch(e){if(ctx.current())toast(e.message,true);return}if(!ctx.current())return;renderMinecraftPlayers(d);if(d.running)refreshPlayers(ctx);else renderPmOnline()}
+function pmButton(action,name,label,cls=''){return `<button type="button" class="btn small ${cls}" data-pm-action="${action}" data-pm-name="${esc(name)}">${label}</button>`}
+function pmRow(name,sub,actions){return `<div class="player-row"><span class="schedule-icon"><svg class="icon"><use href="#i-users"/></svg></span><div><strong>${esc(name)}</strong><span class="when">${sub}</span></div><span></span><div class="actions">${actions}</div></div>`}
+function pmHas(list,name){return (list||[]).some(p=>(p.name||'').toLowerCase()===name.toLowerCase())}
+function renderMinecraftPlayers(d){state.pm=d;
+ $('#pm-mode').classList.toggle('warning',!d.running);
+ $('#pm-mode-text').innerHTML=d.running?'<b>The server is running.</b> Changes apply straight away through its console.':'<b>The server is stopped.</b> Changes are saved to its files and apply when it starts. Names are checked with Mojang.';
+ $('#pm-whitelist-on').checked=!!d.whitelistEnabled;$('#pm-whitelist-state').textContent=d.whitelistEnabled?'On: players not listed below are refused.':'Off: anyone who is not banned can join.';
+ $('#pm-whitelist').innerHTML=d.whitelist.map(p=>pmRow(p.name,'Whitelisted',pmButton('whitelist-remove',p.name,'Remove'))).join('')||'<div class="empty-state">Nobody is on the whitelist.</div>';
+ $('#pm-ops').innerHTML=d.ops.map(p=>pmRow(p.name,'Level '+(p.level||4),pmButton('deop',p.name,'Remove operator'))).join('')||'<div class="empty-state">No operators.</div>';
+ const since=b=>[b.reason?esc(b.reason):'',b.created?'since '+esc(b.created.slice(0,10)):'',b.expires&&b.expires!=='forever'?'until '+esc(b.expires.slice(0,10)):''].filter(Boolean).join(' · ');
+ $('#pm-bans').innerHTML=d.bans.map(b=>pmRow(b.name,since(b),pmButton('pardon',b.name,'Unban'))).concat(d.ipBans.map(b=>pmRow(b.ip,'Address · '+since(b),pmButton('pardon-ip',b.ip,'Unban')))).join('')||'<div class="empty-state">Nobody is banned.</div>';
+ renderPmOnline()}
+function renderPmOnline(){const d=state.pm,p=state.players;if(!d)return;
+ if(!d.running){$('#pm-online-help').textContent='Start the server to see who is online and to kick players.';$('#pm-online').innerHTML='<div class="empty-state">The server is stopped.</div>';$('#pm-online-refresh').disabled=true;return}
+ $('#pm-online-refresh').disabled=false;$('#pm-online-help').textContent=p?.known?p.players.length+' of '+p.maxPlayers+' players online.':'Players connected to the server.';
+ if(!p?.known){$('#pm-online').innerHTML='<div class="empty-state">'+(p?'The player list could not be read. Check the Console.':'Checking…')+'</div>';return}
+ $('#pm-online').innerHTML=p.players.map(name=>pmRow(name,pmHas(d.ops,name)?'Operator':'Player',(d.whitelistEnabled&&!pmHas(d.whitelist,name)?pmButton('whitelist-add',name,'Whitelist'):'')+(pmHas(d.ops,name)?pmButton('deop',name,'Remove operator'):pmButton('op',name,'Make operator'))+pmButton('kick',name,'Kick')+pmButton('ban',name,'Ban','danger'))).join('')||'<div class="empty-state">No players online.</div>'}
+async function pmAction(action,name){const id=state.serverId;if(!id)return;let reason='';
+ if(action==='ban'||action==='ban-ip'||action==='kick'){const verb=action==='kick'?'Kick':'Ban';reason=prompt(`${verb} ${name}? Reason (optional):`,'');if(reason===null)return}
+ try{const d=await api('/api/minecraft/players',{method:'POST',serverId:id,body:JSON.stringify({action,name,reason})});if(id!==state.serverId)return;toast(d.message||'Done');renderMinecraftPlayers(d);
+  if(action==='whitelist-on'||action==='whitelist-off'){if(state.settings)state.settings.whitelistEnabled=d.whitelistEnabled;$('#set-whitelist').checked=d.whitelistEnabled}
+  if(d.running&&(action==='kick'||action==='ban'))setTimeout(()=>{if(id===state.serverId)refreshPlayers()},800);return true}
+ catch(e){toast(e.message,true);if(id===state.serverId)loadMinecraftPlayers()}}
+$('#view-players').addEventListener('click',async e=>{const b=e.target.closest('[data-pm-action],[data-pm-add]');if(!b||b.disabled)return;
+ if(b.dataset.pmAdd){const name=$('#pm-name').value.trim();if(!name){toast('Enter a username',true);return}b.disabled=true;if(await pmAction(b.dataset.pmAdd,name))$('#pm-name').value='';b.disabled=false;return}
+ b.disabled=true;await pmAction(b.dataset.pmAction,b.dataset.pmName);b.disabled=false});
+$('#pm-whitelist-on').addEventListener('change',e=>pmAction(e.target.checked?'whitelist-on':'whitelist-off',''));
+$('#pm-ban-ip').addEventListener('click',async()=>{const ip=$('#pm-ip').value.trim();if(!ip){toast('Enter an IP address',true);return}if(await pmAction('ban-ip',ip))$('#pm-ip').value=''});
+$('#pm-online-refresh').addEventListener('click',()=>refreshPlayers());
 // Dragonwilds worlds: .sav files in the server's save folder. Changes need the
 // server stopped, because the game rewrites saves while it runs.
 async function loadWorlds(ctx=selectionContext()){if(!ctx.id)return;let d;try{d=await scopedApi(ctx,'/api/worlds')}catch(e){if(ctx.current())toast(e.message,true);return}if(!ctx.current())return;

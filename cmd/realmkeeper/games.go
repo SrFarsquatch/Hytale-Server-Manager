@@ -34,11 +34,14 @@ type GameCapability struct {
 	// Worlds means the Worlds tab manages the server's save files.
 	Worlds bool `json:"worlds,omitempty"`
 	// ModsKind names what the Mods tab manages: "mods" or "plugins".
-	ModsKind    string   `json:"modsKind,omitempty"`
-	PlayerList  bool     `json:"playerList"`
-	DeviceAuth  bool     `json:"deviceAuth"`
-	GameUpdates bool     `json:"gameUpdates"`
-	Variants    []string `json:"variants"`
+	ModsKind   string `json:"modsKind,omitempty"`
+	PlayerList bool   `json:"playerList"`
+	// PlayerManagement means the Players tab manages the whitelist,
+	// operators and bans (Minecraft).
+	PlayerManagement bool     `json:"playerManagement"`
+	DeviceAuth       bool     `json:"deviceAuth"`
+	GameUpdates      bool     `json:"gameUpdates"`
+	Variants         []string `json:"variants"`
 }
 
 // GameCatalogEntry is metadata for the create-server UI. Available means that
@@ -106,7 +109,7 @@ func supportedGameCatalog() []GameCatalogEntry {
 			ID: "minecraft-java", Name: "Minecraft Java Edition", Available: true, Protocol: "tcp",
 			Capabilities: GameCapability{
 				Console: true, ConsoleCommands: true, FileManagement: true, Configuration: true,
-				Backups: true, LiveSnapshots: true, PlayerList: true, ServerProperties: true,
+				Backups: true, LiveSnapshots: true, PlayerList: true, PlayerManagement: true, ServerProperties: true,
 				ConfigFiles: []string{}, Variants: minecraftVariants,
 			},
 		},

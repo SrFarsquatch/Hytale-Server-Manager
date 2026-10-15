@@ -27,6 +27,7 @@ Realmkeeper used to be called Hytale Server Manager (HSM); see [Upgrading from H
     - **Fabric:** the Fabric server launcher with the newest stable loader. Mods (`.jar`) go in `mods/`, managed from the Mods tab. Most mods also need Fabric API.
   - EULA acceptance required
   - console and player list (`list`)
+  - a Players tab for the whitelist, operators and bans, with kick, ban and make-operator buttons for online players. A running server is changed through its console; a stopped server's `whitelist.json`, `ops.json`, `banned-players.json` and `banned-ips.json` are edited directly, with names checked against Mojang's account lookup.
   - full snapshots, including while the server is running (autosave is paused for the copy); snapshots also include `plugins/`, `mods/` and `config/`
   - a game rules form for common `server.properties` settings
   - a Java version check before start

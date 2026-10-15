@@ -38,6 +38,8 @@ writeFileSync(join(fakeBin, 'java'), [
   '  echo "[Server thread/INFO]: got $line"',
   '  if [ "$line" = "save-all flush" ]; then echo "[Server thread/INFO]: Saved the game"; fi',
   '  if [ "$line" = "list" ]; then echo "[Server thread/INFO]: There are 2 of a max of 20 players online: Alex, Steve"; fi',
+  // Like the real server, op writes ops.json in the working directory.
+  '  if [ "${line%% *}" = "op" ]; then echo "[{\\"uuid\\":\\"u\\",\\"name\\":\\"${line#op }\\",\\"level\\":4}]" > ops.json; fi',
   '  if [ "$line" = "stop" ]; then exit 0; fi',
   'done',
 ].join('\n'), { mode: 0o755 });
@@ -152,7 +154,7 @@ try {
   const unscoped = [];
   page.on('request', req => {
     const url = new URL(req.url());
-    const serverScoped = /^\/api\/(status|players|resources|settings|server\/|console|logs|files|mods|backups|install\/(status|run-downloader|import-local|minecraft|dragonwilds|terraria)|auth|update)/.test(url.pathname);
+    const serverScoped = /^\/api\/(status|players|resources|settings|server\/|console|logs|files|mods|backups|install\/(status|run-downloader|import-local|minecraft|dragonwilds|terraria)|auth|update|minecraft\/)/.test(url.pathname);
     if (serverScoped && !req.headers()['x-hsm-server']) unscoped.push(req.method() + ' ' + url.pathname);
   });
 
@@ -183,10 +185,12 @@ try {
     await waitForName('Alpha Hytale');
     assert.ok(await visible('[data-view-tab="mods"]'), 'Hytale shows Mods');
     assert.ok(await visible('[data-view-tab="backups"]'), 'Hytale shows Backups');
+    assert.ok(!(await visible('[data-view-tab="players"]')), 'Hytale hides the Minecraft Players tab');
     assert.ok(await visible('.players-panel'), 'Hytale shows players');
     await select('bravo-minecraft');
     await waitForName('Bravo Minecraft');
     assert.ok(!(await visible('[data-view-tab="mods"]')), 'Minecraft hides Mods');
+    assert.ok(await visible('[data-view-tab="players"]'), 'Minecraft shows Players');
     assert.ok(await visible('[data-view-tab="backups"]'), 'Minecraft shows Backups (snapshots)');
     assert.ok(await visible('.players-panel'), 'Minecraft shows players');
     assert.match(await text('#game-capability-note'), /Minecraft Java servers do not support/);
@@ -338,6 +342,34 @@ try {
     assert.match(props.content, /^difficulty=hard$/m);
     await fetch(base + '/api/servers/bravo-minecraft/stop', { method: 'POST', headers: { Cookie: cookie } });
     await page.waitForFunction(() => /Stopped/.test(document.querySelector('#top-status').textContent), null, { timeout: 8000 });
+  });
+
+  await check('Minecraft players: operators from the console, bans while stopped', async () => {
+    await select('bravo-minecraft');
+    await waitForName('Bravo Minecraft');
+    await page.click('#start-btn');
+    await page.waitForFunction(() => /Online|Starting/.test(document.querySelector('#top-status').textContent), null, { timeout: 8000 });
+    await page.click('[data-view-tab="players"]');
+    await page.waitForFunction(() => document.querySelector('#pm-online').textContent.includes('Steve'), null, { timeout: 5000 });
+    assert.match(await text('#pm-mode-text'), /running/);
+    await page.click('#pm-online [data-pm-action="op"][data-pm-name="Steve"]');
+    await page.waitForFunction(() => document.querySelector('#pm-ops').textContent.includes('Steve'), null, { timeout: 6000 });
+    assert.ok(await visible('#pm-online [data-pm-action="deop"][data-pm-name="Steve"]'), 'Steve is shown as an operator');
+    await fetch(base + '/api/servers/bravo-minecraft/stop', { method: 'POST', headers: { Cookie: cookie } });
+    await page.waitForFunction(() => /Stopped/.test(document.querySelector('#top-status').textContent), null, { timeout: 8000 });
+
+    await page.click('[data-view-tab="dashboard"]');
+    await page.click('[data-view-tab="players"]');
+    await page.waitForFunction(() => /stopped/.test(document.querySelector('#pm-mode-text').textContent), null, { timeout: 5000 });
+    await page.fill('#pm-ip', '203.0.113.9');
+    page.once('dialog', d => d.accept('spam'));
+    await page.click('#pm-ban-ip');
+    await page.waitForFunction(() => document.querySelector('#pm-bans').textContent.includes('203.0.113.9'), null, { timeout: 5000 });
+    assert.match(await text('#pm-bans'), /spam/);
+    const bans = await (await fetch(base + '/api/files/content?path=' + encodeURIComponent('game/banned-ips.json'), { headers: { Cookie: cookie, 'X-HSM-Server': 'bravo-minecraft' } })).json();
+    assert.match(bans.content, /"ip": "203\.0\.113\.9"/);
+    await page.click('#pm-bans [data-pm-action="pardon-ip"]');
+    await page.waitForFunction(() => !document.querySelector('#pm-bans').textContent.includes('203.0.113.9'), null, { timeout: 5000 });
   });
 
   await check('Terraria: fixed world settings, players and install state', async () => {
