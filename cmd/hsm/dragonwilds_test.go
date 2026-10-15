@@ -5,8 +5,11 @@ import (
 	"compress/gzip"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPortRangeForGame(t *testing.T) {
@@ -150,5 +153,67 @@ func TestWriteDragonwildsConfigPreservesUnmanagedEntries(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("config lost or missed %q:\n%s", want, got)
 		}
+	}
+}
+
+// fakeSteamCMD installs a steamcmd.sh that fails its first failures runs
+// with SteamCMD's "Missing configuration" error, then installs the server.
+func fakeSteamCMD(t *testing.T, m *ServerManager, failures int) string {
+	t.Helper()
+	dir := filepath.Join(m.toolsDir, "steamcmd")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	script := "#!/bin/bash\n" +
+		"echo \"$*\" >> \"$(dirname \"$0\")/calls.log\"\n" +
+		"n=$(wc -l < \"$(dirname \"$0\")/calls.log\")\n" +
+		"if [ \"$n\" -le " + strconv.Itoa(failures) + " ]; then echo \"ERROR! Failed to install app '4019830' (Missing configuration)\"; exit 8; fi\n" +
+		"mkdir -p \"$2\" && touch \"$2/RSDragonwildsServer.sh\"\n"
+	if err := os.WriteFile(filepath.Join(dir, "steamcmd.sh"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	oldDelay := steamCMDRetryDelay
+	steamCMDRetryDelay = 0
+	t.Cleanup(func() { steamCMDRetryDelay = oldDelay })
+	return filepath.Join(dir, "calls.log")
+}
+
+func TestDragonwildsInstallRetriesMissingConfiguration(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip("the Dragonwilds installer runs only on amd64")
+	}
+	app := newCapabilityTestApp(t, dragonwildsSettings("dw"))
+	m := app.managers["dw"]
+	calls := fakeSteamCMD(t, m, 1)
+	if err := m.installDragonwilds(); err != nil {
+		t.Fatalf("install after one transient failure: %v", err)
+	}
+	b, _ := os.ReadFile(calls)
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("SteamCMD ran %d times, want 2", len(lines))
+	}
+	if !strings.Contains(lines[0], "+login anonymous +app_info_update 1 +app_update 4019830 validate +quit") {
+		t.Errorf("SteamCMD args = %q", lines[0])
+	}
+	if !logContains(m, "retrying, attempt 2 of 3", time.Time{}) || !m.Installed() {
+		t.Error("retry was not logged or the server is not installed")
+	}
+}
+
+func TestDragonwildsInstallGivesUpAfterThreeFailures(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip("the Dragonwilds installer runs only on amd64")
+	}
+	app := newCapabilityTestApp(t, dragonwildsSettings("dw"))
+	m := app.managers["dw"]
+	calls := fakeSteamCMD(t, m, 10)
+	err := m.installDragonwilds()
+	if err == nil || !strings.Contains(err.Error(), "failed 3 times") {
+		t.Fatalf("err = %v, want failure after 3 attempts", err)
+	}
+	b, _ := os.ReadFile(calls)
+	if n := len(strings.Split(strings.TrimSpace(string(b)), "\n")); n != 3 {
+		t.Errorf("SteamCMD ran %d times, want 3", n)
 	}
 }
