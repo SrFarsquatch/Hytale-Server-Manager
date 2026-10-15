@@ -119,7 +119,7 @@ func (a *App) handleModsList(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 500, err.Error())
 		return
 	}
-	var out []FileInfoDTO
+	out := []FileInfoDTO{}
 	for _, e := range entries {
 		if e.IsDir() || !slices.Contains(folder.Exts, strings.ToLower(filepath.Ext(e.Name()))) {
 			continue

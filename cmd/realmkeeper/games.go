@@ -38,10 +38,12 @@ type GameCapability struct {
 	PlayerList bool   `json:"playerList"`
 	// PlayerManagement means the Players tab manages the whitelist,
 	// operators and bans (Minecraft).
-	PlayerManagement bool     `json:"playerManagement"`
-	DeviceAuth       bool     `json:"deviceAuth"`
-	GameUpdates      bool     `json:"gameUpdates"`
-	Variants         []string `json:"variants"`
+	PlayerManagement bool `json:"playerManagement"`
+	// ModBrowser means mods or plugins can be installed from Modrinth.
+	ModBrowser  bool     `json:"modBrowser"`
+	DeviceAuth  bool     `json:"deviceAuth"`
+	GameUpdates bool     `json:"gameUpdates"`
+	Variants    []string `json:"variants"`
 }
 
 // GameCatalogEntry is metadata for the create-server UI. Available means that
@@ -196,6 +198,8 @@ func serverCapabilities(s ServerSettings) GameCapability {
 	c := gameCapabilitiesFor(s.GameType)
 	f, ok := modFolderFor(s)
 	c.Mods, c.ModsKind = ok, f.Kind
+	_, c.ModBrowser = modrinthLoaders[s.MinecraftVariant]
+	c.ModBrowser = c.ModBrowser && ok && normalizeGameType(s.GameType) == "minecraft-java"
 	return c
 }
 

@@ -150,11 +150,13 @@ try {
     if (body.includes('join-secret-123')) leakedSecrets.push(new URL(res.url()).pathname);
   });
   page.on('pageerror', e => pageErrors.push(e.message));
+  // The browser never reaches the real Modrinth; checks fake what they need.
+  await page.route('**/api/modrinth/**', route => route.fulfill({ json: { hits: [], total: 0, offset: 0, gameVersion: '', loaders: [], updates: [], checked: 0 } }));
   // Requests that reach the backend without naming a server would be ambiguous.
   const unscoped = [];
   page.on('request', req => {
     const url = new URL(req.url());
-    const serverScoped = /^\/api\/(status|players|resources|settings|server\/|console|logs|files|mods|backups|install\/(status|run-downloader|import-local|minecraft|dragonwilds|terraria)|auth|update|minecraft\/)/.test(url.pathname);
+    const serverScoped = /^\/api\/(status|players|resources|settings|server\/|console|logs|files|mods|backups|install\/(status|run-downloader|import-local|minecraft|dragonwilds|terraria)|auth|update|minecraft\/|modrinth\/)/.test(url.pathname);
     if (serverScoped && !req.headers()['x-hsm-server']) unscoped.push(req.method() + ' ' + url.pathname);
   });
 
@@ -432,6 +434,30 @@ try {
       await page.click('[data-view-tab="setup"]');
       await page.waitForFunction(() => document.querySelector('#minecraft-install').textContent === 'Install NeoForge server', null, { timeout: 5000 });
       assert.match(await text('#minecraft-install-help'), /NeoForge/);
+
+      // The Modrinth browser, with the app's Modrinth endpoints faked.
+      let installBody = null;
+      const isSearch = url => url.pathname === '/api/modrinth/search';
+      await page.route(isSearch, route => route.fulfill({ json: { hits: [{ project_id: 'jei1', slug: 'jei', title: 'Just Enough Items', author: 'mezz', downloads: 123456, description: 'Item viewer', icon_url: '', installed: false }], total: 1, offset: 0, gameVersion: '', loaders: ['neoforge'] } }));
+      await page.route('**/api/modrinth/projects/jei1/versions', route => route.fulfill({ json: { versions: [{ id: 'v19', versionNumber: '19.0', versionType: 'release', published: '2026-09-01T00:00:00Z' }, { id: 'v20', versionNumber: '20.0', versionType: 'beta', published: '2026-09-20T00:00:00Z' }] } }));
+      await page.route('**/api/modrinth/install', route => { installBody = route.request().postDataJSON(); route.fulfill({ json: { installed: [{ projectId: 'jei1', title: 'Just Enough Items', versionNumber: '19.0' }], message: 'Installed Just Enough Items 19.0' } }); });
+      try {
+        await page.click('[data-view-tab="mods"]');
+        await page.waitForFunction(() => document.querySelector('#modrinth-results').textContent.includes('Just Enough Items'), null, { timeout: 5000 });
+        assert.ok(await visible('#modrinth-card'), 'the Modrinth browser is shown for NeoForge');
+        assert.match(await text('#modrinth-help'), /neoforge/);
+        assert.match(await text('#modrinth-results'), /123k downloads/);
+        await page.click('#modrinth-results [data-mr-versions]');
+        await page.waitForSelector('#modrinth-results select');
+        await page.selectOption('#modrinth-results select', 'v19');
+        await page.click('#modrinth-results [data-mr-install]');
+        await page.waitForFunction(() => document.querySelector('#modrinth-results').textContent.includes('Installed'), null, { timeout: 5000 });
+        assert.deepEqual(installBody, { projectId: 'jei1', versionId: 'v19' });
+      } finally {
+        await page.unroute(isSearch);
+        await page.unroute('**/api/modrinth/projects/jei1/versions');
+        await page.unroute('**/api/modrinth/install');
+      }
     } finally {
       await call('DELETE', '/api/servers/golf-neoforge').catch(() => {});
     }

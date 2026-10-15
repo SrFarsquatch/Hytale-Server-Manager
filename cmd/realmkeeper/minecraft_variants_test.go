@@ -218,3 +218,16 @@ func TestModsFollowTheMinecraftVariant(t *testing.T) {
 		t.Errorf("Hytale mod upload = %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestEmptyModsFolderListsAsAnEmptyArray(t *testing.T) {
+	s := minecraftSettings("fab")
+	s.MinecraftVariant = "fabric"
+	mux := newTestMux(newCapabilityTestApp(t, s))
+	req := httptest.NewRequest("GET", "/api/mods", nil)
+	req.Header.Set("X-HSM-Server", "fab")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != 200 || strings.TrimSpace(rec.Body.String()) != "[]" {
+		t.Errorf("GET /api/mods = %d %q, want [] (the page reads .length)", rec.Code, rec.Body.String())
+	}
+}

@@ -264,7 +264,15 @@
         </section>
 
         <section id="view-mods" class="view">
-          <section class="card"><div class="card-head"><div><h3 id="mods-title">Mods</h3><p class="muted small" id="mods-help">Installed for the selected server only.</p></div><label class="btn primary small file-btn"><svg class="icon"><use href="#i-plus"/></svg><span id="mods-add-label">Add mod</span><input type="file" id="mod-file" accept=".jar,.zip"></label></div><div id="mods-list" class="file-list empty-state">No mods installed.</div></section>
+          <section class="card"><div class="card-head"><div><h3 id="mods-title">Mods</h3><p class="muted small" id="mods-help">Installed for the selected server only.</p></div><label class="btn primary small file-btn"><svg class="icon"><use href="#i-plus"/></svg><span id="mods-add-label">Add mod</span><input type="file" id="mod-file" accept=".jar,.zip"></label></div><div id="mods-list" class="file-list empty-state">No mods installed.</div>
+            <div class="toolbar modrinth-only hidden"><button type="button" class="btn small" id="modrinth-updates">Check for updates</button></div>
+            <div id="modrinth-updates-list" class="schedule-list"></div></section>
+          <section class="card modrinth-only hidden" id="modrinth-card">
+            <div class="card-head"><div><h3>Browse Modrinth</h3><p class="muted small" id="modrinth-help">Mods from modrinth.com for this server.</p></div></div>
+            <form id="modrinth-search" class="inline-fields"><input id="modrinth-query" maxlength="100" placeholder="Search Modrinth" autocomplete="off"><button type="submit" class="btn">Search</button></form>
+            <div id="modrinth-results" class="schedule-list"></div>
+            <div class="toolbar"><button type="button" class="btn small hidden" id="modrinth-more">Show more</button></div>
+          </section>
         </section>
 
         <section id="view-players" class="view">
