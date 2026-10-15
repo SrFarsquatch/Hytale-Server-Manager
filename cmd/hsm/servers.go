@@ -514,7 +514,9 @@ func (a *App) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "server name must be between 2 and 64 characters")
 		return
 	}
-	if in.Port < min || in.Port > max {
+	// An unchanged port is kept even outside the game's range, so servers
+	// created before a range changed (Minecraft moved to 25565+) still save.
+	if in.Port != current.Port && (in.Port < min || in.Port > max) {
 		jsonError(w, 400, fmt.Sprintf("port must be within the Docker/CasaOS %s range %d-%d", strings.ToUpper(entry.Protocol), min, max))
 		return
 	}

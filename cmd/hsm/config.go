@@ -300,6 +300,24 @@ func deploymentPortRange() (int, int, bool) {
 	return start, end, locked
 }
 
+// minecraftPortRange is the TCP range for Minecraft servers. It starts at
+// Minecraft's default port, 25565, so players can usually join without
+// typing a port. HSM_MINECRAFT_PORT_START and _END change it; the same ports
+// must be published in Compose or the CasaOS app settings.
+func minecraftPortRange() (int, int) {
+	start, end := 25565, 25570
+	if n, err := strconv.Atoi(strings.TrimSpace(os.Getenv("HSM_MINECRAFT_PORT_START"))); err == nil && n > 0 && n <= 65535 {
+		start = n
+		if end < start {
+			end = min(start+5, 65535)
+		}
+	}
+	if n, err := strconv.Atoi(strings.TrimSpace(os.Getenv("HSM_MINECRAFT_PORT_END"))); err == nil && n >= start && n <= 65535 {
+		end = n
+	}
+	return start, end
+}
+
 func slugify(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
 	var b strings.Builder

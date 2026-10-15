@@ -38,7 +38,7 @@ func TestCreateAppliesEachGamesDefaults(t *testing.T) {
 		},
 		{
 			name: "minecraft", body: `{"game":"minecraft-java","name":"Blocks","minecraftEulaAccepted":true}`,
-			gameMode: "Survival", motd: "A Minecraft Server", maxPlayers: 20, port: 5520, minecraftVersion: "latest",
+			gameMode: "Survival", motd: "A Minecraft Server", maxPlayers: 20, port: 25565, minecraftVersion: "latest",
 		},
 		{
 			name: "dragonwilds", body: `{"game":"runescape-dragonwilds","name":"Vale","dragonwildsOwnerId":"owner-1","dragonwildsAdminPassword":"admin"}`,
@@ -301,11 +301,52 @@ func TestCatalogServesResolvedRulesForAvailableGames(t *testing.T) {
 			t.Fatalf("%s: rules = %+v", g.ID, g.Rules)
 		}
 		wantMin, wantMax := min, max
-		if g.ID == "runescape-dragonwilds" {
+		switch g.ID {
+		case "runescape-dragonwilds":
 			wantMin, wantMax = 7777, 7782
+		case "minecraft-java":
+			wantMin, wantMax = 25565, 25570
 		}
 		if g.Rules.PortMin != wantMin || g.Rules.PortMax != wantMax {
 			t.Errorf("%s: ports %d-%d, want %d-%d", g.ID, g.Rules.PortMin, g.Rules.PortMax, wantMin, wantMax)
 		}
+	}
+}
+
+func TestMinecraftUsesItsOwnPortRangeAndKeepsOlderPorts(t *testing.T) {
+	// A second Minecraft server takes the next default-range port.
+	app := &App{dataDir: t.TempDir(), managers: map[string]*ServerManager{}}
+	for _, name := range []string{"Blocks", "More Blocks"} {
+		if code, out := createServer(t, app, `{"game":"minecraft-java","name":"`+name+`","minecraftEulaAccepted":true}`); code != 201 {
+			t.Fatalf("create %s = %d %v", name, code, out)
+		}
+	}
+	if a, b := app.cfg.Servers[0].Port, app.cfg.Servers[1].Port; a != 25565 || b != 25566 {
+		t.Errorf("ports = %d, %d; want 25565, 25566", a, b)
+	}
+
+	// A server created on the old shared range keeps its port when other
+	// settings are saved, but cannot move to another port outside the range.
+	app = newCapabilityTestApp(t, minecraftSettings("mc")) // port 5521
+	if code, out := putSettings(t, app, "mc", func(s map[string]any) { s["motd"] = "Still here" }); code != 200 || storedServer(app, "mc").Port != 5521 {
+		t.Fatalf("saving with the old port = %d %v", code, out)
+	}
+	if code, _ := putSettings(t, app, "mc", func(s map[string]any) { s["port"] = float64(5522) }); code != 400 {
+		t.Errorf("moving to another old-range port = %d, want 400", code)
+	}
+	if code, out := putSettings(t, app, "mc", func(s map[string]any) { s["port"] = float64(25565) }); code != 200 || storedServer(app, "mc").Port != 25565 {
+		t.Errorf("moving to 25565 = %d %v", code, out)
+	}
+}
+
+func TestMinecraftPortRangeCanBeConfigured(t *testing.T) {
+	t.Setenv("HSM_MINECRAFT_PORT_START", "30000")
+	t.Setenv("HSM_MINECRAFT_PORT_END", "30009")
+	if min, max := minecraftPortRange(); min != 30000 || max != 30009 {
+		t.Errorf("range = %d-%d", min, max)
+	}
+	t.Setenv("HSM_MINECRAFT_PORT_END", "100") // below the start: ignored
+	if min, max := minecraftPortRange(); min != 30000 || max != 30005 {
+		t.Errorf("range with a bad end = %d-%d", min, max)
 	}
 }

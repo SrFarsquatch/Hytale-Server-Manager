@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#151a24">
   <title>HSM · Game Server Control Panel</title>
-  <link rel="stylesheet" href="/app.css?v=20261016-variants2">
+  <link rel="stylesheet" href="/app.css?v=20261016-mcports1">
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -311,7 +311,7 @@
             </div>
             <div id="minecraft-install-controls" class="steps hidden">
               <div class="step"><span class="step-index">1</span><div><h4>Download official server</h4><p class="muted small" id="minecraft-install-help">Fetches the official server for this server type. The first launch generates the remaining files.</p></div><div class="toolbar"><button type="button" class="btn small primary" id="minecraft-install">Download vanilla server</button></div></div>
-              <p class="muted small">Minecraft Java uses TCP. This release maps TCP 5520–5525 alongside the Hytale UDP ports. Forward the chosen TCP port in your router for players outside your network.</p>
+              <p class="muted small">Minecraft Java uses TCP 25565–25570, starting at the game's default port. Forward the chosen TCP port in your router for players outside your network.</p>
             </div>
             <div id="terraria-install-controls" class="steps hidden">
               <div class="step"><span class="step-index">1</span><div><h4>Download server</h4><p class="muted small" id="terraria-install-help">Fetches the official Terraria dedicated server from terraria.org and installs its Linux build. The world is generated on the first start, which can take a few minutes.</p></div><div class="toolbar"><button type="button" class="btn small primary" id="terraria-install">Download vanilla server</button></div></div>
@@ -471,6 +471,6 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/app.js?v=20261016-variants2"></script>
+  <script src="/app.js?v=20261016-mcports1"></script>
 </body>
 </html>

@@ -25,7 +25,8 @@ type MinecraftAdapter struct{}
 func (MinecraftAdapter) GameType() string { return "minecraft-java" }
 
 func (MinecraftAdapter) Rules() GameRules {
-	return GameRules{GameModes: []string{"Survival", "Adventure", "Creative", "Spectator"}, ModeLabel: "Game mode", DefaultMOTD: "A Minecraft Server", DefaultMaxPlayers: 20, PlayerLimit: 1000, JVMMemory: true, Whitelist: true}
+	min, max := minecraftPortRange()
+	return GameRules{GameModes: []string{"Survival", "Adventure", "Creative", "Spectator"}, ModeLabel: "Game mode", DefaultMOTD: "A Minecraft Server", DefaultMaxPlayers: 20, PlayerLimit: 1000, JVMMemory: true, Whitelist: true, PortMin: min, PortMax: max}
 }
 
 func (MinecraftAdapter) ValidateNew(req *newServerRequest) error {
