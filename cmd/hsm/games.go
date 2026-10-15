@@ -231,5 +231,9 @@ func catalogWithArt() []GameCatalogEntry {
 }
 
 func (a *App) handleGameCatalog(w http.ResponseWriter, r *http.Request) {
-	jsonOut(w, 200, map[string]any{"games": catalogWithArt()})
+	jsonOut(w, 200, map[string]any{
+		"games": catalogWithArt(),
+		// Values remembered from earlier servers, offered by the create wizard.
+		"defaults": map[string]string{"dragonwildsOwnerId": a.rememberedDragonwildsOwner()},
+	})
 }

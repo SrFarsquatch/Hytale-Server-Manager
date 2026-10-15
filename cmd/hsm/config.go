@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -64,6 +65,9 @@ type ControllerConfig struct {
 	// Schedules holds each server's automated tasks, keyed by server ID.
 	Schedules map[string][]Schedule `json:"schedules,omitempty"`
 	Settings  *legacySettings       `json:"settings,omitempty"`
+	// DragonwildsOwnerID is the last Owner ID (in-game Player ID) used, so new
+	// Dragonwilds servers do not ask for it again.
+	DragonwildsOwnerID string `json:"dragonwildsOwnerId,omitempty"`
 }
 
 func defaultServerSettings(id, name string, port int, storage string) ServerSettings {
@@ -141,14 +145,23 @@ func (a *App) loadConfig() error {
 		}
 		cfg.Servers[i].PortMin = min
 		cfg.Servers[i].PortMax = max
-		if cfg.Servers[i].GameMode != "Creative" && cfg.Servers[i].GameMode != "Adventure" {
-			cfg.Servers[i].GameMode = "Adventure"
+		// Repair values using the server's own game rules, so a Minecraft
+		// Survival server or a Terraria difficulty is not reset to Hytale's.
+		rules := (HytaleAdapter{}).Rules()
+		if adapter, err := gameAdapterFor(cfg.Servers[i].GameType); err == nil {
+			rules = adapter.Rules()
 		}
-		if cfg.Servers[i].MaxPlayers < 1 || cfg.Servers[i].MaxPlayers > 1000 {
-			cfg.Servers[i].MaxPlayers = 20
+		if !slices.Contains(rules.GameModes, cfg.Servers[i].GameMode) {
+			cfg.Servers[i].GameMode = rules.GameModes[0]
+		}
+		if cfg.Servers[i].MaxPlayers < 1 || cfg.Servers[i].MaxPlayers > rules.PlayerLimit {
+			cfg.Servers[i].MaxPlayers = rules.DefaultMaxPlayers
 		}
 		if cfg.Servers[i].MOTD == "" {
-			cfg.Servers[i].MOTD = "Welcome to your Hytale server!"
+			cfg.Servers[i].MOTD = rules.DefaultMOTD
+		}
+		if cfg.DragonwildsOwnerID == "" && cfg.Servers[i].GameType == "runescape-dragonwilds" {
+			cfg.DragonwildsOwnerID = strings.TrimSpace(cfg.Servers[i].DragonwildsOwnerID)
 		}
 		if cfg.Servers[i].MemoryMin == "" {
 			cfg.Servers[i].MemoryMin = "2G"
