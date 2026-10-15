@@ -51,7 +51,7 @@ func minecraftLaunchJar(variant string) string {
 // appUserAgent identifies Realmkeeper to download services. PaperMC rejects
 // requests with a generic or missing User-Agent.
 func appUserAgent() string {
-	return "Realmkeeper/" + version + " (+https://github.com/SrFarsquatch/Hytale-Server-Manager)"
+	return "Realmkeeper/" + version + " (+https://github.com/SrFarsquatch/realmkeeper)"
 }
 
 func getJSON(ctx context.Context, client *http.Client, rawURL string, v any) error {

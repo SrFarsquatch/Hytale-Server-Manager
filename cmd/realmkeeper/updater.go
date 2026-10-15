@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	latestReleaseAPI = "https://api.github.com/repos/SrFarsquatch/Hytale-Server-Manager/releases/latest"
+	latestReleaseAPI = "https://api.github.com/repos/SrFarsquatch/realmkeeper/releases/latest"
 	containerImage   = "ghcr.io/srfarsquatch/realmkeeper"
 	dockerSocketPath = "/var/run/docker.sock"
 )
