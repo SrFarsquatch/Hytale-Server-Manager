@@ -31,6 +31,8 @@ type GameCapability struct {
 	// ConfigFiles lists the structured files the in-app config editor may open.
 	ConfigFiles []string `json:"configFiles"`
 	Mods        bool     `json:"mods"`
+	// Worlds means the Worlds tab manages the server's save files.
+	Worlds bool `json:"worlds,omitempty"`
 	// ModsKind names what the Mods tab manages: "mods" or "plugins".
 	ModsKind    string   `json:"modsKind,omitempty"`
 	PlayerList  bool     `json:"playerList"`
@@ -121,7 +123,7 @@ func supportedGameCatalog() []GameCatalogEntry {
 			// Dragonwilds is stopped with SIGINT and does not read commands from stdin.
 			ID: "runescape-dragonwilds", Name: "RuneScape: Dragonwilds", Available: true, Protocol: "udp",
 			Capabilities: GameCapability{
-				Console: true, FileManagement: true, Configuration: true,
+				Console: true, FileManagement: true, Configuration: true, Backups: true, Worlds: true,
 				ConfigFiles: []string{}, Variants: []string{"dedicated"},
 			},
 		},

@@ -36,6 +36,9 @@ func snapshotSpecFor(root string, s ServerSettings) (snapshotSpec, bool) {
 			// Paper plugins and their data, Paper settings, Fabric mods and configs.
 			"plugins", "bukkit.yml", "spigot.yml", "mods", "config",
 		}}, true
+	case "runescape-dragonwilds":
+		// Saves and the game's config; guides spell the save folder both ways.
+		return snapshotSpec{Base: dragonwildsSavedDir(root), Include: []string{"SaveGames", "Savegames", "Config"}}, true
 	case "terraria":
 		include := []string{"Worlds", "serverconfig.txt", "banlist.txt"}
 		if terrariaVariant(s) == "tmodloader" {
