@@ -39,9 +39,27 @@ A self-hosted web panel for running multiple Hytale dedicated servers from one L
   - uses TCP in the published `5520`–`5525` range (shared with Hytale)
 - **RuneScape: Dragonwilds:**
   - SteamCMD install (retried when SteamCMD reports "Missing configuration"), dedicated-server settings and console output
-  - a Worlds tab: upload a world's `.sav` (and `.backup`) from `%LOCALAPPDATA%\RSDragonwilds\Saved\SaveGames`, choose which world loads next (it becomes the newest save and the default world name), start a new world, and restore worlds HSM moved aside. Nothing is deleted: replaced or removed saves go to `world-backups/` in the server folder.
+  - a Worlds tab: upload a world's `.sav` (and `.backup`) from `%LOCALAPPDATA%\RSDragonwilds\Saved\SaveGames`, choose which world loads next (it becomes the newest save and the default world name), start a new world, and restore worlds HSM moved aside. Nothing is deleted: replaced or removed saves go to `backups/worlds/` in the server folder.
   - World rules (Standard, Custom or Creative) live in the save: create the world in the game with the rules you want and upload it, or change settings in game from Settings → Server Management with the admin password.
   - snapshots of the saves and the game's config while the server is stopped
+
+### Data folder layout
+
+Everything is kept under the data folder (`/data` in the container):
+
+```
+controller.json          app settings: servers, schedules, admin login
+tools/                   shared downloads (SteamCMD, Hytale downloader)
+servers/<id>/            one folder per server
+  game/                  the game's own files: install, worlds, configs, mods
+  backups/snapshots/     snapshots made by the app
+  backups/worlds/        Dragonwilds saves moved aside by the Worlds tab
+  imports/               files waiting to be installed (Hytale game.zip)
+  home/                  home folder for the game process and SteamCMD
+  tmp/                   downloads and unpacking; emptied at startup
+```
+
+The in-app file manager shows one server's folder. Older installs are moved to this layout on startup: a first server kept directly in the data folder moves to `servers/<id>/`, and `snapshots/` and `world-backups/` move under `backups/`.
 
 ### Moving a server (export and import)
 

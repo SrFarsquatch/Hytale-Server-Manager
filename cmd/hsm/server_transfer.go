@@ -39,7 +39,7 @@ type serverExport struct {
 // Snapshots and backups are optional because they can be large.
 func exportEntries(withBackups bool) []string {
 	if withBackups {
-		return []string{"game", "snapshots", "world-backups"}
+		return []string{"game", "backups"}
 	}
 	return []string{"game"}
 }
@@ -286,6 +286,20 @@ func (a *App) reserveImportFolder(name string) (string, string, error) {
 	return "", "", errors.New("could not choose a folder for the imported server")
 }
 
+// currentLayoutPath maps folders from exports made before the current
+// storage layout to where they live now.
+func currentLayoutPath(rel string) string {
+	for old, now := range map[string]string{"snapshots": filepath.Join("backups", "snapshots"), "world-backups": filepath.Join("backups", "worlds")} {
+		if rel == old {
+			return now
+		}
+		if rest, ok := strings.CutPrefix(rel, old+string(filepath.Separator)); ok {
+			return filepath.Join(now, rest)
+		}
+	}
+	return rel
+}
+
 // extractServerFiles writes the files/ entries of an export into dst. Paths
 // that would leave dst, and links that point outside it, are refused.
 func extractServerFiles(tr *tar.Reader, dst string) error {
@@ -309,7 +323,7 @@ func extractServerFiles(tr *tar.Reader, dst string) error {
 		if filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
 			return fmt.Errorf("unsafe path %q", hdr.Name)
 		}
-		target := filepath.Join(dst, clean)
+		target := filepath.Join(dst, currentLayoutPath(clean))
 		switch hdr.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(target, 0o755); err != nil {

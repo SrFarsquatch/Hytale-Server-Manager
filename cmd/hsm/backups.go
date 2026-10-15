@@ -35,9 +35,9 @@ func (a *App) handleBackupsList(w http.ResponseWriter, r *http.Request) {
 	root := a.serverRoot(s)
 	native := []FileInfoDTO{}
 	if gameCapabilitiesFor(s.GameType).NativeBackups {
-		native = listAllFiles(filepath.Join(root, "game", "Server", "backups"))
+		native = listAllFiles(filepath.Join(pathsFor(root).Game(), "Server", "backups"))
 	}
-	snapshots := listFiles(filepath.Join(root, "snapshots"), ".tar.gz")
+	snapshots := listFiles(pathsFor(root).Snapshots(), ".tar.gz")
 	if snapshots == nil {
 		snapshots = []FileInfoDTO{} // a server with no snapshots yet has no folder
 	}
@@ -62,8 +62,8 @@ func (a *App) backupMaintenanceLoop() {
 
 func (a *App) pruneBackupRetention(s ServerSettings) {
 	root := a.serverRoot(s)
-	pruneBackupFiles(filepath.Join(root, "game", "Server", "backups"), s.BackupRetention, func(name string) bool { return true })
-	pruneBackupFiles(filepath.Join(root, "snapshots"), s.SnapshotRetention, func(name string) bool {
+	pruneBackupFiles(filepath.Join(pathsFor(root).Game(), "Server", "backups"), s.BackupRetention, func(name string) bool { return true })
+	pruneBackupFiles(pathsFor(root).Snapshots(), s.SnapshotRetention, func(name string) bool {
 		return strings.HasPrefix(name, "snapshot-") && strings.HasSuffix(name, ".tar.gz")
 	})
 }
@@ -161,7 +161,7 @@ func (a *App) createSnapshot(m *ServerManager, s ServerSettings) (string, int, e
 	}
 	defer m.backupMu.Unlock()
 	name := "snapshot-" + time.Now().Format("20060102-150405") + ".tar.gz"
-	dst := filepath.Join(root, "snapshots", name)
+	dst := filepath.Join(pathsFor(root).Snapshots(), name)
 	archive := func() error { return createTarGz(dst, spec.Base, spec.Include) }
 	var err error
 	if m.IsRunning() {
@@ -201,7 +201,7 @@ func (a *App) handleSnapshotRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	root := a.serverRoot(s)
-	src := filepath.Join(root, "snapshots", name)
+	src := filepath.Join(pathsFor(root).Snapshots(), name)
 	if _, err := os.Stat(src); err != nil {
 		jsonError(w, 404, "snapshot not found")
 		return
@@ -212,7 +212,7 @@ func (a *App) handleSnapshotRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Never restore without a copy of what is about to be replaced.
-	safety := filepath.Join(root, "snapshots", "pre-restore-"+time.Now().Format("20060102-150405")+".tar.gz")
+	safety := filepath.Join(pathsFor(root).Snapshots(), "pre-restore-"+time.Now().Format("20060102-150405")+".tar.gz")
 	if err := createTarGz(safety, spec.Base, spec.Include); err != nil {
 		_ = os.Remove(safety)
 		jsonError(w, 500, "could not create the safety snapshot, so nothing was restored: "+err.Error())
@@ -239,7 +239,7 @@ func (a *App) handleSnapshotDelete(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "invalid snapshot")
 		return
 	}
-	if err := os.Remove(filepath.Join(a.serverRoot(s), "snapshots", name)); err != nil {
+	if err := os.Remove(filepath.Join(pathsFor(a.serverRoot(s)).Snapshots(), name)); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			jsonError(w, 404, "snapshot not found")
 		} else {

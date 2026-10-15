@@ -179,7 +179,7 @@ func TestLiveMinecraftSnapshotHoldsSavesAndCapturesWorld(t *testing.T) {
 	}
 	var out struct{ Name string }
 	_ = json.Unmarshal(rec.Body.Bytes(), &out)
-	entries := tarEntries(t, filepath.Join(m.rootDir, "snapshots", out.Name))
+	entries := tarEntries(t, filepath.Join(pathsFor(m.rootDir).Snapshots(), out.Name))
 	if !contains(entries, "world/level.dat") || !contains(entries, "server.properties") {
 		t.Errorf("snapshot entries = %v", entries)
 	}
@@ -204,7 +204,7 @@ func TestLiveMinecraftSnapshotFailsSafelyWithoutSaveConfirmation(t *testing.T) {
 	if rec.Code != 500 || !strings.Contains(rec.Body.String(), "did not confirm") {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
-	if files, _ := os.ReadDir(filepath.Join(m.rootDir, "snapshots")); len(files) != 0 {
+	if files, _ := os.ReadDir(pathsFor(m.rootDir).Snapshots()); len(files) != 0 {
 		t.Errorf("an unconfirmed snapshot was kept: %v", files)
 	}
 	waitFor(t, "autosave re-enabled after failure", func() bool { return logContains(m, "got save-on", time.Time{}) })

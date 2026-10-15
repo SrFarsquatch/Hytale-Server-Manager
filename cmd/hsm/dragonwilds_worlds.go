@@ -20,12 +20,12 @@ import (
 // changed in game from Settings > Server Management with the admin password.
 //
 // HSM never deletes a world: replaced or removed saves are moved to
-// world-backups/<time>/ under the server folder.
+// backups/worlds/<time>/ under the server folder.
 
 const dragonwildsWorldUploadLimit = 512 << 20
 
 func dragonwildsSavedDir(root string) string {
-	return filepath.Join(root, "game", "RSDragonwilds", "Saved")
+	return filepath.Join(pathsFor(root).Game(), "RSDragonwilds", "Saved")
 }
 
 // dragonwildsSaveDir returns the folder the game uses for saves. Guides spell
@@ -103,7 +103,7 @@ func listDragonwildsWorlds(root string) ([]dragonwildsWorld, error) {
 	return worlds, nil
 }
 
-func dragonwildsArchiveDir(root string) string { return filepath.Join(root, "world-backups") }
+func dragonwildsArchiveDir(root string) string { return pathsFor(root).WorldBackups() }
 
 func listDragonwildsArchives(root string) []dragonwildsArchive {
 	entries, _ := os.ReadDir(dragonwildsArchiveDir(root))
@@ -126,7 +126,7 @@ func listDragonwildsArchives(root string) []dragonwildsArchive {
 }
 
 // archiveDragonwildsFiles moves the named save files (when present) into a
-// new world-backups folder and returns its ID.
+// new backups/worlds folder and returns its ID.
 func archiveDragonwildsFiles(root string, files []string) (string, error) {
 	dir := dragonwildsSaveDir(root)
 	var present []string
@@ -287,7 +287,7 @@ func (a *App) handleWorldUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	msg := "Uploaded world " + name
 	if archived != "" {
-		msg += "; the previous copy was moved to world-backups/" + archived
+		msg += "; the previous copy was moved to backups/worlds/" + archived
 	}
 	m.appendLog("controller", msg)
 	if r.FormValue("activate") != "false" {
@@ -356,11 +356,11 @@ func (a *App) handleWorldArchive(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 404, "world not found")
 		return
 	}
-	m.appendLog("controller", "Moved world "+req.Name+" to world-backups/"+id)
+	m.appendLog("controller", "Moved world "+req.Name+" to backups/worlds/"+id)
 	jsonOut(w, 200, map[string]any{"ok": true, "archive": id})
 }
 
-// handleWorldRestore copies a world back from world-backups, archiving any
+// handleWorldRestore copies a world back from backups/worlds, archiving any
 // current save with the same name first.
 func (a *App) handleWorldRestore(w http.ResponseWriter, r *http.Request) {
 	m, s, ok := a.dragonwildsWorldRequest(w, r)
@@ -398,7 +398,7 @@ func (a *App) handleWorldRestore(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	m.appendLog("controller", "Restored world "+req.Name+" from world-backups/"+req.Archive)
+	m.appendLog("controller", "Restored world "+req.Name+" from backups/worlds/"+req.Archive)
 	if err := a.useDragonwildsWorld(m, s, req.Name); err != nil {
 		jsonError(w, 500, err.Error())
 		return
@@ -406,7 +406,7 @@ func (a *App) handleWorldRestore(w http.ResponseWriter, r *http.Request) {
 	jsonOut(w, 200, map[string]any{"ok": true})
 }
 
-// handleWorldNew moves every save to world-backups so the server creates a
+// handleWorldNew moves every save to backups/worlds so the server creates a
 // new Standard world called name on its next start.
 func (a *App) handleWorldNew(w http.ResponseWriter, r *http.Request) {
 	m, s, ok := a.dragonwildsWorldRequest(w, r)
@@ -447,7 +447,7 @@ func (a *App) handleWorldNew(w http.ResponseWriter, r *http.Request) {
 	}
 	msg := "The next start creates a new world, " + req.Name
 	if id != "" {
-		msg += "; previous saves were moved to world-backups/" + id
+		msg += "; previous saves were moved to backups/worlds/" + id
 	}
 	m.appendLog("controller", msg)
 	jsonOut(w, 200, map[string]any{"ok": true, "archive": id})

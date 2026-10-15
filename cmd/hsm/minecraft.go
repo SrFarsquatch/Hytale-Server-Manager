@@ -62,12 +62,12 @@ func (MinecraftAdapter) MergeSettings(in *ServerSettings, current ServerSettings
 func (MinecraftAdapter) ApplySettings(*App, *ServerManager, ServerSettings) error { return nil }
 
 func (MinecraftAdapter) InstallStatus(app *App, s ServerSettings) map[string]any {
-	return map[string]any{"game": s.GameType, "version": s.MinecraftVersion, "variant": s.MinecraftVariant, "eulaAccepted": s.MinecraftEulaAccepted, "paths": map[string]string{"game": filepath.Join(app.serverRoot(s), "game")}}
+	return map[string]any{"game": s.GameType, "version": s.MinecraftVersion, "variant": s.MinecraftVariant, "eulaAccepted": s.MinecraftEulaAccepted, "paths": map[string]string{"game": pathsFor(app.serverRoot(s)).Game()}}
 }
 
 func (MinecraftAdapter) Installed(rootDir string) bool {
-	b, err := os.ReadFile(filepath.Join(rootDir, "game", "eula.txt"))
-	if err != nil || !fileExists(filepath.Join(rootDir, "game", "server.jar")) && !fileExists(filepath.Join(rootDir, "game", fabricLauncherJar)) {
+	b, err := os.ReadFile(filepath.Join(pathsFor(rootDir).Game(), "eula.txt"))
+	if err != nil || !fileExists(filepath.Join(pathsFor(rootDir).Game(), "server.jar")) && !fileExists(filepath.Join(pathsFor(rootDir).Game(), fabricLauncherJar)) {
 		return false
 	}
 	for _, line := range strings.Split(string(b), "\n") {
@@ -85,7 +85,7 @@ func (MinecraftAdapter) PrepareLaunch(app *App, settings ServerSettings) ([]stri
 	if !validMemory(settings.MemoryMin) || !validMemory(settings.MemoryMax) {
 		return nil, errors.New("invalid Minecraft JVM memory settings")
 	}
-	if err := checkMinecraftJava(filepath.Join(app.serverRoot(settings), "game"), detectJavaMajor); err != nil {
+	if err := checkMinecraftJava(pathsFor(app.serverRoot(settings)).Game(), detectJavaMajor); err != nil {
 		return nil, err
 	}
 	if err := writeMinecraftProperties(app.serverRoot(settings), settings); err != nil {
@@ -95,7 +95,7 @@ func (MinecraftAdapter) PrepareLaunch(app *App, settings ServerSettings) ([]stri
 }
 
 func (MinecraftAdapter) BuildProcess(rootDir string, args []string) (ProcessLaunch, error) {
-	gameDir := filepath.Join(rootDir, "game")
+	gameDir := pathsFor(rootDir).Game()
 	jar := "server.jar"
 	for i := 0; i+1 < len(args); i++ {
 		if args[i] == "-jar" {
@@ -273,7 +273,7 @@ func (m *ServerManager) installMinecraft(version, variant string) error {
 			m.appendLog("installer", "Could not read the Java requirement for Minecraft "+resolvedVersion+": "+err.Error())
 		}
 	}
-	gameDir := filepath.Join(m.rootDir, "game")
+	gameDir := pathsFor(m.rootDir).Game()
 	if err := os.MkdirAll(gameDir, 0755); err != nil {
 		return err
 	}
@@ -346,7 +346,7 @@ func validateMinecraftJar(path string) error {
 }
 
 func writeMinecraftProperties(root string, s ServerSettings) error {
-	gameDir := filepath.Join(root, "game")
+	gameDir := pathsFor(root).Game()
 	if err := os.MkdirAll(gameDir, 0755); err != nil {
 		return err
 	}

@@ -123,7 +123,7 @@ func (a *App) handleMinecraftPropertiesGet(w http.ResponseWriter, r *http.Reques
 	if !requireCapability(w, s, "Editing server.properties", func(c GameCapability) bool { return c.ServerProperties }) {
 		return
 	}
-	values, err := readMinecraftProperties(filepath.Join(a.serverRoot(s), "game"))
+	values, err := readMinecraftProperties(pathsFor(a.serverRoot(s)).Game())
 	if err != nil {
 		jsonError(w, 500, err.Error())
 		return
@@ -161,7 +161,7 @@ func (a *App) handleMinecraftPropertiesPut(w http.ResponseWriter, r *http.Reques
 		}
 		updates = append(updates, struct{ key, value string }{key, value})
 	}
-	gameDir := filepath.Join(a.serverRoot(s), "game")
+	gameDir := pathsFor(a.serverRoot(s)).Game()
 	if err := os.MkdirAll(gameDir, 0o755); err != nil {
 		jsonError(w, 500, err.Error())
 		return

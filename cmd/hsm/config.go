@@ -179,6 +179,7 @@ func (a *App) loadConfig() error {
 			cfg.Servers[i].SnapshotRetention = 5
 		}
 	}
+	migrateStorage(a.dataDir, cfg.Servers)
 	a.cfg = cfg
 	return a.saveConfigUnlocked()
 }
@@ -188,7 +189,7 @@ func (a *App) migrateMissingHytaleSettings(s *ServerSettings, raw map[string]jso
 		_, present := raw[key]
 		return !present
 	}
-	path := filepath.Join(a.serverRoot(*s), "game", "Server", "config.json")
+	path := filepath.Join(pathsFor(a.serverRoot(*s)).Game(), "Server", "config.json")
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return
@@ -363,14 +364,7 @@ func ensureRootDirs(dataDir string) error {
 	return nil
 }
 
-func ensureServerDirs(root string) error {
-	for _, d := range []string{root, filepath.Join(root, "game"), filepath.Join(root, "imports"), filepath.Join(root, "snapshots"), filepath.Join(root, "home")} {
-		if err := os.MkdirAll(d, 0755); err != nil {
-			return err
-		}
-	}
-	return nil
-}
+func ensureServerDirs(root string) error { return pathsFor(root).Ensure() }
 
 func envFirst(keys []string, fallback string) string {
 	for _, key := range keys {

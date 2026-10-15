@@ -117,7 +117,7 @@ func (a *App) handleImportLocal(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 409, "stop the server before importing server files")
 		return
 	}
-	if err := m.ImportBundle(filepath.Join(a.serverRoot(s), "imports", "game.zip")); err != nil {
+	if err := m.ImportBundle(filepath.Join(pathsFor(a.serverRoot(s)).Imports(), "game.zip")); err != nil {
 		jsonError(w, 409, err.Error())
 		return
 	}
@@ -144,7 +144,7 @@ func (m *ServerManager) RunDownloader() error {
 	m.mu.Unlock()
 	go func() {
 		defer func() { m.mu.Lock(); m.installBusy = false; m.mu.Unlock() }()
-		bundle := filepath.Join(m.rootDir, "imports", "game.zip")
+		bundle := filepath.Join(pathsFor(m.rootDir).Imports(), "game.zip")
 		_ = os.Remove(bundle)
 		m.appendLog("installer", "Launching official Hytale Downloader. Complete the device authorization shown below.")
 		cmd := exec.Command(downloader, "-download-path", bundle)
@@ -204,7 +204,7 @@ func (m *ServerManager) ImportBundle(path string) error {
 }
 
 func (m *ServerManager) importBundleSync(path string) error {
-	tmp := filepath.Join(m.rootDir, ".import-tmp")
+	tmp := filepath.Join(pathsFor(m.rootDir).Tmp(), "import")
 	_ = os.RemoveAll(tmp)
 	if err := os.MkdirAll(tmp, 0755); err != nil {
 		return err
@@ -217,7 +217,7 @@ func (m *ServerManager) importBundleSync(path string) error {
 	if err != nil {
 		return err
 	}
-	dest := filepath.Join(m.rootDir, "game")
+	dest := pathsFor(m.rootDir).Game()
 	if fileExists(filepath.Join(dest, "Server", "HytaleServer.jar")) {
 		return errors.New("a server is already installed; use Hytale's built-in updater instead of overwriting it")
 	}
@@ -314,7 +314,7 @@ func extractZip(src, dst string) error {
 }
 
 func locateGameRoot(root string) (string, error) {
-	candidates := []string{root, filepath.Join(root, "game"), filepath.Join(root, "HytaleServer")}
+	candidates := []string{root, pathsFor(root).Game(), filepath.Join(root, "HytaleServer")}
 	for _, c := range candidates {
 		if fileExists(filepath.Join(c, "Server", "HytaleServer.jar")) && fileExists(filepath.Join(c, "Assets.zip")) {
 			return c, nil
@@ -338,8 +338,8 @@ func locateGameRoot(root string) (string, error) {
 }
 
 func cloneGameInstall(srcRoot, dstRoot string) error {
-	src := filepath.Join(srcRoot, "game")
-	dst := filepath.Join(dstRoot, "game")
+	src := pathsFor(srcRoot).Game()
+	dst := pathsFor(dstRoot).Game()
 	if !fileExists(filepath.Join(src, "Server", "HytaleServer.jar")) {
 		return errors.New("source server files are missing")
 	}

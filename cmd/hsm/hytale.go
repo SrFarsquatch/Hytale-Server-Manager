@@ -48,7 +48,7 @@ func (a *App) serveServerJSONGet(w http.ResponseWriter, r *http.Request, name st
 	if !requireCapability(w, s, "Editing "+name, func(c GameCapability) bool { return c.allowsConfigFile(name) }) {
 		return
 	}
-	path := filepath.Join(a.serverRoot(s), "game", "Server", name)
+	path := filepath.Join(pathsFor(a.serverRoot(s)).Game(), "Server", name)
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		jsonOut(w, 200, map[string]any{"name": name, "exists": false, "content": "{}", "running": m.IsRunning(), "editable": !m.IsRunning()})
@@ -86,7 +86,7 @@ func (a *App) serveServerJSONPut(w http.ResponseWriter, r *http.Request, name st
 		jsonError(w, 400, "file must contain valid JSON: "+err.Error())
 		return
 	}
-	path := filepath.Join(a.serverRoot(s), "game", "Server", name)
+	path := filepath.Join(pathsFor(a.serverRoot(s)).Game(), "Server", name)
 	if err := atomicWrite(path, []byte(body.Content), 0644); err != nil {
 		jsonError(w, 500, err.Error())
 		return
@@ -214,7 +214,7 @@ func (a *App) handleModDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) applyHytaleConfig(s ServerSettings) error {
-	serverDir := filepath.Join(a.serverRoot(s), "game", "Server")
+	serverDir := filepath.Join(pathsFor(a.serverRoot(s)).Game(), "Server")
 	path := filepath.Join(serverDir, "config.json")
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -279,5 +279,5 @@ func (a *App) writeJVMOptionsFor(s ServerSettings) error {
 		return errors.New("invalid JVM memory settings")
 	}
 	lines := []string{"# Managed by Hytale Server Manager - " + s.ServerName, "-Xms" + s.MemoryMin, "-Xmx" + s.MemoryMax, "-XX:+UseG1GC"}
-	return atomicWrite(filepath.Join(a.serverRoot(s), "game", "jvm.options"), []byte(strings.Join(lines, "\n")+"\n"), 0644)
+	return atomicWrite(filepath.Join(pathsFor(a.serverRoot(s)).Game(), "jvm.options"), []byte(strings.Join(lines, "\n")+"\n"), 0644)
 }

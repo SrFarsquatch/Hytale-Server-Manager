@@ -46,7 +46,7 @@ func hytaleExportSource(t *testing.T) (*App, http.Handler, ServerSettings) {
 	writeFile(t, filepath.Join(root, "game", "Assets.zip"), "assets")
 	writeFile(t, filepath.Join(root, "game", "Server", "universe", "worlds", "default", "chunk.bin"), "world-data")
 	writeFile(t, filepath.Join(root, "game", "Server", "backups", "auto.zip"), "native-backup")
-	writeFile(t, filepath.Join(root, "snapshots", "snapshot-1.tar.gz"), "snap")
+	writeFile(t, filepath.Join(pathsFor(root).Snapshots(), "snapshot-1.tar.gz"), "snap")
 	if err := os.Symlink("universe", filepath.Join(root, "game", "Server", "world-link")); err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestExportAndImportMoveAServerToAFreshInstall(t *testing.T) {
 	if link, err := os.Readlink(filepath.Join(root, "game", "Server", "world-link")); err != nil || link != "universe" {
 		t.Errorf("symlink = %q, %v", link, err)
 	}
-	if fileExists(filepath.Join(root, "game", "Server", "backups", "auto.zip")) || fileExists(filepath.Join(root, "snapshots", "snapshot-1.tar.gz")) {
+	if fileExists(filepath.Join(root, "game", "Server", "backups", "auto.zip")) || fileExists(filepath.Join(pathsFor(root).Snapshots(), "snapshot-1.tar.gz")) {
 		t.Error("backups were exported without being asked for")
 	}
 	if got := fresh.cfg.Schedules["alpha"]; len(got) != 1 || got[0].ID != "nightly" {
@@ -108,7 +108,7 @@ func TestExportWithBackupsAndImportBesideTheOriginal(t *testing.T) {
 		t.Errorf("copy reused the original's identity: %#v", s)
 	}
 	root := app.serverRoot(s)
-	if !fileExists(filepath.Join(root, "game", "Server", "backups", "auto.zip")) || !fileExists(filepath.Join(root, "snapshots", "snapshot-1.tar.gz")) {
+	if !fileExists(filepath.Join(root, "game", "Server", "backups", "auto.zip")) || !fileExists(filepath.Join(pathsFor(root).Snapshots(), "snapshot-1.tar.gz")) {
 		t.Error("backups were not included when asked for")
 	}
 }

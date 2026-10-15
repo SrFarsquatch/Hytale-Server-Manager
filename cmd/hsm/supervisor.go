@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -176,7 +175,7 @@ func (m *ServerManager) Start(args []string) error {
 	}
 	cmd := exec.Command(spec.Path, spec.Args...)
 	cmd.Dir = spec.Dir
-	cmd.Env = append(os.Environ(), "HOME="+filepath.Join(m.rootDir, "home"))
+	cmd.Env = append(os.Environ(), "HOME="+pathsFor(m.rootDir).Home())
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

@@ -140,16 +140,16 @@ func (DragonwildsAdapter) ApplySettings(app *App, m *ServerManager, s ServerSett
 }
 
 func (DragonwildsAdapter) InstallStatus(app *App, s ServerSettings) map[string]any {
-	return map[string]any{"game": s.GameType, "paths": map[string]string{"game": filepath.Join(app.serverRoot(s), "game"), "steamcmd": filepath.Join(app.dataDir, "tools", "steamcmd", "steamcmd.sh")}}
+	return map[string]any{"game": s.GameType, "paths": map[string]string{"game": pathsFor(app.serverRoot(s)).Game(), "steamcmd": filepath.Join(app.dataDir, "tools", "steamcmd", "steamcmd.sh")}}
 }
 
 func (DragonwildsAdapter) Installed(rootDir string) bool {
-	return fileExists(filepath.Join(rootDir, "game", "RSDragonwildsServer.sh")) ||
-		fileExists(filepath.Join(rootDir, "game", "RSDragonwilds", "Binaries", "Linux", "RSDragonwildsServer-Linux-Shipping"))
+	return fileExists(filepath.Join(pathsFor(rootDir).Game(), "RSDragonwildsServer.sh")) ||
+		fileExists(filepath.Join(pathsFor(rootDir).Game(), "RSDragonwilds", "Binaries", "Linux", "RSDragonwildsServer-Linux-Shipping"))
 }
 
 func (DragonwildsAdapter) BuildProcess(rootDir string, args []string) (ProcessLaunch, error) {
-	gameDir := filepath.Join(rootDir, "game")
+	gameDir := pathsFor(rootDir).Game()
 	launcher := filepath.Join(gameDir, "RSDragonwildsServer.sh")
 	if fileExists(launcher) {
 		if err := os.Chmod(launcher, 0755); err != nil {
@@ -189,8 +189,8 @@ func (DragonwildsAdapter) PrepareLaunch(app *App, settings ServerSettings) ([]st
 
 func writeDragonwildsConfig(root string, settings ServerSettings) error {
 	configDirs := []string{
-		filepath.Join(root, "game", "RSDragonwilds", "Saved", "Config", "Linux"),
-		filepath.Join(root, "game", "RSDragonwilds", "Saved", "Config", "LinuxServer"),
+		filepath.Join(pathsFor(root).Game(), "RSDragonwilds", "Saved", "Config", "Linux"),
+		filepath.Join(pathsFor(root).Game(), "RSDragonwilds", "Saved", "Config", "LinuxServer"),
 	}
 	worldName := strings.TrimSpace(settings.DragonwildsWorldName)
 	if worldName == "" {
@@ -393,7 +393,7 @@ func (m *ServerManager) installDragonwilds() error {
 		_ = os.Remove(tmpArchive)
 	}
 	_ = os.Chmod(steamCMD, 0755)
-	gameDir := filepath.Join(m.rootDir, "game")
+	gameDir := pathsFor(m.rootDir).Game()
 	if err := os.MkdirAll(gameDir, 0755); err != nil {
 		return err
 	}
@@ -431,7 +431,7 @@ var (
 func (m *ServerManager) runSteamCMD(steamCMD, steamDir string, args []string) error {
 	cmd := exec.Command(steamCMD, args...)
 	cmd.Dir = steamDir
-	cmd.Env = append(os.Environ(), "HOME="+filepath.Join(m.rootDir, "home"))
+	cmd.Env = append(os.Environ(), "HOME="+pathsFor(m.rootDir).Home())
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err

@@ -153,7 +153,7 @@ func TestUploadWorldKeepsThePreviousCopyAndLoadsTheUpload(t *testing.T) {
 	if len(got.Archives) != 1 || !reflect.DeepEqual(got.Archives[0].Files, []string{"Old Vale.backup", "Old Vale.sav"}) {
 		t.Fatalf("archives = %+v", got.Archives)
 	}
-	if b, _ := os.ReadFile(filepath.Join(root, "world-backups", got.Archives[0].ID, "Old Vale.sav")); string(b) != "old" {
+	if b, _ := os.ReadFile(filepath.Join(pathsFor(root).WorldBackups(), got.Archives[0].ID, "Old Vale.sav")); string(b) != "old" {
 		t.Errorf("archived copy = %q", b)
 	}
 

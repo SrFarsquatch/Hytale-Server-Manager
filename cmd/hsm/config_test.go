@@ -192,8 +192,9 @@ func TestLoadConfigDefaultsMissingGameTypeToHytale(t *testing.T) {
 	if got := a.cfg.Servers[0].ID; got != "legacy" {
 		t.Fatalf("legacy server ID changed to %q", got)
 	}
-	if got := a.cfg.Servers[0].StorageDir; got != "." {
-		t.Fatalf("legacy storage directory changed to %q", got)
+	// A server kept in the data folder moves to servers/<id> (see storage.go).
+	if got := a.cfg.Servers[0].StorageDir; got != filepath.Join("servers", "legacy") {
+		t.Fatalf("legacy storage directory = %q, want servers/legacy", got)
 	}
 }
 

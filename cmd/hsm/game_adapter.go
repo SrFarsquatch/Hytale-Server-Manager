@@ -166,13 +166,13 @@ func (HytaleAdapter) ApplySettings(app *App, m *ServerManager, s ServerSettings)
 func (HytaleAdapter) InstallStatus(app *App, s ServerSettings) map[string]any {
 	root := app.serverRoot(s)
 	downloader := filepath.Join(app.dataDir, "tools", "hytale-downloader")
-	bundle := filepath.Join(root, "imports", "game.zip")
-	return map[string]any{"downloaderPresent": fileExists(downloader), "bundlePresent": fileExists(bundle), "paths": map[string]string{"downloader": downloader, "bundle": bundle, "game": filepath.Join(root, "game")}}
+	bundle := filepath.Join(pathsFor(root).Imports(), "game.zip")
+	return map[string]any{"downloaderPresent": fileExists(downloader), "bundlePresent": fileExists(bundle), "paths": map[string]string{"downloader": downloader, "bundle": bundle, "game": pathsFor(root).Game()}}
 }
 
 func (HytaleAdapter) Installed(rootDir string) bool {
-	return fileExists(filepath.Join(rootDir, "game", "Server", "HytaleServer.jar")) &&
-		fileExists(filepath.Join(rootDir, "game", "Assets.zip"))
+	return fileExists(filepath.Join(pathsFor(rootDir).Game(), "Server", "HytaleServer.jar")) &&
+		fileExists(filepath.Join(pathsFor(rootDir).Game(), "Assets.zip"))
 }
 
 func (HytaleAdapter) PrepareLaunch(app *App, settings ServerSettings) ([]string, error) {
@@ -191,7 +191,7 @@ func (HytaleAdapter) PrepareLaunch(app *App, settings ServerSettings) ([]string,
 }
 
 func (HytaleAdapter) BuildProcess(rootDir string, args []string) (ProcessLaunch, error) {
-	gameDir := filepath.Join(rootDir, "game")
+	gameDir := pathsFor(rootDir).Game()
 	startScript := filepath.Join(gameDir, "start.sh")
 	if !fileExists(startScript) {
 		return ProcessLaunch{}, errors.New("game/start.sh is missing; import an official server bundle or run /update setup first")

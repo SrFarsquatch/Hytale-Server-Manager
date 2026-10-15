@@ -307,7 +307,7 @@ func removeServerData(root string, sharedRoot bool) error {
 	if !sharedRoot {
 		return os.RemoveAll(root)
 	}
-	for _, name := range []string{"game", "imports", "snapshots", "home", "backups"} {
+	for _, name := range append([]string{"tmp"}, legacyRootEntries...) {
 		if err := os.RemoveAll(filepath.Join(root, name)); err != nil {
 			return fmt.Errorf("remove server data %s: %w", name, err)
 		}

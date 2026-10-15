@@ -24,9 +24,9 @@ var hytaleSnapshotEntries = []string{"universe", "mods", "config.json", "permiss
 func snapshotSpecFor(root string, s ServerSettings) (snapshotSpec, bool) {
 	switch normalizeGameType(s.GameType) {
 	case "hytale":
-		return snapshotSpec{Base: filepath.Join(root, "game", "Server"), Include: hytaleSnapshotEntries}, true
+		return snapshotSpec{Base: filepath.Join(pathsFor(root).Game(), "Server"), Include: hytaleSnapshotEntries}, true
 	case "minecraft-java":
-		game := filepath.Join(root, "game")
+		game := pathsFor(root).Game()
 		level := minecraftLevelName(game)
 		// Vanilla keeps every dimension inside the level folder; Bukkit-style
 		// servers use sibling _nether/_the_end folders, captured when present.
@@ -45,7 +45,7 @@ func snapshotSpecFor(root string, s ServerSettings) (snapshotSpec, bool) {
 			// Modded worlds need the same mods and their settings.
 			include = append(include, "Mods", "ModConfigs")
 		}
-		return snapshotSpec{Base: filepath.Join(root, "game"), Include: include}, true
+		return snapshotSpec{Base: pathsFor(root).Game(), Include: include}, true
 	}
 	return snapshotSpec{}, false
 }

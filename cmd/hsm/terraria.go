@@ -102,7 +102,7 @@ func (TerrariaAdapter) MergeSettings(in *ServerSettings, current ServerSettings)
 func (TerrariaAdapter) ApplySettings(*App, *ServerManager, ServerSettings) error { return nil }
 
 func (TerrariaAdapter) InstallStatus(app *App, s ServerSettings) map[string]any {
-	gameDir := filepath.Join(app.serverRoot(s), "game")
+	gameDir := pathsFor(app.serverRoot(s)).Game()
 	info, _ := readTerrariaInstallInfo(gameDir)
 	return map[string]any{
 		"game": s.GameType, "version": s.TerrariaVersion, "installedVersion": info.Version,
@@ -113,7 +113,7 @@ func (TerrariaAdapter) InstallStatus(app *App, s ServerSettings) map[string]any 
 }
 
 func (TerrariaAdapter) Installed(rootDir string) bool {
-	return fileExists(filepath.Join(rootDir, "game", terrariaBinary)) || tmodloaderInstalled(filepath.Join(rootDir, "game"))
+	return fileExists(filepath.Join(pathsFor(rootDir).Game(), terrariaBinary)) || tmodloaderInstalled(pathsFor(rootDir).Game())
 }
 
 func (TerrariaAdapter) PrepareLaunch(app *App, s ServerSettings) ([]string, error) {
@@ -129,14 +129,14 @@ func (TerrariaAdapter) PrepareLaunch(app *App, s ServerSettings) ([]string, erro
 	if tml {
 		// -nosteam skips the start script's interactive Steam prompt. The save
 		// directory keeps worlds, mods and mod configs inside the server folder.
-		gameDir := filepath.Join(app.serverRoot(s), "game")
+		gameDir := pathsFor(app.serverRoot(s)).Game()
 		args = append([]string{"-nosteam"}, append(args, "-tmlsavedirectory", gameDir)...)
 	}
 	return append(args, splitArgs(s.ExtraArgs)...), nil
 }
 
 func (TerrariaAdapter) BuildProcess(rootDir string, args []string) (ProcessLaunch, error) {
-	gameDir := filepath.Join(rootDir, "game")
+	gameDir := pathsFor(rootDir).Game()
 	if tmodloaderInstalled(gameDir) {
 		script := filepath.Join(gameDir, tmodloaderStartScript)
 		return ProcessLaunch{Path: "bash", Args: append([]string{script}, args...), Dir: gameDir}, nil
@@ -185,7 +185,7 @@ func oneLine(s string) string {
 // and keeps any other lines the owner added. The world is generated on first
 // start (autocreate) and loaded on later starts.
 func writeTerrariaConfig(root string, s ServerSettings) (string, error) {
-	gameDir := filepath.Join(root, "game")
+	gameDir := pathsFor(root).Game()
 	worlds := filepath.Join(gameDir, "Worlds")
 	if err := os.MkdirAll(worlds, 0755); err != nil {
 		return "", err
@@ -372,8 +372,12 @@ func (m *ServerManager) installTerraria(version string) error {
 // installServerZip downloads a server zip, extracts it to a staging folder and
 // copies the folder holding marker into game/. It returns the game folder.
 func (m *ServerManager) installServerZip(ctx context.Context, client *http.Client, zipURL, marker, what string) (string, error) {
-	zipPath := filepath.Join(m.rootDir, ".server-download.zip")
-	staging := filepath.Join(m.rootDir, ".server-extract")
+	tmp := pathsFor(m.rootDir).Tmp()
+	if err := os.MkdirAll(tmp, 0755); err != nil {
+		return "", err
+	}
+	zipPath := filepath.Join(tmp, "server-download.zip")
+	staging := filepath.Join(tmp, "server-extract")
 	defer os.Remove(zipPath)
 	defer os.RemoveAll(staging)
 	_ = os.RemoveAll(staging)
@@ -394,7 +398,7 @@ func (m *ServerManager) installServerZip(ctx context.Context, client *http.Clien
 	if dir == "" {
 		return "", errors.New("the download does not contain " + what)
 	}
-	gameDir := filepath.Join(m.rootDir, "game")
+	gameDir := pathsFor(m.rootDir).Game()
 	if err := os.MkdirAll(filepath.Join(gameDir, "Worlds"), 0755); err != nil {
 		return "", err
 	}
