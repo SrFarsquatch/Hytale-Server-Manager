@@ -31,8 +31,20 @@ func crashTestApp(t *testing.T, autoRestart bool, script string) (*App, *ServerM
 		app.cfgMu.Lock()
 		app.cfg.Servers[0].AutoRestart = false
 		app.cfgMu.Unlock()
-		if pid := currentPID(m); pid > 0 {
-			_ = syscall.Kill(-pid, syscall.SIGKILL)
+		// A restart already past its auto-restart check can still start the
+		// server and write its config files. Wait until the server is stopped
+		// and the log is quiet, so the temp folder is not removed while it is
+		// being written.
+		deadline := time.Now().Add(5 * time.Second)
+		for last := -1; time.Now().Before(deadline); time.Sleep(150 * time.Millisecond) {
+			if pid := currentPID(m); pid > 0 {
+				_ = syscall.Kill(-pid, syscall.SIGKILL)
+			}
+			n := len(m.logs.Snapshot())
+			if n == last && !m.IsRunning() {
+				break
+			}
+			last = n
 		}
 	})
 	return app, m, s
