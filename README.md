@@ -1,6 +1,8 @@
-# Hytale Server Manager
+# Realmkeeper
 
-A self-hosted web panel for running multiple Hytale dedicated servers from one Linux host. It is designed for Docker and CasaOS and is not affiliated with or endorsed by Hypixel Studios.
+A self-hosted web panel for running game servers (Hytale, Minecraft Java, RuneScape: Dragonwilds and Terraria) from one Linux host. It is designed for Docker and CasaOS and is not affiliated with or endorsed by Hypixel Studios, Mojang, Jagex or Re-Logic.
+
+Realmkeeper used to be called Hytale Server Manager (HSM); see [Upgrading from Hytale Server Manager](#upgrading-from-hytale-server-manager).
 
 ## What it manages
 
@@ -31,7 +33,7 @@ A self-hosted web panel for running multiple Hytale dedicated servers from one L
 - **Terraria (vanilla or tModLoader):**
   - choose the server type when creating the server:
     - **Vanilla:** the official server from terraria.org (`latest` or a chosen release such as `1.4.4.9`). The Linux server runs only on x86-64 (amd64) hosts.
-    - **tModLoader:** the latest (or a chosen) release from GitHub. The first start downloads the .NET runtime into the server folder, so it also runs on ARM hosts. Upload `.tmod` files from the Mods tab; HSM keeps `Mods/enabled.json` in sync. Workshop mods can be copied from a game client's `steamapps/workshop/content/1281930` folder.
+    - **tModLoader:** the latest (or a chosen) release from GitHub. The first start downloads the .NET runtime into the server folder, so it also runs on ARM hosts. Upload `.tmod` files from the Mods tab; Realmkeeper keeps `Mods/enabled.json` in sync. Workshop mods can be copied from a game client's `steamapps/workshop/content/1281930` folder.
   - world name, size and difficulty chosen at creation; the world is generated on first start
   - `serverconfig.txt` written before each start, keeping any extra lines you add
   - console, player list (`playing`), graceful stop (`exit` saves the world)
@@ -39,7 +41,7 @@ A self-hosted web panel for running multiple Hytale dedicated servers from one L
   - uses TCP in the published `5520`–`5525` range (shared with Hytale)
 - **RuneScape: Dragonwilds:**
   - SteamCMD install (retried when SteamCMD reports "Missing configuration"), dedicated-server settings and console output
-  - a Worlds tab: upload a world's `.sav` (and `.backup`) from `%LOCALAPPDATA%\RSDragonwilds\Saved\SaveGames`, choose which world loads next (it becomes the newest save and the default world name), start a new world, and restore worlds HSM moved aside. Nothing is deleted: replaced or removed saves go to `backups/worlds/` in the server folder.
+  - a Worlds tab: upload a world's `.sav` (and `.backup`) from `%LOCALAPPDATA%\RSDragonwilds\Saved\SaveGames`, choose which world loads next (it becomes the newest save and the default world name), start a new world, and restore worlds Realmkeeper moved aside. Nothing is deleted: replaced or removed saves go to `backups/worlds/` in the server folder.
   - World rules (Standard, Custom or Creative) live in the save: create the world in the game with the rules you want and upload it, or change settings in game from Settings → Server Management with the admin password.
   - snapshots of the saves and the game's config while the server is stopped
 
@@ -63,9 +65,9 @@ The in-app file manager shows one server's folder. Older installs are moved to t
 
 ### Moving a server (export and import)
 
-- **Export** (a server's Settings tab, server stopped) downloads one `.tar.gz` with the server's `game` folder (installed server, worlds, settings, mods) and its HSM settings and schedules. Tick **with backups** to include snapshots and backups, which can be large. The export contains the server's passwords; keep it private.
+- **Export** (a server's Settings tab, server stopped) downloads one `.tar.gz` with the server's `game` folder (installed server, worlds, settings, mods) and its Realmkeeper settings and schedules. Tick **with backups** to include snapshots and backups, which can be large. The export contains the server's passwords; keep it private.
 - **Import** (My Servers, or the welcome screen on a fresh install) uploads an export and creates a new server from it. It keeps the name, settings, world and schedules; it gets a new ID if that one is taken, and a new port if its port is in use or outside the game's range.
-- To reinstall HSM from scratch: stop each server, export it, reinstall, then import the files. Hytale may ask you to authenticate the server again on its first start.
+- To reinstall Realmkeeper from scratch: stop each server, export it, reinstall, then import the files. Hytale may ask you to authenticate the server again on its first start.
 
 ### Schedules and crash recovery
 
@@ -80,8 +82,8 @@ Restoring a snapshot first saves a safety copy, then replaces the world and sett
 ## Run with Docker Compose
 
 ```bash
-git clone https://github.com/SrFarsquatch/Hytale-Server-Manager.git
-cd Hytale-Server-Manager
+git clone https://github.com/SrFarsquatch/Hytale-Server-Manager.git realmkeeper
+cd realmkeeper
 ./install.sh
 ```
 
@@ -94,24 +96,21 @@ The default Hytale UDP range is `5520-5525`. Each running instance gets its own 
 Use `docker-compose.casaos.yml`. It pulls the published multi-architecture image from GitHub Container Registry. New installs store persistent data in:
 
 ```text
-/DATA/AppData/hytale-server-manager
+/DATA/AppData/realmkeeper
 ```
 
 Both supplied Compose files explicitly configure container DNS (Cloudflare `1.1.1.1` and Google `8.8.8.8`) because Hytale's OAuth/device login and token refresh require the manager container to resolve Hytale authentication hosts. Hytale server processes run inside the manager container, so this setting covers their authentication requests too. If your network blocks public DNS or requires a local DNS resolver, replace these entries with DNS servers reachable from your host network.
 
-## Existing Orbis v0.4 data
+## Upgrading from Hytale Server Manager
 
-The backend still accepts the old `ORBIS_*` environment variables, `X-Orbis-Server` header and `orbis_session` cookie for migration compatibility. If you already have data under an older bind mount, point the new container at that same directory instead of creating a new empty volume.
+Realmkeeper is the same app under a new name. Existing installs keep working:
 
-## Server layout
+- **In-app updates** carry on as before: the updater keeps the container's name, data folder, ports and settings. Images are published under both `ghcr.io/srfarsquatch/realmkeeper` and the old `ghcr.io/srfarsquatch/hytale-server-manager`.
+- **Settings:** the environment variables are now `REALMKEEPER_*` (for example `REALMKEEPER_DATA_DIR`). The old `HSM_*` names, and the `ORBIS_*` names from Orbis v0.4, are still read when the new one is not set.
+- **Sign-in** sessions and the remembered server carry over.
+- **Exports** made by Hytale Server Manager import into Realmkeeper.
 
-The first server remains compatible with the original single-server storage layout. Additional servers are kept under:
-
-```text
-/data/servers/<server-id>/
-```
-
-Each instance keeps its own `game/`, imports, snapshots, Hytale world/universe data, mods, configuration and backups.
+A new CasaOS install of Realmkeeper uses `/DATA/AppData/realmkeeper`. To keep an existing install's servers, either export each server and import it into the new install, or point the new app's `/data` at the old `/DATA/AppData/hytale-server-manager` folder. Stop the old app first: both use the same ports.
 
 ## First-run setup
 
@@ -139,8 +138,8 @@ If the error persists, the DNS servers may be unreachable or outbound HTTPS may 
 
 The web panel uses TCP `8008` on the host and container. The Compose and CasaOS definitions publish:
 
-- `5520`–`5525` over UDP and TCP, for Hytale (UDP/QUIC) and Terraria (TCP) servers. `HSM_GAME_PORT_START` and `HSM_GAME_PORT_END` must match this range.
-- `25565`–`25570` over TCP, for Minecraft Java servers. It starts at Minecraft's default port, so players can join the first server with just the address. `HSM_MINECRAFT_PORT_START` and `HSM_MINECRAFT_PORT_END` must match this range.
+- `5520`–`5525` over UDP and TCP, for Hytale (UDP/QUIC) and Terraria (TCP) servers. `REALMKEEPER_GAME_PORT_START` and `REALMKEEPER_GAME_PORT_END` must match this range.
+- `25565`–`25570` over TCP, for Minecraft Java servers. It starts at Minecraft's default port, so players can join the first server with just the address. `REALMKEEPER_MINECRAFT_PORT_START` and `REALMKEEPER_MINECRAFT_PORT_END` must match this range.
 - `7777`–`7782` over UDP, for RuneScape: Dragonwilds servers.
 
 Minecraft servers created before the 25565 range keep their port; change it in the server's Settings to move one onto the new range.
@@ -156,9 +155,9 @@ This project does not bundle proprietary Hytale server files. Install them with 
 Official icons and logos for Hytale, Minecraft Java, RuneScape: Dragonwilds and Terraria are bundled. A game without artwork falls back to a coloured monogram. Artwork is optional, bundled into the build, and only used when the file exists:
 
 ```text
-cmd/hsm/web/assets/games/art/<game-id>-icon.webp    square, 256×256, transparent background
-cmd/hsm/web/assets/games/art/<game-id>-logo.webp    the game's wordmark, shown on the Overview card
-cmd/hsm/web/assets/games/art/<game-id>-banner.jpg   optional wide background, about 1200×400
+cmd/realmkeeper/web/assets/games/art/<game-id>-icon.webp    square, 256×256, transparent background
+cmd/realmkeeper/web/assets/games/art/<game-id>-logo.webp    the game's wordmark, shown on the Overview card
+cmd/realmkeeper/web/assets/games/art/<game-id>-banner.jpg   optional wide background, about 1200×400
 ```
 
 Game IDs: `hytale`, `minecraft-java`, `runescape-dragonwilds`, `terraria`. Accepted formats: PNG, WebP, JPG/JPEG or SVG. Rebuild the image after adding files. Game logos and artwork belong to their publishers; only add artwork you are permitted to use.
@@ -167,9 +166,9 @@ Game IDs: `hytale`, `minecraft-java`, `runescape-dragonwilds`, `terraria`. Accep
 
 ```bash
 go vet ./... && go test ./...
-node --check cmd/hsm/web/app.js
+node --check cmd/realmkeeper/web/app.js
 # Browser regression test for server switching (needs the `playwright` npm package and Chromium):
-go build -o /tmp/hsm ./cmd/hsm && node tests/browser/workspace-selection.mjs /tmp/hsm
+go build -o /tmp/realmkeeper ./cmd/realmkeeper && node tests/browser/workspace-selection.mjs /tmp/realmkeeper
 ```
 
-CI runs the same browser test as a separate `browser` job. The browser test starts its own HSM instance against a temporary data directory and uses a fake Hytale `start.sh`, so it never downloads games or touches real server data. See `docs/audit-2026-10-workspace-selection.md` for the current audit and backlog.
+CI runs the same browser test as a separate `browser` job. The browser test starts its own Realmkeeper instance against a temporary data directory and uses a fake Hytale `start.sh`, so it never downloads games or touches real server data. See `docs/audit-2026-10-workspace-selection.md` for the current audit and backlog.

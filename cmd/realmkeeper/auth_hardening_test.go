@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -45,5 +46,21 @@ func TestClientAddressUsesRemoteAddrNotForwardedHeader(t *testing.T) {
 	r.Header.Set("X-Forwarded-For", "198.51.100.7")
 	if got := clientAddress(r); got != "192.0.2.9" {
 		t.Fatalf("clientAddress() = %q, want actual peer IP", got)
+	}
+}
+
+func TestLoginsFromBeforeTheRenameStayValid(t *testing.T) {
+	app := &App{dataDir: t.TempDir(), managers: map[string]*ServerManager{}, sessions: map[string]Session{}}
+	mux := http.NewServeMux()
+	app.routes(mux)
+	token := app.newSession("admin")
+	for _, name := range []string{sessionCookieName, "hsm_session", "orbis_session"} {
+		req := httptest.NewRequest("GET", "/api/servers", nil)
+		req.AddCookie(&http.Cookie{Name: name, Value: token})
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != 200 {
+			t.Errorf("%s cookie: GET /api/servers = %d", name, rec.Code)
+		}
 	}
 }

@@ -11,7 +11,7 @@ import (
 )
 
 // minecraftProperty is one server.properties key offered in the structured
-// form. Keys HSM already manages from server settings (port, MOTD, players,
+// form. Keys Realmkeeper already manages from server settings (port, MOTD, players,
 // game mode, whitelist, online mode) are deliberately not listed here.
 type minecraftProperty struct {
 	Key      string   `json:"key"`

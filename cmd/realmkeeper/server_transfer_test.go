@@ -56,7 +56,7 @@ func hytaleExportSource(t *testing.T) (*App, http.Handler, ServerSettings) {
 func TestExportAndImportMoveAServerToAFreshInstall(t *testing.T) {
 	_, srcMux, _ := hytaleExportSource(t)
 	rec := exportServer(t, srcMux, "alpha", "")
-	if rec.Code != 200 || !strings.Contains(rec.Header().Get("Content-Disposition"), "hsm-alpha-") {
+	if rec.Code != 200 || !strings.Contains(rec.Header().Get("Content-Disposition"), "realmkeeper-alpha-") {
 		t.Fatalf("export = %d %s", rec.Code, rec.Header())
 	}
 

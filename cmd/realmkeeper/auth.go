@@ -212,7 +212,7 @@ func (a *App) validSession(token string) bool {
 }
 
 func (a *App) setSessionCookie(w http.ResponseWriter, token string) {
-	http.SetCookie(w, &http.Cookie{Name: "hsm_session", Value: token, Path: "/", MaxAge: 7 * 24 * 3600, HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: false})
+	http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Value: token, Path: "/", MaxAge: 7 * 24 * 3600, HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: false})
 }
 
 func hashPassword(password string) (string, error) {
@@ -271,15 +271,23 @@ func pbkdf2SHA256(password, salt []byte, iterations, keyLen int) []byte {
 	return out[:keyLen]
 }
 
+// sessionCookieName is the login cookie. Logins from before the rename used
+// one of legacySessionCookies; they stay valid until they expire.
+const sessionCookieName = "realmkeeper_session"
+
+var legacySessionCookies = []string{"hsm_session", "orbis_session"}
+
 func sessionCookie(r *http.Request) (*http.Cookie, error) {
-	if c, err := r.Cookie("hsm_session"); err == nil {
-		return c, nil
+	for _, name := range append([]string{sessionCookieName}, legacySessionCookies...) {
+		if c, err := r.Cookie(name); err == nil {
+			return c, nil
+		}
 	}
-	return r.Cookie("orbis_session")
+	return nil, http.ErrNoCookie
 }
 
 func clearSessionCookies(w http.ResponseWriter) {
-	for _, name := range []string{"hsm_session", "orbis_session"} {
+	for _, name := range append([]string{sessionCookieName}, legacySessionCookies...) {
 		http.SetCookie(w, &http.Cookie{Name: name, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode})
 	}
 }

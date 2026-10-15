@@ -220,7 +220,7 @@ func writeDragonwildsConfig(root string, settings ServerSettings) error {
 	return nil
 }
 
-// mergeDragonwildsINI updates only the keys managed by HSM, preserving other
+// mergeDragonwildsINI updates only the keys managed by Realmkeeper, preserving other
 // settings and game-generated admin-account entries in the INI file.
 func mergeDragonwildsINI(path string, values []struct{ key, value string }) error {
 	const section = "[/script/dominion.dedicatedserversettings]"

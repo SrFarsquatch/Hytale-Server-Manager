@@ -21,7 +21,7 @@ import (
 // A server export is a .tar.gz holding hsm-export.json (the server's
 // settings, including its passwords, and schedules) followed by the server's
 // files under files/. Importing it creates a new server, so a server can move
-// to a fresh install of HSM or another machine.
+// to a fresh install or another machine.
 
 const exportManifestName = "hsm-export.json"
 
@@ -62,7 +62,7 @@ func (a *App) handleServerExport(w http.ResponseWriter, r *http.Request) {
 	schedules := append([]Schedule(nil), a.cfg.Schedules[s.ID]...)
 	a.cfgMu.RUnlock()
 	manifest, err := json.MarshalIndent(serverExport{
-		Format: 1, App: "hytale-server-manager", AppVersion: version,
+		Format: 1, App: "realmkeeper", AppVersion: version,
 		ExportedAt: time.Now().UTC().Format(time.RFC3339), Server: s, Schedules: schedules,
 	}, "", "  ")
 	if err != nil {
@@ -70,7 +70,7 @@ func (a *App) handleServerExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	name := fmt.Sprintf("hsm-%s-%s.tar.gz", s.ID, time.Now().Format("20060102-150405"))
+	name := fmt.Sprintf("realmkeeper-%s-%s.tar.gz", s.ID, time.Now().Format("20060102-150405"))
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", name))
 	m.appendLog("controller", "Exporting server to "+name)
@@ -163,14 +163,14 @@ func writeServerExport(w io.Writer, root string, manifest []byte, withBackups bo
 func (a *App) handleServerImport(w http.ResponseWriter, r *http.Request) {
 	gz, err := gzip.NewReader(r.Body)
 	if err != nil {
-		jsonError(w, 400, "this is not an HSM server export (.tar.gz)")
+		jsonError(w, 400, "this is not a Realmkeeper server export (.tar.gz)")
 		return
 	}
 	defer gz.Close()
 	tr := tar.NewReader(gz)
 	hdr, err := tr.Next()
 	if err != nil || hdr.Name != exportManifestName || hdr.Size > 4<<20 {
-		jsonError(w, 400, "this is not an HSM server export: "+exportManifestName+" must come first")
+		jsonError(w, 400, "this is not a Realmkeeper server export: "+exportManifestName+" must come first")
 		return
 	}
 	var manifest serverExport
@@ -256,7 +256,7 @@ func (a *App) handleServerImport(w http.ResponseWriter, r *http.Request) {
 	if game == "runescape-dragonwilds" {
 		a.rememberDragonwildsOwner(s.DragonwildsOwnerID)
 	}
-	m.appendLog("controller", fmt.Sprintf("Imported from an export made %s by HSM %s", manifest.ExportedAt, manifest.AppVersion))
+	m.appendLog("controller", fmt.Sprintf("Imported from an export made %s by version %s", manifest.ExportedAt, manifest.AppVersion))
 	if schedErr != nil {
 		m.appendLog("controller", "Schedules were not imported: "+schedErr.Error())
 	}

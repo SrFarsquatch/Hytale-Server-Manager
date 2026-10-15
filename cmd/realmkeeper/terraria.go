@@ -181,7 +181,7 @@ func oneLine(s string) string {
 	return strings.NewReplacer("\r", " ", "\n", " ", "\x00", "").Replace(s)
 }
 
-// writeTerrariaConfig writes the settings HSM manages into serverconfig.txt
+// writeTerrariaConfig writes the settings Realmkeeper manages into serverconfig.txt
 // and keeps any other lines the owner added. The world is generated on first
 // start (autocreate) and loaded on later starts.
 func writeTerrariaConfig(root string, s ServerSettings) (string, error) {

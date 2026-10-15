@@ -1,12 +1,12 @@
 // Browser regression test for server selection and workspace isolation.
 //
-// It starts a real HSM binary against a throwaway data directory, creates a
+// It starts a real Realmkeeper binary against a throwaway data directory, creates a
 // Hytale server backed by a fake start.sh (no game download), a Minecraft Java
 // server and a Dragonwilds server, then drives the UI in Chromium.
 //
 // Usage:
-//   go build -o /tmp/hsm ./cmd/hsm
-//   node tests/browser/workspace-selection.mjs /tmp/hsm
+//   go build -o /tmp/realmkeeper ./cmd/realmkeeper
+//   node tests/browser/workspace-selection.mjs /tmp/realmkeeper
 //
 // Playwright is resolved from PLAYWRIGHT_MODULE when set, otherwise from the
 // "playwright" package (npm install playwright).
@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 
 const binary = process.argv[2];
 if (!binary) {
-  console.error('usage: node tests/browser/workspace-selection.mjs <path-to-hsm-binary>');
+  console.error('usage: node tests/browser/workspace-selection.mjs <path-to-realmkeeper-binary>');
   process.exit(2);
 }
 const playwrightModule = process.env.PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : 'playwright';
@@ -27,9 +27,9 @@ const { chromium } = await import(playwrightModule);
 
 const port = 18000 + Math.floor(Math.random() * 1000);
 const base = `http://127.0.0.1:${port}`;
-const dataDir = mkdtempSync(join(tmpdir(), 'hsm-browser-'));
+const dataDir = mkdtempSync(join(tmpdir(), 'realmkeeper-browser-'));
 // A stand-in `java` so Minecraft servers can run without Mojang's jar.
-const fakeBin = mkdtempSync(join(tmpdir(), 'hsm-fake-java-'));
+const fakeBin = mkdtempSync(join(tmpdir(), 'realmkeeper-fake-java-'));
 writeFileSync(join(fakeBin, 'java'), [
   '#!/bin/bash',
   'if [ "$1" = "-version" ]; then echo \'openjdk version "21.0.4"\' >&2; exit 0; fi',
@@ -42,7 +42,7 @@ writeFileSync(join(fakeBin, 'java'), [
   'done',
 ].join('\n'), { mode: 0o755 });
 const server = spawn(binary, [], {
-  env: { ...process.env, PATH: fakeBin + ':' + process.env.PATH, HSM_DATA_DIR: dataDir, HSM_LISTEN: `127.0.0.1:${port}`, HSM_GAME_PORT_START: '5520', HSM_GAME_PORT_END: '5525' },
+  env: { ...process.env, PATH: fakeBin + ':' + process.env.PATH, REALMKEEPER_DATA_DIR: dataDir, REALMKEEPER_LISTEN: `127.0.0.1:${port}`, REALMKEEPER_GAME_PORT_START: '5520', REALMKEEPER_GAME_PORT_END: '5525' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let serverOutput = '';
@@ -67,7 +67,7 @@ async function waitForServer() {
   for (let i = 0; i < 50; i++) {
     try { await fetch(base + '/api/health'); return; } catch { await new Promise(r => setTimeout(r, 100)); }
   }
-  throw new Error('HSM did not start:\n' + serverOutput);
+  throw new Error('Realmkeeper did not start:\n' + serverOutput);
 }
 
 function fakeMinecraftInstall(id) {
@@ -443,7 +443,7 @@ try {
     await waitForName('Charlie Dragonwilds');
     await page.click('[data-view-tab="settings"]');
     const [download] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }), page.click('#export-server')]);
-    assert.match(download.suggestedFilename(), /^hsm-charlie-dragonwilds-.*\.tar\.gz$/);
+    assert.match(download.suggestedFilename(), /^realmkeeper-charlie-dragonwilds-.*\.tar\.gz$/);
     const file = await download.path();
     await page.click('#back-to-servers').catch(() => page.click('[data-view="servers"]'));
     await page.waitForSelector('[data-import-server]:visible', { timeout: 5000 });

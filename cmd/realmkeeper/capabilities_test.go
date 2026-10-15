@@ -193,7 +193,7 @@ func newTestMux(app *App) http.Handler {
 	mux := http.NewServeMux()
 	app.routes(mux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r.AddCookie(&http.Cookie{Name: "hsm_session", Value: token})
+		r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
 		mux.ServeHTTP(w, r)
 	})
 }

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#151a24">
-  <title>HSM · Game Server Control Panel</title>
+  <title>Realmkeeper · Game Server Panel</title>
   <link rel="stylesheet" href="/app.css?v=20261016-export1">
 </head>
 <body>
@@ -41,7 +41,7 @@
 
   <div id="auth" class="auth-shell hidden">
     <form id="auth-form" class="auth-card">
-      <div class="brand-mark-row"><span class="brand-mark" aria-hidden="true">H</span><span class="auth-product">HSM Game Server Manager</span></div>
+      <div class="brand-mark-row"><span class="brand-mark" aria-hidden="true">R</span><span class="auth-product">Realmkeeper</span></div>
       <h1 id="auth-title">Sign in</h1>
       <p id="auth-copy" class="muted">Manage your game servers on this host.</p>
       <label>Username<input id="auth-user" autocomplete="username" value="admin" required></label>
@@ -54,15 +54,15 @@
   <div id="app" class="app hidden">
     <header class="mobile-bar">
       <button type="button" id="nav-toggle" class="icon-btn" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false"><svg class="icon"><use href="#i-menu"/></svg></button>
-      <span class="brand-mark small" aria-hidden="true">H</span>
-      <span id="mobile-context" class="mobile-context">HSM</span>
+      <span class="brand-mark small" aria-hidden="true">R</span>
+      <span id="mobile-context" class="mobile-context">Realmkeeper</span>
     </header>
     <div id="sidebar-scrim" class="sidebar-scrim" hidden></div>
 
     <aside id="sidebar" class="sidebar" aria-label="Navigation">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true">H</span>
-        <div><strong>HSM</strong><small>Game server panel · v0.6.0</small></div>
+        <span class="brand-mark" aria-hidden="true">R</span>
+        <div><strong>Realmkeeper</strong><small>Game server panel · v0.6.0</small></div>
       </div>
 
       <nav id="nav" class="side-section" aria-label="Main navigation">
@@ -131,7 +131,7 @@
         <section id="view-servers" class="view active">
           <div id="first-run" class="welcome hidden">
             <div class="welcome-card">
-              <span class="brand-mark large" aria-hidden="true">H</span>
+              <span class="brand-mark large" aria-hidden="true">R</span>
               <h2>Create your first server</h2>
               <p class="muted">Pick a game, choose a few settings, then install the server files. Nothing is created until you confirm.</p>
               <button type="button" id="first-create" class="btn primary large"><svg class="icon"><use href="#i-plus"/></svg>Create server</button>
@@ -222,7 +222,7 @@
                   <svg id="usage-svg" viewBox="0 0 600 220" preserveAspectRatio="none" aria-hidden="true"></svg>
                   <div id="usage-tooltip" class="usage-tooltip hidden"></div>
                 </div>
-                <p class="muted small">Measured for the whole HSM container every 2 seconds while this page is open; the data volume shows the filesystem holding /data.</p>
+                <p class="muted small">Measured for the whole Realmkeeper container every 2 seconds while this page is open; the data volume shows the filesystem holding /data.</p>
               </section>
             </div>
           </div>
@@ -288,7 +288,7 @@
             </ul>
           </section>
           <section class="card" id="world-archive-card">
-            <div class="card-head"><div><h3>World backups</h3><p class="muted small">Saves replaced, removed or moved aside by HSM. Restore one to use it again.</p></div></div>
+            <div class="card-head"><div><h3>World backups</h3><p class="muted small">Saves replaced, removed or moved aside by Realmkeeper. Restore one to use it again.</p></div></div>
             <div id="world-archives" class="schedule-list"></div>
           </section>
         </section>
@@ -355,8 +355,8 @@
                 <div>
                   <p><b>Finding the server:</b> In Dragonwilds, open Worlds → Public and search for the exact default world name. Search is case-sensitive. Keep the server and game client on matching versions.</p>
                   <p><b>Worlds:</b> Use the <b>Worlds</b> tab to upload a save from your PC, choose which world loads, start a new world, or restore an older one. The server loads the newest save; with none, it creates a new Standard world named after the default world name.</p>
-                  <p><b>Logs:</b> <code>RSDragonwilds/Saved/Logs/RSDragonwilds.log</code>. HSM's Console also shows server and SteamCMD output.</p>
-                  <p><b>Config:</b> HSM writes <code>DedicatedServer.ini</code> under the Linux config directories before launch. Stop the server before making manual edits; the game may discard INI changes made while it is running.</p>
+                  <p><b>Logs:</b> <code>RSDragonwilds/Saved/Logs/RSDragonwilds.log</code>. Realmkeeper's Console also shows server and SteamCMD output.</p>
+                  <p><b>Config:</b> Realmkeeper writes <code>DedicatedServer.ini</code> under the Linux config directories before launch. Stop the server before making manual edits; the game may discard INI changes made while it is running.</p>
                 </div>
               </details>
             </div>
@@ -405,7 +405,7 @@
         <section id="view-app-settings" class="view">
           <section class="card" aria-labelledby="app-update-title">
             <div class="card-head">
-              <div><h3 id="app-update-title">Application updates</h3><p class="muted small">Check for new Hytale Server Manager releases and update this container from the dashboard.</p></div>
+              <div><h3 id="app-update-title">Application updates</h3><p class="muted small">Check for new Realmkeeper releases and update this container from the dashboard.</p></div>
               <span id="app-update-badge" class="update-badge">Checking</span>
             </div>
             <div class="stat-row compact">

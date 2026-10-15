@@ -292,7 +292,7 @@ func (m *ServerManager) installMinecraft(version, variant string) error {
 		_ = os.Remove(tmpPath)
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(gameDir, "eula.txt"), []byte("# Accepted by the server owner in HSM. See https://aka.ms/MinecraftEULA.\neula=true\n"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(gameDir, "eula.txt"), []byte("# Accepted by the server owner in Realmkeeper. See https://aka.ms/MinecraftEULA.\neula=true\n"), 0600); err != nil {
 		return err
 	}
 	if err := writeMinecraftInstallInfo(gameDir, minecraftInstallInfo{Version: resolvedVersion, JavaMajor: javaMajor, Variant: variant}); err != nil {
@@ -354,7 +354,7 @@ func writeMinecraftProperties(root string, s ServerSettings) error {
 		return errors.New("Minecraft EULA must be accepted before installing or starting this server")
 	}
 	eula := filepath.Join(gameDir, "eula.txt")
-	if err := os.WriteFile(eula, []byte("# Accepted by the server owner in HSM. See https://aka.ms/MinecraftEULA.\neula=true\n"), 0600); err != nil {
+	if err := os.WriteFile(eula, []byte("# Accepted by the server owner in Realmkeeper. See https://aka.ms/MinecraftEULA.\neula=true\n"), 0600); err != nil {
 		return err
 	}
 	mode := "survival"
@@ -460,7 +460,7 @@ func checkMinecraftJava(gameDir string, detect func() (int, error)) error {
 		return fmt.Errorf("could not check the installed Java version: %w", err)
 	}
 	if have < info.JavaMajor {
-		return fmt.Errorf("Minecraft %s needs Java %d or newer, but this container has Java %d; update the HSM image to one with a newer Java runtime", info.Version, info.JavaMajor, have)
+		return fmt.Errorf("Minecraft %s needs Java %d or newer, but this container has Java %d; update the Realmkeeper image to one with a newer Java runtime", info.Version, info.JavaMajor, have)
 	}
 	return nil
 }

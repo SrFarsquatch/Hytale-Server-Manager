@@ -340,13 +340,26 @@ func TestMinecraftUsesItsOwnPortRangeAndKeepsOlderPorts(t *testing.T) {
 }
 
 func TestMinecraftPortRangeCanBeConfigured(t *testing.T) {
-	t.Setenv("HSM_MINECRAFT_PORT_START", "30000")
-	t.Setenv("HSM_MINECRAFT_PORT_END", "30009")
+	t.Setenv("REALMKEEPER_MINECRAFT_PORT_START", "30000")
+	t.Setenv("REALMKEEPER_MINECRAFT_PORT_END", "30009")
 	if min, max := minecraftPortRange(); min != 30000 || max != 30009 {
 		t.Errorf("range = %d-%d", min, max)
 	}
-	t.Setenv("HSM_MINECRAFT_PORT_END", "100") // below the start: ignored
+	t.Setenv("REALMKEEPER_MINECRAFT_PORT_END", "100") // below the start: ignored
 	if min, max := minecraftPortRange(); min != 30000 || max != 30005 {
 		t.Errorf("range with a bad end = %d-%d", min, max)
+	}
+}
+
+func TestSettingsFromBeforeTheRenameStillApply(t *testing.T) {
+	t.Setenv("REALMKEEPER_DATA_DIR", "")
+	t.Setenv("HSM_DATA_DIR", "/old")
+	t.Setenv("ORBIS_DATA_DIR", "/older")
+	if got := appEnv("DATA_DIR", "/data"); got != "/old" {
+		t.Errorf("HSM_DATA_DIR: got %q", got)
+	}
+	t.Setenv("REALMKEEPER_DATA_DIR", "/new")
+	if got := appEnv("DATA_DIR", "/data"); got != "/new" {
+		t.Errorf("REALMKEEPER_DATA_DIR should win: got %q", got)
 	}
 }

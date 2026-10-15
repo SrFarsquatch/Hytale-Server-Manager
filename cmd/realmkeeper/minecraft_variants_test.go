@@ -89,7 +89,7 @@ func TestResolvePaperPicksTheNewestStableBuild(t *testing.T) {
 		t.Errorf("1.8.8 = %v, want unknown version", err)
 	}
 	for _, ua := range *agents {
-		if !strings.HasPrefix(ua, "HytaleServerManager/") {
+		if !strings.HasPrefix(ua, "Realmkeeper/") {
 			t.Errorf("request sent User-Agent %q", ua)
 		}
 	}

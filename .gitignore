@@ -3,8 +3,9 @@ data/
 *.log
 
 # Local builds
+/realmkeeper
+/cmd/realmkeeper/realmkeeper
 /hsm
-/cmd/hsm/hsm
 /orbis
 /hytale-server-manager
 /dist/

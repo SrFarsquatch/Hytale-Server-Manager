@@ -48,10 +48,10 @@ func minecraftLaunchJar(variant string) string {
 	return "server.jar"
 }
 
-// hsmUserAgent identifies HSM to download services. PaperMC rejects
+// appUserAgent identifies Realmkeeper to download services. PaperMC rejects
 // requests with a generic or missing User-Agent.
-func hsmUserAgent() string {
-	return "HytaleServerManager/" + version + " (+https://github.com/SrFarsquatch/Hytale-Server-Manager)"
+func appUserAgent() string {
+	return "Realmkeeper/" + version + " (+https://github.com/SrFarsquatch/Hytale-Server-Manager)"
 }
 
 func getJSON(ctx context.Context, client *http.Client, rawURL string, v any) error {
@@ -59,7 +59,7 @@ func getJSON(ctx context.Context, client *http.Client, rawURL string, v any) err
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", hsmUserAgent())
+	req.Header.Set("User-Agent", appUserAgent())
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -78,7 +78,7 @@ func downloadVerified(ctx context.Context, client *http.Client, rawURL, dst stri
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", hsmUserAgent())
+	req.Header.Set("User-Agent", appUserAgent())
 	resp, err := client.Do(req)
 	if err != nil {
 		return err

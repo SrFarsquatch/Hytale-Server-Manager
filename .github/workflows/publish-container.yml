@@ -36,7 +36,11 @@ jobs:
           build-args: APP_VERSION=${{ env.APP_VERSION }}
           platforms: linux/amd64,linux/arm64
           push: true
+          # Also published under the old name, which installs from before the
+          # rename update from.
           tags: |
+            ghcr.io/srfarsquatch/realmkeeper:${{ github.ref_name }}
+            ghcr.io/srfarsquatch/realmkeeper:latest
             ghcr.io/srfarsquatch/hytale-server-manager:${{ github.ref_name }}
             ghcr.io/srfarsquatch/hytale-server-manager:latest
           labels: |

@@ -13,7 +13,7 @@ func TestUpdateHelpersToRemove(t *testing.T) {
 		{ID: "fail-old", Names: []string{"/hsm-update-helper-150"}, State: "exited", Status: "Exited (1) 2 days ago", Created: 150},
 		{ID: "fail-new", Names: []string{"/hsm-update-helper-250"}, State: "exited", Status: "Exited (1) 1 day ago", Created: 250},
 		{ID: "running", Names: []string{"/hsm-update-helper-400"}, State: "running", Status: "Up 10 seconds", Created: 400},
-		{ID: "manager", Names: []string{"/hytale-server-manager"}, State: "exited", Status: "Exited (0) 1 hour ago", Created: 50},
+		{ID: "manager", Names: []string{"/realmkeeper"}, State: "exited", Status: "Exited (0) 1 hour ago", Created: 50},
 		{ID: "other", Names: []string{"/not-an-hsm-update-helper-1"}, State: "exited", Status: "Exited (0)", Created: 60},
 	}
 	got := updateHelpersToRemove(containers)

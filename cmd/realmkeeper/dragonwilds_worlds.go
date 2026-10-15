@@ -19,7 +19,7 @@ import (
 // so a world with custom rules is made in the game and uploaded here, or
 // changed in game from Settings > Server Management with the admin password.
 //
-// HSM never deletes a world: replaced or removed saves are moved to
+// Realmkeeper never deletes a world: replaced or removed saves are moved to
 // backups/worlds/<time>/ under the server folder.
 
 const dragonwildsWorldUploadLimit = 512 << 20

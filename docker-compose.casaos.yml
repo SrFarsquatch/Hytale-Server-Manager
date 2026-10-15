@@ -1,8 +1,8 @@
-name: hytale-server-manager
+name: realmkeeper
 services:
   manager:
-    image: ghcr.io/srfarsquatch/hytale-server-manager:latest
-    container_name: hytale-server-manager
+    image: ghcr.io/srfarsquatch/realmkeeper:latest
+    container_name: realmkeeper
     restart: unless-stopped
     # Hytale OAuth/device authentication needs working DNS inside this container.
     # The server processes are launched by the manager, so this resolver config
@@ -40,18 +40,18 @@ services:
       - "25570:25570/tcp"
     volumes:
       - type: bind
-        source: /DATA/AppData/hytale-server-manager
+        source: /DATA/AppData/realmkeeper
         target: /data
       - type: bind
         source: /var/run/docker.sock
         target: /var/run/docker.sock
     environment:
-      HSM_DATA_DIR: /data
-      HSM_LISTEN: ":8008"
-      HSM_GAME_PORT_START: "5520"
-      HSM_GAME_PORT_END: "5525"
-      HSM_MINECRAFT_PORT_START: "25565"
-      HSM_MINECRAFT_PORT_END: "25570"
+      REALMKEEPER_DATA_DIR: /data
+      REALMKEEPER_LISTEN: ":8008"
+      REALMKEEPER_GAME_PORT_START: "5520"
+      REALMKEEPER_GAME_PORT_END: "5525"
+      REALMKEEPER_MINECRAFT_PORT_START: "25565"
+      REALMKEEPER_MINECRAFT_PORT_END: "25570"
       TZ: America/Vancouver
     stop_grace_period: 100s
 x-casaos:
@@ -62,13 +62,13 @@ x-casaos:
   author: Community
   category: Games
   description:
-    en_us: Self-hosted multi-server manager for Hytale dedicated servers.
+    en_us: Self-hosted panel for Hytale, Minecraft Java, RuneScape Dragonwilds and Terraria dedicated servers.
   developer: Community
   index: /
   port_map: "8008"
   scheme: http
-  store_app_id: hytale-server-manager
+  store_app_id: realmkeeper
   tagline:
-    en_us: Run and manage multiple Hytale servers from one panel.
+    en_us: Run and manage your game servers from one panel.
   title:
-    en_us: Hytale Server Manager
+    en_us: Realmkeeper

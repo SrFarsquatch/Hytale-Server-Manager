@@ -193,7 +193,7 @@ func (a *App) handleModDelete(w http.ResponseWriter, r *http.Request) {
 	folder, _ := modFolderFor(s)
 	dir := filepath.Join(a.serverRoot(s), folder.Dir)
 	if name == "enabled.json" {
-		jsonError(w, 400, "enabled.json is managed by HSM")
+		jsonError(w, 400, "enabled.json is managed by Realmkeeper")
 		return
 	}
 	if err := os.Remove(filepath.Join(dir, name)); err != nil {
@@ -278,6 +278,6 @@ func (a *App) writeJVMOptionsFor(s ServerSettings) error {
 	if !validMemory(s.MemoryMin) || !validMemory(s.MemoryMax) {
 		return errors.New("invalid JVM memory settings")
 	}
-	lines := []string{"# Managed by Hytale Server Manager - " + s.ServerName, "-Xms" + s.MemoryMin, "-Xmx" + s.MemoryMax, "-XX:+UseG1GC"}
+	lines := []string{"# Managed by Realmkeeper - " + s.ServerName, "-Xms" + s.MemoryMin, "-Xmx" + s.MemoryMax, "-XX:+UseG1GC"}
 	return atomicWrite(filepath.Join(pathsFor(a.serverRoot(s)).Game(), "jvm.options"), []byte(strings.Join(lines, "\n")+"\n"), 0644)
 }

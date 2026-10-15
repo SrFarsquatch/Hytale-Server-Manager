@@ -59,12 +59,11 @@ func TestDiskUsage(t *testing.T) {
 }
 
 func TestDeploymentPortRangeDefaults(t *testing.T) {
-	t.Setenv("HSM_GAME_PORT_START", "")
-	t.Setenv("ORBIS_GAME_PORT_START", "")
-	t.Setenv("HSM_GAME_PORT_END", "")
-	t.Setenv("ORBIS_GAME_PORT_END", "")
-	t.Setenv("HSM_GAME_PORT", "")
-	t.Setenv("ORBIS_GAME_PORT", "")
+	for _, prefix := range []string{"REALMKEEPER_", "HSM_", "ORBIS_"} {
+		for _, name := range []string{"GAME_PORT_START", "GAME_PORT_END", "GAME_PORT"} {
+			t.Setenv(prefix+name, "")
+		}
+	}
 	start, end, locked := deploymentPortRange()
 	if start != 5520 || end != 5525 || locked {
 		t.Fatalf("deploymentPortRange() = (%d, %d, %v), want (5520, 5525, false)", start, end, locked)

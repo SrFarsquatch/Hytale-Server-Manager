@@ -287,19 +287,19 @@ func deploymentPortRange() (int, int, bool) {
 	start := 5520
 	end := 5525
 	locked := false
-	if v := strings.TrimSpace(envFirst([]string{"HSM_GAME_PORT_START", "ORBIS_GAME_PORT_START"}, "")); v != "" {
+	if v := appEnv("GAME_PORT_START", ""); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 65535 {
 			start = n
 			locked = true
 		}
 	}
-	if v := strings.TrimSpace(envFirst([]string{"HSM_GAME_PORT_END", "ORBIS_GAME_PORT_END"}, "")); v != "" {
+	if v := appEnv("GAME_PORT_END", ""); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= start && n <= 65535 {
 			end = n
 			locked = true
 		}
 	}
-	if v := strings.TrimSpace(envFirst([]string{"HSM_GAME_PORT", "ORBIS_GAME_PORT"}, "")); v != "" {
+	if v := appEnv("GAME_PORT", ""); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 65535 {
 			start = n
 			if end < start {
@@ -316,17 +316,17 @@ func deploymentPortRange() (int, int, bool) {
 
 // minecraftPortRange is the TCP range for Minecraft servers. It starts at
 // Minecraft's default port, 25565, so players can usually join without
-// typing a port. HSM_MINECRAFT_PORT_START and _END change it; the same ports
+// typing a port. REALMKEEPER_MINECRAFT_PORT_START and _END change it; the same ports
 // must be published in Compose or the CasaOS app settings.
 func minecraftPortRange() (int, int) {
 	start, end := 25565, 25570
-	if n, err := strconv.Atoi(strings.TrimSpace(os.Getenv("HSM_MINECRAFT_PORT_START"))); err == nil && n > 0 && n <= 65535 {
+	if n, err := strconv.Atoi(appEnv("MINECRAFT_PORT_START", "")); err == nil && n > 0 && n <= 65535 {
 		start = n
 		if end < start {
 			end = min(start+5, 65535)
 		}
 	}
-	if n, err := strconv.Atoi(strings.TrimSpace(os.Getenv("HSM_MINECRAFT_PORT_END"))); err == nil && n >= start && n <= 65535 {
+	if n, err := strconv.Atoi(appEnv("MINECRAFT_PORT_END", "")); err == nil && n >= start && n <= 65535 {
 		end = n
 	}
 	return start, end
@@ -366,9 +366,11 @@ func ensureRootDirs(dataDir string) error {
 
 func ensureServerDirs(root string) error { return pathsFor(root).Ensure() }
 
-func envFirst(keys []string, fallback string) string {
-	for _, key := range keys {
-		if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+// appEnv reads the setting REALMKEEPER_<name>. Installs from before the
+// rename set HSM_<name>, and older ones ORBIS_<name>; both still work.
+func appEnv(name, fallback string) string {
+	for _, prefix := range []string{"REALMKEEPER_", "HSM_", "ORBIS_"} {
+		if v := strings.TrimSpace(os.Getenv(prefix + name)); v != "" {
 			return v
 		}
 	}

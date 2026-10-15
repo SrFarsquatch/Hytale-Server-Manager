@@ -1,4 +1,4 @@
-/* HSM panel styles. One stylesheet; tokens first, then layout, components and views. */
+/* Realmkeeper panel styles. One stylesheet; tokens first, then layout, components and views. */
 :root {
   --bg: #141925;
   --sidebar: #171d2a;

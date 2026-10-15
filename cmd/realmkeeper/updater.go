@@ -21,7 +21,7 @@ import (
 
 const (
 	latestReleaseAPI = "https://api.github.com/repos/SrFarsquatch/Hytale-Server-Manager/releases/latest"
-	containerImage   = "ghcr.io/srfarsquatch/hytale-server-manager"
+	containerImage   = "ghcr.io/srfarsquatch/realmkeeper"
 	dockerSocketPath = "/var/run/docker.sock"
 )
 
@@ -150,7 +150,7 @@ func checkAppUpdate(ctx context.Context) (AppUpdateInfo, error) {
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	req.Header.Set("User-Agent", "Hytale-Server-Manager-Updater")
+	req.Header.Set("User-Agent", "Realmkeeper-Updater")
 	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
 	if err != nil {
 		return info, fmt.Errorf("could not check GitHub releases: %w", err)
@@ -401,8 +401,8 @@ func launchUpdateHelper(containerID, targetImage string) error {
 	name := "hsm-update-helper-" + strconv.FormatInt(time.Now().Unix(), 10)
 	createBody := map[string]any{
 		"Image":      inspect.Image,
-		"Cmd":        []string{"/usr/local/bin/hytale-server-manager", "--update-helper"},
-		"Env":        []string{"HSM_UPDATE_CONTAINER_ID=" + containerID, "HSM_UPDATE_TARGET_IMAGE=" + targetImage},
+		"Cmd":        []string{"/usr/local/bin/realmkeeper", "--update-helper"},
+		"Env":        []string{"REALMKEEPER_UPDATE_CONTAINER_ID=" + containerID, "REALMKEEPER_UPDATE_TARGET_IMAGE=" + targetImage},
 		"HostConfig": hostConfig,
 	}
 	createBytes, err := d.call(ctx, http.MethodPost, "/containers/create?name="+url.QueryEscape(name), createBody, http.StatusCreated)
@@ -423,10 +423,10 @@ func launchUpdateHelper(containerID, targetImage string) error {
 }
 
 func runUpdateHelper() {
-	containerID := strings.TrimSpace(os.Getenv("HSM_UPDATE_CONTAINER_ID"))
-	targetImage := strings.TrimSpace(os.Getenv("HSM_UPDATE_TARGET_IMAGE"))
+	containerID := appEnv("UPDATE_CONTAINER_ID", "")
+	targetImage := appEnv("UPDATE_TARGET_IMAGE", "")
 	if containerID == "" || targetImage == "" {
-		fmt.Fprintln(os.Stderr, "update helper requires HSM_UPDATE_CONTAINER_ID and HSM_UPDATE_TARGET_IMAGE")
+		fmt.Fprintln(os.Stderr, "update helper requires REALMKEEPER_UPDATE_CONTAINER_ID and REALMKEEPER_UPDATE_TARGET_IMAGE")
 		os.Exit(2)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Minute)
@@ -486,7 +486,7 @@ func performContainerUpdate(ctx context.Context, containerID, targetImage string
 	name, _ := inspect["Name"].(string)
 	name = strings.TrimPrefix(name, "/")
 	if name == "" {
-		name = "hytale-server-manager"
+		name = "realmkeeper"
 	}
 	config["Image"] = targetImage
 	config["Hostname"] = ""

@@ -44,7 +44,7 @@ func main() {
 		runUpdateHelper()
 		return
 	}
-	dataDir := envFirst([]string{"HSM_DATA_DIR", "ORBIS_DATA_DIR"}, "/data")
+	dataDir := appEnv("DATA_DIR", "/data")
 	if err := ensureRootDirs(dataDir); err != nil {
 		log.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	app.routes(mux)
-	addr := envFirst([]string{"HSM_LISTEN", "ORBIS_LISTEN"}, ":8008")
+	addr := appEnv("LISTEN", ":8008")
 	srv := &http.Server{Addr: addr, Handler: securityHeaders(mux), ReadHeaderTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second}
 
 	app.cfgMu.RLock()
@@ -86,7 +86,7 @@ func main() {
 		}
 	}
 
-	log.Printf("Hytale Server Manager %s listening on %s", version, addr)
+	log.Printf("Realmkeeper %s listening on %s", version, addr)
 	log.Fatal(srv.ListenAndServe())
 }
 
