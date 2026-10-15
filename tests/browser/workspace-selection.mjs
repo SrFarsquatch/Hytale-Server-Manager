@@ -461,6 +461,17 @@ try {
     await page.click('#wizard-next');
     assert.equal(await value('#new-server-mode'), 'Survival');
     assert.ok(await visible('#new-minecraft-variant'), 'Minecraft offers vanilla, Paper and Fabric');
+    await page.click('#wizard-back');
+    await page.click('#wizard-back');
+    await page.click('[data-game-choice="runescape-dragonwilds"]');
+    await page.click('#wizard-next');
+    await page.click('#wizard-next');
+    assert.equal(await value('#new-dragonwilds-owner'), 'owner-1', 'the Owner ID is remembered from the existing Dragonwilds server');
+    await page.click('#wizard-back');
+    await page.click('#wizard-back');
+    await page.click('[data-game-choice="minecraft-java"]');
+    await page.click('#wizard-next');
+    await page.click('#wizard-next');
     await page.selectOption('#new-minecraft-variant', 'fabric');
     assert.match(await text('#new-minecraft-variant-help'), /Fabric/);
     assert.ok(!(await visible('#terraria-fields')), 'Terraria fields are hidden for Minecraft');

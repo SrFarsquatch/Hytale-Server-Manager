@@ -21,6 +21,25 @@ import (
 const dragonwildsSteamAppID = "4019830"
 const steamCMDArchiveURL = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz"
 
+// rememberDragonwildsOwner saves the Owner ID used by a Dragonwilds server so
+// the create wizard can offer it next time.
+func (a *App) rememberDragonwildsOwner(ownerID string) {
+	ownerID = strings.TrimSpace(ownerID)
+	a.cfgMu.Lock()
+	defer a.cfgMu.Unlock()
+	if ownerID == "" || ownerID == a.cfg.DragonwildsOwnerID {
+		return
+	}
+	a.cfg.DragonwildsOwnerID = ownerID
+	_ = a.saveConfigLocked()
+}
+
+func (a *App) rememberedDragonwildsOwner() string {
+	a.cfgMu.RLock()
+	defer a.cfgMu.RUnlock()
+	return a.cfg.DragonwildsOwnerID
+}
+
 func nameSafeDefault(s string) string {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -52,6 +71,9 @@ func (DragonwildsAdapter) Rules() GameRules {
 }
 
 func (DragonwildsAdapter) ValidateNew(req *newServerRequest) error {
+	if strings.TrimSpace(req.DragonwildsOwnerID) == "" {
+		req.DragonwildsOwnerID = req.rememberedOwnerID
+	}
 	if strings.TrimSpace(req.DragonwildsOwnerID) == "" {
 		return errors.New("RuneScape: Dragonwilds requires your in-game Player ID as the server Owner ID")
 	}
@@ -107,6 +129,7 @@ func (DragonwildsAdapter) MergeSettings(in *ServerSettings, current ServerSettin
 // game may discard live edits. PrepareLaunch writes the saved values before
 // the next start; when stopped and installed, the file is kept in sync now.
 func (DragonwildsAdapter) ApplySettings(app *App, m *ServerManager, s ServerSettings) error {
+	app.rememberDragonwildsOwner(s.DragonwildsOwnerID)
 	if m.IsRunning() || !m.Installed() {
 		return nil
 	}

@@ -85,6 +85,9 @@ type newServerRequest struct {
 	TerrariaVersion          string `json:"terrariaVersion"`
 	TerrariaWorldName        string `json:"terrariaWorldName"`
 	TerrariaWorldSize        string `json:"terrariaWorldSize"`
+	// rememberedOwnerID is the saved Dragonwilds Owner ID, used when the
+	// request leaves the Owner ID empty. Set by the server, never decoded.
+	rememberedOwnerID string
 }
 
 func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
@@ -100,6 +103,7 @@ func (a *App) handleServersCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, fmt.Sprintf("%q is not supported by this release; see GET /api/games for supported games", game))
 		return
 	}
+	body.rememberedOwnerID = a.rememberedDragonwildsOwner()
 	if err := adapter.ValidateNew(&body); err != nil {
 		jsonError(w, 400, err.Error())
 		return

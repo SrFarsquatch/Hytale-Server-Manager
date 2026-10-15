@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#151a24">
   <title>HSM · Game Server Control Panel</title>
-  <link rel="stylesheet" href="/app.css?v=20261016-worlds1">
+  <link rel="stylesheet" href="/app.css?v=20261016-owner1">
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -473,7 +473,7 @@
             <h3>Dragonwilds dedicated server</h3>
             <p class="muted small">Your Owner ID is required by the game. Find it at the bottom of the in-game Settings menu.</p>
             <div class="form-grid">
-              <label class="span-two">Owner ID (required)<input id="new-dragonwilds-owner" maxlength="128" autocomplete="off" placeholder="Your in-game Player ID"></label>
+              <label class="span-two">Owner ID (required)<input id="new-dragonwilds-owner" maxlength="128" autocomplete="off" placeholder="Your in-game Player ID"><small id="new-dragonwilds-owner-help"></small></label>
               <label>Default world name<input id="new-dragonwilds-world" maxlength="32" value="Dragonwilds World"></label>
               <label>Admin password (required)<input id="new-dragonwilds-admin" type="password" maxlength="128" autocomplete="new-password"></label>
               <label class="span-two">World password (optional)<input id="new-dragonwilds-password" type="password" maxlength="128" autocomplete="new-password"></label>
@@ -498,6 +498,6 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/app.js?v=20261016-worlds1"></script>
+  <script src="/app.js?v=20261016-owner1"></script>
 </body>
 </html>
