@@ -43,6 +43,12 @@ A self-hosted web panel for running multiple Hytale dedicated servers from one L
   - World rules (Standard, Custom or Creative) live in the save: create the world in the game with the rules you want and upload it, or change settings in game from Settings → Server Management with the admin password.
   - snapshots of the saves and the game's config while the server is stopped
 
+### Moving a server (export and import)
+
+- **Export** (a server's Settings tab, server stopped) downloads one `.tar.gz` with the server's `game` folder (installed server, worlds, settings, mods) and its HSM settings and schedules. Tick **with backups** to include snapshots and backups, which can be large. The export contains the server's passwords; keep it private.
+- **Import** (My Servers, or the welcome screen on a fresh install) uploads an export and creates a new server from it. It keeps the name, settings, world and schedules; it gets a new ID if that one is taken, and a new port if its port is in use or outside the game's range.
+- To reinstall HSM from scratch: stop each server, export it, reinstall, then import the files. Hytale may ask you to authenticate the server again on its first start.
+
 ### Schedules and crash recovery
 
 - **Schedules (per server):** restart, start, stop, back up or run a console command, either daily at a set time (optionally on chosen weekdays) or repeating every N minutes or hours.
