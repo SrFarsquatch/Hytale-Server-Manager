@@ -15,20 +15,24 @@ import (
 )
 
 type ServerManager struct {
-	mu          sync.Mutex
-	rootDir     string
-	toolsDir    string
-	gameType    string
-	cmd         *exec.Cmd
-	stdin       io.WriteCloser
-	running     bool
-	phase       string
-	startedAt   time.Time
-	exitCode    int
-	lastExitAt  time.Time
-	installBusy bool
-	logs        *LogRing
-	hub         *LogHub
+	mu         sync.Mutex
+	rootDir    string
+	toolsDir   string
+	gameType   string
+	cmd        *exec.Cmd
+	stdin      io.WriteCloser
+	running    bool
+	phase      string
+	startedAt  time.Time
+	exitCode   int
+	lastExitAt time.Time
+	// lastExitCrashed is false when the last exit followed a stop request,
+	// even with a non-zero code: Dragonwilds is stopped with SIGINT and
+	// always reports one.
+	lastExitCrashed bool
+	installBusy     bool
+	logs            *LogRing
+	hub             *LogHub
 	// Stop escalation delays; zero uses the production defaults.
 	stopGrace     time.Duration
 	stopInterrupt time.Duration
@@ -121,6 +125,10 @@ func (m *ServerManager) Status() Status {
 	started := m.startedAt
 	exitCode := m.exitCode
 	lastExit := m.lastExitAt
+	stateCode := exitCode
+	if !m.lastExitCrashed {
+		stateCode = 0 // a requested stop is shown as offline, not crashed
+	}
 	busy := m.installBusy
 	phase := m.phase
 	pid := 0
@@ -135,7 +143,7 @@ func (m *ServerManager) Status() Status {
 	if !lastExit.IsZero() {
 		st.LastExitAt = lastExit.Format(time.RFC3339)
 	}
-	st.State = serverDisplayStateWithPhase(running, phase, busy, st.Installed, exitCode, lastExit)
+	st.State = serverDisplayStateWithPhase(running, phase, busy, st.Installed, stateCode, lastExit)
 	if running && pid > 0 {
 		st.MemoryBytes = readProcessGroupMemory(pid)
 	} else {
@@ -192,6 +200,7 @@ func (m *ServerManager) Start(args []string) error {
 	m.startedAt = time.Now()
 	m.phase = "starting"
 	m.exitCode = 0
+	m.lastExitCrashed = false
 	m.appendLogLocked("controller", fmt.Sprintf("Starting %s server on PID %d", m.gameType, cmd.Process.Pid))
 	go m.scanPipe(stdout, "server")
 	go m.scanPipe(stderr, "stderr")
@@ -226,8 +235,13 @@ func (m *ServerManager) wait(cmd *exec.Cmd) {
 		m.exitCode = code
 		m.lastExitAt = time.Now()
 		crashed = code != 0 && !m.stopRequested
+		m.lastExitCrashed = crashed
 	}
-	m.appendLogLocked("controller", fmt.Sprintf("Server process exited with code %d", code))
+	if code != 0 && !crashed && m.cmd == cmd {
+		m.appendLogLocked("controller", fmt.Sprintf("Server stopped as requested (exit code %d)", code))
+	} else {
+		m.appendLogLocked("controller", fmt.Sprintf("Server process exited with code %d", code))
+	}
 	onCrash := m.onCrash
 	m.mu.Unlock()
 	if crashed && onCrash != nil {

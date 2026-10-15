@@ -91,6 +91,9 @@ func TestCrashIsNotRestartedWhenAutoRestartIsOff(t *testing.T) {
 	if got := countLog(m, "Starting hytale server"); got != 1 {
 		t.Errorf("server started %d times with auto-restart off", got)
 	}
+	if st := m.Status(); st.State != "crashed" || st.ExitCode != 1 {
+		t.Errorf("unrequested exit: state %q, code %d; want crashed, 1", st.State, st.ExitCode)
+	}
 }
 
 func TestRequestedStopAndCleanExitAreNotCrashes(t *testing.T) {
@@ -107,6 +110,14 @@ func TestRequestedStopAndCleanExitAreNotCrashes(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	if got := countLog(m, "Starting hytale server"); got != 1 {
 		t.Errorf("requested stop was treated as a crash: %d starts", got)
+	}
+	// Dragonwilds always exits non-zero when stopped (SIGINT); a requested
+	// stop must show as offline, not crashed.
+	if st := m.Status(); st.State != "offline" || st.ExitCode != 3 {
+		t.Errorf("requested stop: state %q, code %d; want offline, 3", st.State, st.ExitCode)
+	}
+	if !logContains(m, "Server stopped as requested (exit code 3)", time.Time{}) {
+		t.Error("requested stop was not logged as such")
 	}
 
 	app2, m2, s2 := crashTestApp(t, true, "#!/bin/bash\necho done\nexit 0\n")
