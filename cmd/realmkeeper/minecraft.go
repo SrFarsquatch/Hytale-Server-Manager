@@ -34,7 +34,7 @@ func (MinecraftAdapter) ValidateNew(req *newServerRequest) error {
 		req.MinecraftVariant = "vanilla"
 	}
 	if !validMinecraftVariant(req.MinecraftVariant) {
-		return errors.New("Minecraft server type must be vanilla, paper or fabric")
+		return errors.New("Minecraft server type must be vanilla, paper, fabric, quilt, forge or neoforge")
 	}
 	if !req.MinecraftEulaAccepted {
 		return errors.New("you must accept the Minecraft EULA before creating this server")
@@ -66,8 +66,9 @@ func (MinecraftAdapter) InstallStatus(app *App, s ServerSettings) map[string]any
 }
 
 func (MinecraftAdapter) Installed(rootDir string) bool {
-	b, err := os.ReadFile(filepath.Join(pathsFor(rootDir).Game(), "eula.txt"))
-	if err != nil || !fileExists(filepath.Join(pathsFor(rootDir).Game(), "server.jar")) && !fileExists(filepath.Join(pathsFor(rootDir).Game(), fabricLauncherJar)) {
+	gameDir := pathsFor(rootDir).Game()
+	b, err := os.ReadFile(filepath.Join(gameDir, "eula.txt"))
+	if err != nil || !minecraftServerFilesPresent(gameDir) {
 		return false
 	}
 	for _, line := range strings.Split(string(b), "\n") {
@@ -91,19 +92,42 @@ func (MinecraftAdapter) PrepareLaunch(app *App, settings ServerSettings) ([]stri
 	if err := writeMinecraftProperties(app.serverRoot(settings), settings); err != nil {
 		return nil, err
 	}
-	return []string{"-Xms" + settings.MemoryMin, "-Xmx" + settings.MemoryMax, "-jar", minecraftLaunchJar(settings.MinecraftVariant), "nogui"}, nil
+	memory := []string{"-Xms" + settings.MemoryMin, "-Xmx" + settings.MemoryMax}
+	if info, ok := readMinecraftInstallInfo(pathsFor(app.serverRoot(settings)).Game()); ok && info.ArgsFile != "" {
+		// Forge and NeoForge: the installer's argument file names the
+		// classpath and main class.
+		return append(memory, "@"+info.ArgsFile, "nogui"), nil
+	}
+	return append(memory, "-jar", minecraftLaunchJar(settings.MinecraftVariant), "nogui"), nil
+}
+
+// minecraftServerFilesPresent reports whether a server's launch files exist:
+// a jar to run, or the argument file Forge and NeoForge start from.
+func minecraftServerFilesPresent(gameDir string) bool {
+	if info, ok := readMinecraftInstallInfo(gameDir); ok && info.ArgsFile != "" {
+		return fileExists(filepath.Join(gameDir, filepath.FromSlash(info.ArgsFile)))
+	}
+	for _, jar := range []string{"server.jar", fabricLauncherJar, quiltLauncherJar} {
+		if fileExists(filepath.Join(gameDir, jar)) {
+			return true
+		}
+	}
+	return false
 }
 
 func (MinecraftAdapter) BuildProcess(rootDir string, args []string) (ProcessLaunch, error) {
 	gameDir := pathsFor(rootDir).Game()
 	jar := "server.jar"
-	for i := 0; i+1 < len(args); i++ {
-		if args[i] == "-jar" {
+	for i, arg := range args {
+		if arg == "-jar" && i+1 < len(args) {
 			jar = args[i+1]
 		}
+		if file, ok := strings.CutPrefix(arg, "@"); ok {
+			jar = filepath.FromSlash(file)
+		}
 	}
-	if !fileExists(filepath.Join(gameDir, jar)) {
-		return ProcessLaunch{}, errors.New("Minecraft " + jar + " is missing; install the server files first")
+	if !filepath.IsLocal(jar) || !fileExists(filepath.Join(gameDir, jar)) {
+		return ProcessLaunch{}, errors.New("Minecraft " + filepath.ToSlash(jar) + " is missing; install the server files first")
 	}
 	return ProcessLaunch{Path: "java", Args: append([]string(nil), args...), Dir: gameDir}, nil
 }
@@ -244,12 +268,17 @@ func (m *ServerManager) RunMinecraftInstaller(version, variant string) error {
 	return nil
 }
 
-var minecraftVariantNames = map[string]string{"vanilla": "vanilla", "paper": "Paper", "fabric": "Fabric"}
+var minecraftVariantNames = map[string]string{"vanilla": "vanilla", "paper": "Paper", "fabric": "Fabric", "quilt": "Quilt", "forge": "Forge", "neoforge": "NeoForge"}
 
 func (m *ServerManager) installMinecraft(version, variant string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	// Loader installers download Minecraft and many libraries, so the whole
+	// install gets longer than any single download.
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
 	client := &http.Client{Timeout: 8 * time.Minute}
+	if _, loader := minecraftLoaderHosts[variant]; loader {
+		return m.installMinecraftLoader(ctx, client, version, variant)
+	}
 	var resolvedVersion, downloadURL, sha string
 	var javaMajor int
 	var err error
@@ -426,6 +455,11 @@ type minecraftInstallInfo struct {
 	Version   string `json:"version"`
 	JavaMajor int    `json:"javaMajor"`
 	Variant   string `json:"variant,omitempty"`
+	// LoaderVersion is the Forge, NeoForge or Quilt build.
+	LoaderVersion string `json:"loaderVersion,omitempty"`
+	// ArgsFile is the argument file Forge and NeoForge start from, relative
+	// to the game folder.
+	ArgsFile string `json:"argsFile,omitempty"`
 }
 
 const minecraftInstallInfoFile = ".hsm-minecraft.json"
@@ -491,7 +525,7 @@ func parseJavaMajor(output string) (int, bool) {
 func detectJavaMajor() (int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "java", "-version").CombinedOutput()
+	out, err := exec.CommandContext(ctx, javaCommand, "-version").CombinedOutput()
 	if err != nil {
 		return 0, fmt.Errorf("java -version failed: %w", err)
 	}

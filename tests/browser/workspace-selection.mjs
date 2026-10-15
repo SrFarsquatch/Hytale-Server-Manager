@@ -422,6 +422,21 @@ try {
     }
   });
 
+  await check('NeoForge servers manage mods and install with the loader', async () => {
+    await call('POST', '/api/servers', { game: 'minecraft-java', minecraftVariant: 'neoforge', minecraftVersion: 'latest', minecraftEulaAccepted: true, name: 'Golf NeoForge', memoryMin: '1G', memoryMax: '2G' });
+    try {
+      await page.waitForSelector('[data-select-server="golf-neoforge"]', { timeout: 10000 });
+      await select('golf-neoforge');
+      await waitForName('Golf NeoForge');
+      assert.equal(await text('#mods-tab-label'), 'Mods');
+      await page.click('[data-view-tab="setup"]');
+      await page.waitForFunction(() => document.querySelector('#minecraft-install').textContent === 'Install NeoForge server', null, { timeout: 5000 });
+      assert.match(await text('#minecraft-install-help'), /NeoForge/);
+    } finally {
+      await call('DELETE', '/api/servers/golf-neoforge').catch(() => {});
+    }
+  });
+
   await check('tModLoader servers take .tmod mods', async () => {
     await call('POST', '/api/servers', { game: 'terraria', terrariaVariant: 'tmodloader', name: 'Foxtrot Modded' });
     try {
@@ -509,7 +524,7 @@ try {
     await page.click('#wizard-next');
     await page.click('#wizard-next');
     assert.equal(await value('#new-server-mode'), 'Survival');
-    assert.ok(await visible('#new-minecraft-variant'), 'Minecraft offers vanilla, Paper and Fabric');
+    assert.deepEqual(await page.$$eval('#new-minecraft-variant option', o => o.map(x => x.value)), ['vanilla', 'paper', 'fabric', 'quilt', 'forge', 'neoforge']);
     await page.click('#wizard-back');
     await page.click('#wizard-back');
     await page.click('[data-game-choice="runescape-dragonwilds"]');
@@ -523,6 +538,10 @@ try {
     await page.click('#wizard-next');
     await page.selectOption('#new-minecraft-variant', 'fabric');
     assert.match(await text('#new-minecraft-variant-help'), /Fabric/);
+    for (const loader of ['Quilt', 'Forge', 'NeoForge']) {
+      await page.selectOption('#new-minecraft-variant', loader.toLowerCase());
+      assert.match(await text('#new-minecraft-variant-help'), new RegExp(loader));
+    }
     assert.ok(!(await visible('#terraria-fields')), 'Terraria fields are hidden for Minecraft');
     await page.click('#cancel-server-dialog');
   });

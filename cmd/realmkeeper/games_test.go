@@ -61,8 +61,8 @@ func TestGameCatalogCapabilitiesDoNotOverstatePlannedGameSupport(t *testing.T) {
 				c.Mods || c.NativeBackups || c.DeviceAuth || c.GameUpdates {
 				t.Errorf("Minecraft Java vanilla capabilities unexpected: %#v", game.Capabilities)
 			}
-			if strings.Join(game.Capabilities.Variants, ",") != "vanilla,paper,fabric" {
-				t.Errorf("Minecraft variants = %#v, want vanilla, paper and fabric", game.Capabilities.Variants)
+			if strings.Join(game.Capabilities.Variants, ",") != "vanilla,paper,fabric,quilt,forge,neoforge" {
+				t.Errorf("Minecraft variants = %#v, want vanilla, paper and the mod loaders", game.Capabilities.Variants)
 			}
 			continue
 		}

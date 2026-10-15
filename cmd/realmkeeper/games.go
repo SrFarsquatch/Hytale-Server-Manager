@@ -180,7 +180,7 @@ func modFolderFor(s ServerSettings) (modFolder, bool) {
 		switch s.MinecraftVariant {
 		case "paper":
 			return modFolder{Dir: filepath.Join("game", "plugins"), Exts: []string{".jar"}, Kind: "plugins"}, true
-		case "fabric":
+		case "fabric", "quilt", "forge", "neoforge":
 			return modFolder{Dir: filepath.Join("game", "mods"), Exts: []string{".jar"}, Kind: "mods"}, true
 		}
 	case "terraria":

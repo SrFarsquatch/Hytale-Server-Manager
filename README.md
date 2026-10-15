@@ -20,11 +20,15 @@ Realmkeeper used to be called Hytale Server Manager (HSM); see [Upgrading from H
 
 ### Other games
 
-- **Minecraft Java (vanilla, Paper or Fabric):**
+- **Minecraft Java (vanilla, Paper, Fabric, Quilt, Forge or NeoForge):**
   - choose the server type when creating the server:
     - **Vanilla:** Mojang's official server.
     - **Paper:** the newest stable PaperMC build, checked against its published SHA-256. Plugins (`.jar`) go in `plugins/`, managed from the Plugins tab.
     - **Fabric:** the Fabric server launcher with the newest stable loader. Mods (`.jar`) go in `mods/`, managed from the Mods tab. Most mods also need Fabric API.
+    - **Quilt:** installed with Quilt's own installer for the chosen Minecraft release. Mods go in `mods/`; Quilt runs most Fabric mods (add Quilted Fabric API).
+    - **Forge:** the recommended Forge build for the Minecraft version, or the latest build when none is recommended. Minecraft 1.17 or newer: older Forge needs Java 8, which the image does not include.
+    - **NeoForge:** the newest stable NeoForge build for the Minecraft version (1.20.2 or newer; NeoForge for 1.20.1 is published as Forge).
+    - Forge, NeoForge and Quilt are installed by running the loader's installer, which downloads Minecraft and the loader's libraries. Installers come only from the loader's own HTTPS site, checked against the published SHA-256 when there is one. Forge and NeoForge start from the `unix_args.txt` their installer writes.
   - EULA acceptance required
   - console and player list (`list`)
   - a Players tab for the whitelist, operators and bans, with kick, ban and make-operator buttons for online players. A running server is changed through its console; a stopped server's `whitelist.json`, `ops.json`, `banned-players.json` and `banned-ips.json` are edited directly, with names checked against Mojang's account lookup.

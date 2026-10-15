@@ -162,7 +162,7 @@ func TestMinecraftInstallerInstallsEachVariant(t *testing.T) {
 			}
 		})
 	}
-	if err := (&ServerManager{gameType: "minecraft-java"}).RunMinecraftInstaller("latest", "forge"); err == nil {
+	if err := (&ServerManager{gameType: "minecraft-java"}).RunMinecraftInstaller("latest", "spigot"); err == nil {
 		t.Error("an unknown variant was accepted")
 	}
 }
