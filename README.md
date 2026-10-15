@@ -37,7 +37,11 @@ A self-hosted web panel for running multiple Hytale dedicated servers from one L
   - console, player list (`playing`), graceful stop (`exit` saves the world)
   - snapshots of `Worlds`, `serverconfig.txt` and `banlist.txt` (plus `Mods` and `ModConfigs` for tModLoader) while the server is stopped
   - uses TCP in the published `5520`–`5525` range (shared with Hytale)
-- **RuneScape: Dragonwilds:** SteamCMD install, dedicated-server settings and console output.
+- **RuneScape: Dragonwilds:**
+  - SteamCMD install (retried when SteamCMD reports "Missing configuration"), dedicated-server settings and console output
+  - a Worlds tab: upload a world's `.sav` (and `.backup`) from `%LOCALAPPDATA%\RSDragonwilds\Saved\SaveGames`, choose which world loads next (it becomes the newest save and the default world name), start a new world, and restore worlds HSM moved aside. Nothing is deleted: replaced or removed saves go to `world-backups/` in the server folder.
+  - World rules (Standard, Custom or Creative) live in the save: create the world in the game with the rules you want and upload it, or change settings in game from Settings → Server Management with the admin password.
+  - snapshots of the saves and the game's config while the server is stopped
 
 ### Schedules and crash recovery
 

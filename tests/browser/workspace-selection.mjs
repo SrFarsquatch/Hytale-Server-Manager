@@ -410,6 +410,34 @@ try {
     }
   });
 
+  await check('Dragonwilds worlds can be uploaded, switched and started fresh', async () => {
+    const saves = join(dataDir, 'servers', 'charlie-dragonwilds', 'game', 'RSDragonwilds', 'Saved', 'SaveGames');
+    mkdirSync(saves, { recursive: true });
+    writeFileSync(join(saves, 'Old Vale.sav'), 'old');
+    await select('alpha-hytale');
+    await waitForName('Alpha Hytale');
+    assert.ok(!(await visible('[data-view-tab="worlds"]')), 'Hytale has no Worlds tab');
+    await select('charlie-dragonwilds');
+    await waitForName('Charlie Dragonwilds');
+    await page.click('[data-view-tab="worlds"]');
+    await page.waitForFunction(() => document.querySelector('#world-list').textContent.includes('Old Vale'), null, { timeout: 5000 });
+    await page.setInputFiles('#world-file', [
+      { name: 'Misty Peaks.sav', mimeType: 'application/octet-stream', buffer: Buffer.from('sav') },
+      { name: 'Misty Peaks.backup', mimeType: 'application/octet-stream', buffer: Buffer.from('bak') },
+    ]);
+    await page.waitForFunction(() => /Misty Peaks.*Loads next/.test(document.querySelector('#world-list').textContent), null, { timeout: 5000 });
+    assert.match(await text('#world-list'), /has \.backup/);
+    await page.click('[data-world-action="use"][data-world="Old Vale"]');
+    await page.waitForFunction(() => /Old Vale\s*Loads next/.test(document.querySelector('#world-list').textContent), null, { timeout: 5000 });
+    await page.fill('#new-world-name', 'Fresh Start');
+    page.once('dialog', d => d.accept());
+    await page.click('#new-world-btn');
+    await page.waitForFunction(() => /No saved worlds yet.*Fresh Start/.test(document.querySelector('#world-list').textContent), null, { timeout: 5000 });
+    assert.ok(await visible('#world-archive-card'), 'moved saves are listed as world backups');
+    const settings = await (await fetch(base + '/api/settings', { headers: { Cookie: cookie, 'X-HSM-Server': 'charlie-dragonwilds' } })).json();
+    assert.equal(settings.dragonwildsWorldName, 'Fresh Start');
+  });
+
   await check('the wizard applies each game\'s rules', async () => {
     await page.click('#add-server-side');
     await page.click('[data-game-choice="terraria"]');

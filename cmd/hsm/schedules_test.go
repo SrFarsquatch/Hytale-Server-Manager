@@ -61,11 +61,12 @@ func TestNormalizeSchedules(t *testing.T) {
 			t.Errorf("%s: accepted", name)
 		}
 	}
-	// Dragonwilds cannot take console commands or backups.
-	for _, action := range []string{"command", "backup"} {
-		if _, err := normalizeSchedules([]Schedule{{Action: action, Command: "x", Kind: "interval", EveryMinutes: 30}}, "runescape-dragonwilds"); err == nil {
-			t.Errorf("Dragonwilds accepted %s", action)
-		}
+	// Dragonwilds cannot take console commands, but can make snapshots.
+	if _, err := normalizeSchedules([]Schedule{{Action: "command", Command: "x", Kind: "interval", EveryMinutes: 30}}, "runescape-dragonwilds"); err == nil {
+		t.Error("Dragonwilds accepted a console command")
+	}
+	if _, err := normalizeSchedules([]Schedule{{Action: "backup", Kind: "interval", EveryMinutes: 30}}, "runescape-dragonwilds"); err != nil {
+		t.Errorf("Dragonwilds refused a backup: %v", err)
 	}
 }
 

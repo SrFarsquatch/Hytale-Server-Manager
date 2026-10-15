@@ -100,10 +100,10 @@ func TestHytaleOnlyEndpointsRejectOtherGames(t *testing.T) {
 	}{
 		{"GET", "/api/mods", "mc", ""},
 		{"DELETE", "/api/mods/example.jar", "mc", ""},
-		{"GET", "/api/backups", "dw", ""},
 		{"POST", "/api/backups/native", "mc", ""},
-		{"POST", "/api/backups/snapshot", "dw", ""},
-		{"POST", "/api/backups/snapshot-1.tar.gz/restore", "dw", ""},
+		{"POST", "/api/backups/native", "dw", ""},
+		{"GET", "/api/worlds", "mc", ""},
+		{"POST", "/api/worlds/new", "mc", `{"name":"x"}`},
 		{"POST", "/api/auth/device", "mc", ""},
 		{"POST", "/api/update/apply", "dw", ""},
 		{"GET", "/api/server/file/config.json", "mc", ""},

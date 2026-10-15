@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#151a24">
   <title>HSM · Game Server Control Panel</title>
-  <link rel="stylesheet" href="/app.css?v=20261016-mcports1">
+  <link rel="stylesheet" href="/app.css?v=20261016-worlds1">
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -116,6 +116,7 @@
             <button type="button" data-view-tab="console"><svg class="icon"><use href="#i-terminal"/></svg>Console</button>
             <button type="button" data-view-tab="config"><svg class="icon"><use href="#i-folder"/></svg>Files</button>
             <button type="button" data-view-tab="mods"><svg class="icon"><use href="#i-puzzle"/></svg><span id="mods-tab-label">Mods</span></button>
+            <button type="button" data-view-tab="worlds"><svg class="icon"><use href="#i-globe"/></svg>Worlds</button>
             <button type="button" data-view-tab="backups"><svg class="icon"><use href="#i-archive"/></svg>Backups</button>
             <button type="button" data-view-tab="schedules"><svg class="icon"><use href="#i-clock"/></svg>Schedules</button>
             <button type="button" data-view-tab="setup"><svg class="icon"><use href="#i-download"/></svg>Install</button>
@@ -263,6 +264,33 @@
           <section class="card"><div class="card-head"><div><h3 id="mods-title">Mods</h3><p class="muted small" id="mods-help">Installed for the selected server only.</p></div><label class="btn primary small file-btn"><svg class="icon"><use href="#i-plus"/></svg><span id="mods-add-label">Add mod</span><input type="file" id="mod-file" accept=".jar,.zip"></label></div><div id="mods-list" class="file-list empty-state">No mods installed.</div></section>
         </section>
 
+        <section id="view-worlds" class="view">
+          <div id="worlds-running" class="notice warning hidden"><svg class="icon"><use href="#i-alert"/></svg><span><b>Stop the server to change worlds.</b> The game rewrites its saves while it runs, so uploads and switching are disabled until it stops.</span></div>
+          <section class="card">
+            <div class="card-head"><div><h3>Worlds</h3><p class="muted small" id="worlds-help">The server loads the newest save when it starts. If there is none, it creates a new Standard world.</p></div>
+              <label class="btn primary small file-btn" id="world-upload-btn"><svg class="icon"><use href="#i-cloud"/></svg>Upload world<input type="file" id="world-file" accept=".sav,.backup" multiple></label></div>
+            <div id="world-list" class="schedule-list"><div class="empty-state">Loading worlds…</div></div>
+            <p class="muted small">Upload a world's <code>.sav</code> file, and its <code>.backup</code> file if you have it, from <code>%LOCALAPPDATA%\RSDragonwilds\Saved\SaveGames</code> on the PC where it was played. Load it in single player and exit cleanly first so the save is current. Characters are stored separately and do not come with the world. A world with the same name is moved to world backups first.</p>
+          </section>
+          <section class="card">
+            <div class="card-head"><div><h3>Start a new world</h3><p class="muted small">Moves every current save to world backups. The next start creates a new Standard world with this name.</p></div></div>
+            <div class="inline-fields"><input id="new-world-name" maxlength="32" placeholder="World name"><button type="button" class="btn" id="new-world-btn">Start new world</button></div>
+          </section>
+          <section class="card">
+            <div class="card-head"><div><h3>World rules and players</h3></div></div>
+            <ul class="muted small world-tips">
+              <li><b>World type and rules</b> (Standard, Custom or Creative, and their settings) are stored inside the save. To use custom rules, create the world in the game with the settings you want, then upload its save here.</li>
+              <li><b>In game</b>, anyone who enters the admin password from Settings opens <b>Settings → Server Management</b> to manage the running server and its players.</li>
+              <li><b>Players</b> find the server under Worlds → Public by searching for the exact default world name, including capitals. A world password (Settings) limits who can join.</li>
+              <li><b>Backups</b>: the Backups tab takes snapshots of all saves and the game's config while the server is stopped.</li>
+            </ul>
+          </section>
+          <section class="card" id="world-archive-card">
+            <div class="card-head"><div><h3>World backups</h3><p class="muted small">Saves replaced, removed or moved aside by HSM. Restore one to use it again.</p></div></div>
+            <div id="world-archives" class="schedule-list"></div>
+          </section>
+        </section>
+
         <section id="view-backups" class="view">
           <section class="card" id="backup-schedule-card">
             <div class="card-head"><div><h3>Schedule &amp; retention</h3><p class="muted small" id="backup-schedule-help">How often Hytale makes automatic backups and how many copies to keep. Oldest automatic backups are removed first.</p></div><button type="button" class="btn primary small" id="save-backup-settings">Save</button></div>
@@ -324,8 +352,7 @@
                 <summary>World saves, discovery and troubleshooting</summary>
                 <div>
                   <p><b>Finding the server:</b> In Dragonwilds, open Worlds → Public and search for the exact default world name. Search is case-sensitive. Keep the server and game client on matching versions.</p>
-                  <p><b>New worlds:</b> If <code>RSDragonwilds/Saved/Savegames</code> has no <code>.sav</code> file, the game creates a new Standard world. World difficulty and custom gameplay sliders live in the world save, not in the five documented dedicated-server settings.</p>
-                  <p><b>Importing a world:</b> Stop the server first, back up the server's <code>RSDragonwilds/Saved/Savegames</code> directory, then copy your chosen <code>.sav</code> into that folder. Start the server and search using the world name shown by the save. Never replace saves without a backup.</p>
+                  <p><b>Worlds:</b> Use the <b>Worlds</b> tab to upload a save from your PC, choose which world loads, start a new world, or restore an older one. The server loads the newest save; with none, it creates a new Standard world named after the default world name.</p>
                   <p><b>Logs:</b> <code>RSDragonwilds/Saved/Logs/RSDragonwilds.log</code>. HSM's Console also shows server and SteamCMD output.</p>
                   <p><b>Config:</b> HSM writes <code>DedicatedServer.ini</code> under the Linux config directories before launch. Stop the server before making manual edits; the game may discard INI changes made while it is running.</p>
                 </div>
@@ -471,6 +498,6 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/app.js?v=20261016-mcports1"></script>
+  <script src="/app.js?v=20261016-worlds1"></script>
 </body>
 </html>
