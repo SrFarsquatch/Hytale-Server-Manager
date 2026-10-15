@@ -82,7 +82,7 @@ Restoring a snapshot first saves a safety copy, then replaces the world and sett
 ## Run with Docker Compose
 
 ```bash
-git clone https://github.com/SrFarsquatch/Hytale-Server-Manager.git realmkeeper
+git clone https://github.com/SrFarsquatch/realmkeeper.git
 cd realmkeeper
 ./install.sh
 ```

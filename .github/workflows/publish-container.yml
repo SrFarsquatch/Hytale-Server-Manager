@@ -44,7 +44,7 @@ jobs:
             ghcr.io/srfarsquatch/hytale-server-manager:${{ github.ref_name }}
             ghcr.io/srfarsquatch/hytale-server-manager:latest
           labels: |
-            org.opencontainers.image.source=https://github.com/SrFarsquatch/Hytale-Server-Manager
+            org.opencontainers.image.source=https://github.com/SrFarsquatch/realmkeeper
             org.opencontainers.image.version=${{ github.ref_name }}
 
       - name: Publish GitHub Release
