@@ -148,6 +148,8 @@ func (a *App) routes(mux *http.ServeMux) {
 	mux.Handle("POST /api/install/dragonwilds", a.auth(http.HandlerFunc(a.handleDragonwildsInstall)))
 	mux.Handle("POST /api/install/minecraft", a.auth(http.HandlerFunc(a.handleMinecraftInstall)))
 	mux.Handle("POST /api/install/terraria", a.auth(http.HandlerFunc(a.handleTerrariaInstall)))
+	mux.Handle("GET /api/servers/{id}/export", a.auth(http.HandlerFunc(a.handleServerExport)))
+	mux.Handle("POST /api/servers/import", a.auth(http.HandlerFunc(a.handleServerImport)))
 	mux.Handle("GET /api/worlds", a.auth(http.HandlerFunc(a.handleWorldsList)))
 	mux.Handle("POST /api/worlds/upload", a.auth(http.HandlerFunc(a.handleWorldUpload)))
 	mux.Handle("POST /api/worlds/use", a.auth(http.HandlerFunc(a.handleWorldUse)))

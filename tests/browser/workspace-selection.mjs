@@ -438,6 +438,23 @@ try {
     assert.equal(settings.dragonwildsWorldName, 'Fresh Start');
   });
 
+  await check('a server can be exported and imported as a copy', async () => {
+    await select('charlie-dragonwilds');
+    await waitForName('Charlie Dragonwilds');
+    await page.click('[data-view-tab="settings"]');
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }), page.click('#export-server')]);
+    assert.match(download.suggestedFilename(), /^hsm-charlie-dragonwilds-.*\.tar\.gz$/);
+    const file = await download.path();
+    await page.click('#back-to-servers').catch(() => page.click('[data-view="servers"]'));
+    await page.waitForSelector('[data-import-server]:visible', { timeout: 5000 });
+    await page.setInputFiles('#import-file', file);
+    await page.waitForFunction(() => document.querySelectorAll('[data-select-server^="charlie-dragonwilds-"]').length === 1, null, { timeout: 10000 });
+    const servers = await call('GET', '/api/servers');
+    const copy = servers.find(s => s.id.startsWith('charlie-dragonwilds-'));
+    assert.ok(copy && copy.port !== servers.find(s => s.id === 'charlie-dragonwilds').port, 'the copy gets its own port');
+    await call('DELETE', '/api/servers/' + copy.id);
+  });
+
   await check('the wizard applies each game\'s rules', async () => {
     await page.click('#add-server-side');
     await page.click('[data-game-choice="terraria"]');
