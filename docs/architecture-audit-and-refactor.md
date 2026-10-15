@@ -8,8 +8,8 @@ This is an incremental refactor. Hytale is the compatibility baseline: existing 
 
 ## Baseline findings
 
-- The application entry point and much of the domain/HTTP layer are concentrated in `cmd/hsm/main.go`, while the existing `cmd/hsm/game_adapter.go` already provides a first adapter seam for launch preparation. The seam is incomplete: `ServerManager.Installed`, `ServerManager.Start`, and `ServerManager.Stop` still branch on game type, so the supervisor is not yet game-neutral.
-- The UI is embedded from `cmd/hsm/web/*`; edits to the frontend must continue to be shipped in the application image, and cache keys must be bumped when static assets change.
+- The application entry point and much of the domain/HTTP layer are concentrated in `cmd/realmkeeper/main.go`, while the existing `cmd/realmkeeper/game_adapter.go` already provides a first adapter seam for launch preparation. The seam is incomplete: `ServerManager.Installed`, `ServerManager.Start`, and `ServerManager.Stop` still branch on game type, so the supervisor is not yet game-neutral.
+- The UI is embedded from `cmd/realmkeeper/web/*`; edits to the frontend must continue to be shipped in the application image, and cache keys must be bumped when static assets change.
 - Server identity is passed to APIs using `X-HSM-Server`. The frontend keeps selected-server state and uses asynchronous API calls, so selection changes must be treated as a concurrency boundary.
 - The README describes Hytale-specific behavior and legacy data migration. That behavior is a compatibility contract, not disposable scaffolding.
 - The current Go module declaration is `github.com/example/hytale-server-manager`, which does not match the public repository path. Before changing it, search all Go files and workflows for imports or scripts that depend on the old module path.

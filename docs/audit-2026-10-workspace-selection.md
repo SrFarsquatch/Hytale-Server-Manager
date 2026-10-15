@@ -60,9 +60,9 @@ installers and lifecycles. All of these are backed by real endpoints and unit te
 
 ## 5. Milestone 1 changes (this branch)
 
-- `cmd/hsm/games.go`: the catalog is now the single source of truth for per-game capabilities (`consoleCommands`, `configFiles`, `deviceAuth`, `gameUpdates`, protocol). `requireCapability` returns 409 for unsupported features.
-- `cmd/hsm/main.go`: capabilities and protocol added to each `/api/servers` entry (additive). Enforcement on console, mods, backups/snapshots, config files, update/auth shortcuts and players. Hytale installers reject other games. The server-ID fallback is limited to single-server installs.
-- `cmd/hsm/web/app.js`: one `setSelectedServer()` transition used by every flow. It aborts in-flight reads (`AbortController`), bumps a generation counter, closes SSE and clears all server-scoped state and DOM. Reads use a selection context and discard stale responses. Mutations pass the server ID captured when the user acted. Settings and status failures show a persistent error with Retry. Log streaming is SSE-first with a de-duplicated resync, and polling is used only while disconnected. Workspace tabs and controls come from backend capabilities.
+- `cmd/realmkeeper/games.go`: the catalog is now the single source of truth for per-game capabilities (`consoleCommands`, `configFiles`, `deviceAuth`, `gameUpdates`, protocol). `requireCapability` returns 409 for unsupported features.
+- `cmd/realmkeeper/main.go`: capabilities and protocol added to each `/api/servers` entry (additive). Enforcement on console, mods, backups/snapshots, config files, update/auth shortcuts and players. Hytale installers reject other games. The server-ID fallback is limited to single-server installs.
+- `cmd/realmkeeper/web/app.js`: one `setSelectedServer()` transition used by every flow. It aborts in-flight reads (`AbortController`), bumps a generation counter, closes SSE and clears all server-scoped state and DOM. Reads use a selection context and discard stale responses. Mutations pass the server ID captured when the user acted. Settings and status failures show a persistent error with Retry. Log streaming is SSE-first with a de-duplicated resync, and polling is used only while disconnected. Workspace tabs and controls come from backend capabilities.
 - `index.html` / `panel-redesign.css`: error banner, config editor panel id, overview visibility fix, cache keys bumped.
 - CI: ESLint `no-undef` check on `app.js`. This class of bug (defect #1) passed `node --check`.
 

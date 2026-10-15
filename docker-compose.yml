@@ -1,10 +1,10 @@
-name: hytale-server-manager
+name: realmkeeper
 services:
   manager:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: hytale-server-manager
+    container_name: realmkeeper
     restart: unless-stopped
     # Hytale OAuth/device authentication needs working DNS inside this container.
     # The server processes are launched by the manager, so this resolver config
@@ -43,11 +43,11 @@ services:
       - ./data:/data
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      HSM_DATA_DIR: /data
-      HSM_LISTEN: ":8008"
-      HSM_GAME_PORT_START: "5520"
-      HSM_GAME_PORT_END: "5525"
-      HSM_MINECRAFT_PORT_START: "25565"
-      HSM_MINECRAFT_PORT_END: "25570"
+      REALMKEEPER_DATA_DIR: /data
+      REALMKEEPER_LISTEN: ":8008"
+      REALMKEEPER_GAME_PORT_START: "5520"
+      REALMKEEPER_GAME_PORT_END: "5525"
+      REALMKEEPER_MINECRAFT_PORT_START: "25565"
+      REALMKEEPER_MINECRAFT_PORT_END: "25570"
       TZ: America/Vancouver
     stop_grace_period: 100s

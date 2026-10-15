@@ -1,3 +1,3 @@
-module github.com/example/hytale-server-manager
+module github.com/srfarsquatch/realmkeeper
 
 go 1.23

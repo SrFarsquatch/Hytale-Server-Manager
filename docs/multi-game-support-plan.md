@@ -23,7 +23,7 @@
 
 ## Repository baseline
 
-The current project is a Go application built from `cmd/hsm`, with its HTTP API and server management implementation concentrated in `cmd/hsm/main.go`. The frontend is embedded with `//go:embed web/*`. Existing server records use `ServerSettings` and are persisted in the controller configuration. Hytale-specific assumptions appear in defaults, config editing, JVM options, installation/download flows, server startup, mods, and backups.
+The current project is a Go application built from `cmd/hsm`, with its HTTP API and server management implementation concentrated in `cmd/realmkeeper/main.go`. The frontend is embedded with `//go:embed web/*`. Existing server records use `ServerSettings` and are persisted in the controller configuration. Hytale-specific assumptions appear in defaults, config editing, JVM options, installation/download flows, server startup, mods, and backups.
 
 The Docker image currently builds the Go binary and runs it in a container with persistent `/data`. CasaOS uses the same application image. The first migration must therefore avoid moving the entry point, changing the volume layout, or making a new runtime dependency mandatory.
 
@@ -135,7 +135,7 @@ Represent unsupported capabilities explicitly. The UI must not show a nonfunctio
 - Multiple Hytale servers still start, stop, restart, and select correctly.
 - Hytale downloader/import, console, configuration, mods, backups, snapshots, and updater behavior remain intact.
 - Unsupported capabilities are not presented as working features.
-- `go test ./...`, `go vet ./...`, and `go build ./cmd/hsm` pass.
+- `go test ./...`, `go vet ./...`, and `go build ./cmd/realmkeeper` pass.
 - Docker/CasaOS persistent data remains mounted at the same path and survives an application update/rollback.
 
 ## Risks and mitigations

@@ -22,7 +22,7 @@ jobs:
       - name: Run tests
         run: go test ./...
       - name: Check browser JavaScript syntax
-        run: node --check cmd/hsm/web/app.js
+        run: node --check cmd/realmkeeper/web/app.js
       - name: Check browser JavaScript for undefined names
         # A call to an undefined function only fails at runtime, after the UI has
         # partly updated; catch it before release.
@@ -31,17 +31,17 @@ jobs:
           --rule '{"no-undef":"error"}'
           --parser-options ecmaVersion:2022
           --global document,window,localStorage,fetch,EventSource,FormData,AbortController,location,navigator,confirm,prompt,setTimeout,clearTimeout,setInterval,clearInterval,URL,Option,console
-          cmd/hsm/web/app.js
+          cmd/realmkeeper/web/app.js
       - name: Run vet
         run: go vet ./...
       - name: Build application
-        run: go build -trimpath -o /tmp/hytale-server-manager ./cmd/hsm
+        run: go build -trimpath -o /tmp/realmkeeper ./cmd/realmkeeper
       - name: Validate Compose configurations
         run: |
           docker compose -f docker-compose.yml config -q
           docker compose -f docker-compose.casaos.yml config -q
       - name: Build Docker image
-        run: docker build --build-arg APP_VERSION=0.6.0 -t hytale-server-manager:ci .
+        run: docker build --build-arg APP_VERSION=0.6.0 -t realmkeeper:ci .
   browser:
     # Drives the real binary in Chromium: server switching, stale responses,
     # console streaming, capability-gated tabs, mobile drawer and secrets.
@@ -55,7 +55,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Build application
-        run: go build -trimpath -o /tmp/hsm ./cmd/hsm
+        run: go build -trimpath -o /tmp/realmkeeper ./cmd/realmkeeper
       - name: Install Playwright and Chromium
         run: |
           npm install --no-save --prefix /tmp/pw playwright@1.56.1
@@ -63,4 +63,4 @@ jobs:
       - name: Run browser regression test
         env:
           PLAYWRIGHT_MODULE: /tmp/pw/node_modules/playwright/index.mjs
-        run: node tests/browser/workspace-selection.mjs /tmp/hsm
+        run: node tests/browser/workspace-selection.mjs /tmp/realmkeeper
