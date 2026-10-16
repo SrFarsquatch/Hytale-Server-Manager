@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -251,27 +252,67 @@ func (a *App) applyHytaleConfig(s ServerSettings) error {
 	if err != nil {
 		return err
 	}
-	var cfg map[string]any
-	if err := json.Unmarshal(b, &cfg); err != nil {
+	out, err := patchHytaleConfig(b, s)
+	if err != nil {
 		return fmt.Errorf("invalid config.json: %w", err)
 	}
-	cfg["ServerName"] = s.ServerName
-	cfg["Port"] = s.Port
-	cfg["MOTD"] = s.MOTD
-	cfg["Password"] = s.Password
-	cfg["MaxPlayers"] = s.MaxPlayers
-	cfg["RequireJoinPermission"] = s.WhitelistEnabled
-	defaults, ok := cfg["Defaults"].(map[string]any)
-	if !ok {
-		defaults = map[string]any{}
-		cfg["Defaults"] = defaults
-	}
-	defaults["GameMode"] = s.GameMode
-	out, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return err
+	if bytes.Equal(out, b) {
+		return nil // already current; leave the game's file untouched
 	}
 	return atomicWrite(path, out, 0644)
+}
+
+// patchHytaleConfig sets the values Realmkeeper manages in an existing
+// config.json and keeps every other byte, including the sections the game
+// writes itself (such as its backup settings), exactly as they were.
+func patchHytaleConfig(b []byte, s ServerSettings) ([]byte, error) {
+	if !json.Valid(b) {
+		return nil, errors.New("the file is not valid JSON")
+	}
+	out := b
+	var err error
+	for _, m := range []struct {
+		key   string
+		value any
+	}{
+		{"ServerName", s.ServerName}, {"Port", s.Port}, {"MOTD", s.MOTD}, {"Password", s.Password},
+		{"MaxPlayers", s.MaxPlayers}, {"RequireJoinPermission", s.WhitelistEnabled},
+	} {
+		if out, err = setHytaleConfigValue(out, m.key, m.value); err != nil {
+			return nil, err
+		}
+	}
+	defaults, err := jsonMember(out, "Defaults")
+	if err != nil {
+		return nil, err
+	}
+	if len(defaults) == 0 || defaults[0] != '{' {
+		defaults = []byte("{}")
+	}
+	if defaults, err = setHytaleConfigValue(defaults, "GameMode", s.GameMode); err != nil {
+		return nil, err
+	}
+	return setJSONMemberRaw(out, "Defaults", defaults)
+}
+
+// setHytaleConfigValue sets a member unless it already holds that value, so
+// an unchanged file is not rewritten (a number spelled 20.0 stays as it is).
+func setHytaleConfigValue(doc []byte, key string, value any) ([]byte, error) {
+	current, err := jsonMember(doc, key)
+	if err != nil {
+		return nil, err
+	}
+	if current != nil {
+		want, err := encodeJSONValue(value)
+		if err != nil {
+			return nil, err
+		}
+		var a, b any
+		if json.Unmarshal(current, &a) == nil && json.Unmarshal(want, &b) == nil && fmt.Sprint(a) == fmt.Sprint(b) {
+			return doc, nil
+		}
+	}
+	return setJSONMember(doc, key, value)
 }
 
 func (a *App) writeJVMOptionsFor(s ServerSettings) error {
