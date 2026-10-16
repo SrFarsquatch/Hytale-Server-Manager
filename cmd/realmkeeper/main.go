@@ -56,13 +56,7 @@ func main() {
 	go app.backupMaintenanceLoop()
 	go app.schedulerLoop()
 	go app.watchPublishedPorts()
-	// Remove finished self-update helper containers. The helper is usually
-	// still exiting when the new manager starts, so check again shortly after.
-	go func() {
-		cleanupUpdateHelpers()
-		time.Sleep(2 * time.Minute)
-		cleanupUpdateHelpers()
-	}()
+	go cleanupUpdateHelpersLoop()
 
 	mux := http.NewServeMux()
 	app.routes(mux)
