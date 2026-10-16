@@ -129,11 +129,13 @@ func (a *App) handleAppUpdateApply(w http.ResponseWriter, r *http.Request) {
 	}
 	targetImage := containerImage + ":latest"
 	setUpdateState("updating", "Starting the updater helper. The dashboard will briefly reconnect when the new version starts.", info.LatestVersion)
-	if err := launchUpdateHelper(containerID, targetImage); err != nil {
+	helperID, err := launchUpdateHelper(containerID, targetImage)
+	if err != nil {
 		setUpdateState("failed", err.Error(), "")
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	go watchUpdateHelper(newDockerAPI(), helperID, 3*time.Second)
 	jsonOut(w, http.StatusAccepted, map[string]any{
 		"ok":            true,
 		"status":        "updating",
@@ -223,6 +225,13 @@ func compareVersions(a, b string) int {
 		return 1
 	}
 	return -1
+}
+
+// handleAppUpdateStatus reports an update's progress without asking GitHub,
+// so the page can poll it while an update runs.
+func (a *App) handleAppUpdateStatus(w http.ResponseWriter, r *http.Request) {
+	status, message, target := updateState.snapshot(time.Now())
+	jsonOut(w, http.StatusOK, map[string]any{"status": status, "message": message, "targetVersion": target, "currentVersion": version})
 }
 
 func setUpdateState(status, message, target string) {
@@ -369,23 +378,23 @@ func (d *dockerAPI) call(ctx context.Context, method, endpoint string, body any,
 	return nil, fmt.Errorf("Docker API %s %s returned HTTP %d: %s", method, endpoint, resp.StatusCode, payload.Message)
 }
 
-func launchUpdateHelper(containerID, targetImage string) error {
+func launchUpdateHelper(containerID, targetImage string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	d := newDockerAPI()
 	inspectBytes, err := d.call(ctx, http.MethodGet, "/containers/"+url.PathEscape(containerID)+"/json", nil, http.StatusOK)
 	if err != nil {
-		return fmt.Errorf("inspect current container: %w", err)
+		return "", fmt.Errorf("inspect current container: %w", err)
 	}
 	var inspect struct {
 		Config map[string]any `json:"Config"`
 		Image  string         `json:"Image"`
 	}
 	if err := json.Unmarshal(inspectBytes, &inspect); err != nil {
-		return err
+		return "", err
 	}
 	if inspect.Image == "" {
-		return errors.New("Docker did not report the current application image")
+		return "", errors.New("Docker did not report the current application image")
 	}
 	hostConfig := map[string]any{
 		"Binds":         []string{dockerSocketPath + ":" + dockerSocketPath},
@@ -399,27 +408,33 @@ func launchUpdateHelper(containerID, targetImage string) error {
 		}
 	}
 	name := "hsm-update-helper-" + strconv.FormatInt(time.Now().Unix(), 10)
+	// The helper runs the binary directly as root rather than through the
+	// image's entrypoint (tini, then gosu to the unprivileged user): it needs
+	// only the Docker socket, and the entrypoint's /data and group setup is
+	// for the manager.
 	createBody := map[string]any{
 		"Image":      inspect.Image,
-		"Cmd":        []string{"/usr/local/bin/realmkeeper", "--update-helper"},
+		"Entrypoint": []string{"/usr/local/bin/realmkeeper"},
+		"Cmd":        []string{"--update-helper"},
+		"User":       "0:0",
 		"Env":        []string{"REALMKEEPER_UPDATE_CONTAINER_ID=" + containerID, "REALMKEEPER_UPDATE_TARGET_IMAGE=" + targetImage},
 		"HostConfig": hostConfig,
 	}
 	createBytes, err := d.call(ctx, http.MethodPost, "/containers/create?name="+url.QueryEscape(name), createBody, http.StatusCreated)
 	if err != nil {
-		return fmt.Errorf("create updater helper: %w", err)
+		return "", fmt.Errorf("create updater helper: %w", err)
 	}
 	var created struct {
 		ID string `json:"Id"`
 	}
 	if err := json.Unmarshal(createBytes, &created); err != nil || created.ID == "" {
-		return errors.New("Docker created the updater helper but returned no container ID")
+		return "", errors.New("Docker created the updater helper but returned no container ID")
 	}
 	if _, err := d.call(ctx, http.MethodPost, "/containers/"+created.ID+"/start", nil, http.StatusNoContent, http.StatusNotModified); err != nil {
 		_, _ = d.call(context.Background(), http.MethodDelete, "/containers/"+created.ID+"?force=true&v=true", nil, http.StatusNoContent)
-		return fmt.Errorf("start updater helper: %w", err)
+		return "", fmt.Errorf("start updater helper: %w", err)
 	}
-	return nil
+	return created.ID, nil
 }
 
 func runUpdateHelper() {
@@ -432,7 +447,7 @@ func runUpdateHelper() {
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Minute)
 	defer cancel()
 	if err := performContainerUpdate(ctx, containerID, targetImage); err != nil {
-		fmt.Fprintln(os.Stderr, "application update failed:", err)
+		fmt.Println("Update failed:", err)
 		os.Exit(1)
 	}
 }
@@ -449,27 +464,17 @@ func performContainerUpdate(ctx context.Context, containerID, targetImage string
 	if !hasTag || repo != containerImage {
 		return errors.New("invalid target image")
 	}
+	helperLog("Downloading " + targetImage + "…")
 	resp, err := d.request(ctx, http.MethodPost, "/images/create?fromImage="+url.QueryEscape(repo)+"&tag="+url.QueryEscape(tag), nil)
 	if err != nil {
 		return fmt.Errorf("pull release image: %w", err)
 	}
-	pullLog, readErr := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
+	err = readPullProgress(resp)
 	resp.Body.Close()
-	if readErr != nil {
-		return readErr
+	if err != nil {
+		return err
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("pull release image returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(pullLog)))
-	}
-	for _, line := range bytes.Split(pullLog, []byte("\n")) {
-		var item struct {
-			Error string `json:"error"`
-		}
-		_ = json.Unmarshal(line, &item)
-		if item.Error != "" {
-			return fmt.Errorf("pull release image failed: %s", item.Error)
-		}
-	}
+	helperLog("Download complete")
 
 	inspectBytes, err := d.call(ctx, http.MethodGet, "/containers/"+url.PathEscape(containerID)+"/json", nil, http.StatusOK)
 	if err != nil {
@@ -528,6 +533,7 @@ func performContainerUpdate(ctx context.Context, containerID, targetImage string
 		shortID = shortID[:12]
 	}
 	oldName := "hsm-rollback-" + shortID
+	helperLog("Stopping the current manager…")
 	if _, err := d.call(ctx, http.MethodPost, "/containers/"+url.PathEscape(containerID)+"/stop?t=30", nil, http.StatusNoContent, http.StatusNotModified); err != nil {
 		return fmt.Errorf("stop current manager: %w", err)
 	}
@@ -535,6 +541,7 @@ func performContainerUpdate(ctx context.Context, containerID, targetImage string
 		_, _ = d.call(context.Background(), http.MethodPost, "/containers/"+url.PathEscape(containerID)+"/start", nil, http.StatusNoContent, http.StatusNotModified)
 		return fmt.Errorf("stage previous container for rollback: %w", err)
 	}
+	helperLog("Starting the new version…")
 	newBytes, err := d.call(ctx, http.MethodPost, "/containers/create?name="+url.QueryEscape(name), createBody, http.StatusCreated)
 	if err != nil {
 		rollbackOldContainer(d, containerID, oldName, name)
@@ -554,7 +561,43 @@ func performContainerUpdate(ctx context.Context, containerID, targetImage string
 	}
 	// The new version is running with the old container's mounts, ports and restart policy.
 	_, _ = d.call(context.Background(), http.MethodDelete, "/containers/"+url.PathEscape(containerID)+"?force=true&v=true", nil, http.StatusNoContent)
+	helperLog("Update complete")
 	return nil
+}
+
+// helperLog writes a progress line to the helper's output, which the
+// manager reads from the container log to show progress and failures.
+func helperLog(line string) { fmt.Println(line) }
+
+// readPullProgress reads Docker's pull progress stream to the end (closing
+// it early cancels the pull) and returns the first error it reports.
+func readPullProgress(resp *http.Response) error {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+		return fmt.Errorf("pull release image returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
+	}
+	dec := json.NewDecoder(resp.Body)
+	for {
+		var item struct {
+			Status string `json:"status"`
+			ID     string `json:"id"`
+			Error  string `json:"error"`
+		}
+		err := dec.Decode(&item)
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("read pull progress: %w", err)
+		}
+		if item.Error != "" {
+			return fmt.Errorf("pull release image failed: %s", item.Error)
+		}
+		// Per-layer lines carry an ID; only the overall ones are worth showing.
+		if item.ID == "" && item.Status != "" {
+			helperLog(item.Status)
+		}
+	}
 }
 
 func rollbackOldContainer(d *dockerAPI, oldID, oldName, originalName string) {
