@@ -93,6 +93,7 @@ func main() {
 func (a *App) routes(mux *http.ServeMux) {
 	mux.Handle("GET /api/app-update", a.auth(http.HandlerFunc(a.handleAppUpdateCheck)))
 	mux.Handle("POST /api/app-update", a.auth(http.HandlerFunc(a.handleAppUpdateApply)))
+	mux.Handle("GET /api/app-update/status", a.auth(http.HandlerFunc(a.handleAppUpdateStatus)))
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		jsonOut(w, 200, map[string]any{"ok": true, "version": version})
 	})
